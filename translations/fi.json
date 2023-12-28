@@ -1,0 +1,61 @@
+{
+  "config": {
+    "error": {
+      "connection_problem": "Datan haku epäonnistui",
+      "unknown": "Tuntematon virhe"
+    },
+    "abort": {
+      "already_configured": "Tämä yhdistelmä on jo käytössä"
+    },
+    "step": {
+      "user": {
+        "title": "FMI data",
+        "description": "Integraation asetukset",
+        "data": {
+          "label": "Sensorin nimi",
+          "sensor_type": "Sensorin tyyppi",
+          "fmisid": "Kohdesijainnin tunniste (FMISID)"
+        }
+      },
+      "forecast": {
+        "title": "FMI ennuste",
+        "description": "Ennusteasetukset",
+        "data": {
+          "step": "Aikaväli kahden mitta-arvon välillä minuuteissa",
+          "forecast_hours": "Näytettävien tuntien määrä",
+          "forecast_past_hours": "Näytettävä historia tunneissa"
+        }
+      }
+    }
+  },
+  "options": {
+    "error": {
+      "connection_problem": "Datan haku epäonnistui",
+      "unknown": "Tuntematon virhe"
+    },
+    "step": {
+      "init": {
+        "title": "FMI ennuste",
+        "description": "Ennusteasetukset",
+        "data": {
+          "step": "Aikaväli kahden mitta-arvon välillä minuuteissa",
+          "forecast_hours": "Näytettävien tuntien määrä",
+          "forecast_past_hours": "Näytettävä historia tunneissa"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "UVI": {
+        "name": "UVI"
+      },
+      "Waterlevel": {
+        "name": "Vedenkorkeus"
+      },
+      "Waterlevel forecast": {
+        "name": "Vedenkorkeusennuste"
+      }
+    }
+  }
+}
