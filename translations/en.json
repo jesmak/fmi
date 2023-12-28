@@ -1,0 +1,61 @@
+{
+  "config": {
+    "error": {
+      "connection_problem": "Could not retrieve FMI data",
+      "unknown": "Unknown error occured"
+    },
+    "abort": {
+      "already_configured": "This combination is already configured"
+    },
+    "step": {
+      "user": {
+        "title": "FMI data",
+        "description": "Integration settings",
+        "data": {
+          "label": "Label for this sensor",
+          "sensor_type": "Type of this sensor",
+          "fmisid": "ID of the target location (FMISID)"
+        }
+      },
+      "forecast": {
+        "title": "FMI forecast",
+        "description": "Forecast settings",
+        "data": {
+          "step": "Time step between two values in minutes",
+          "forecast_hours": "Forecast hours to show",
+          "forecast_past_hours": "Forecast history to show (hours)"
+        }
+      }
+    }
+  },
+  "options": {
+    "error": {
+      "connection_problem": "Could not retrieve FMI data",
+      "unknown": "Unknown error occured"
+    },
+    "step": {
+      "init": {
+        "title": "FMI forecast",
+        "description": "Forecast settings",
+        "data": {
+          "step": "Time step between two values in minutes",
+          "forecast_hours": "Forecast hours to show",
+          "forecast_past_hours": "Forecast history to show (hours)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "UVI": {
+        "name": "UVI"
+      },
+      "Waterlevel": {
+        "name": "Waterlevel"
+      },
+      "Waterlevel forecast": {
+        "name": "Waterlevel forecast"
+      }
+    }
+  }
+}
