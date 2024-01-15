@@ -1,60 +1,52 @@
 {
   "config": {
     "error": {
-      "connection_problem": "Could not retrieve FMI data",
+      "connection_problem": "Could not retrieve FMI data (invalid FMISID?)",
       "unknown": "Unknown error occured"
     },
     "abort": {
-      "already_configured": "This combination is already configured"
+      "already_configured": "A configuration with this label already exists"
     },
     "step": {
       "user": {
-        "title": "FMI data",
-        "description": "Integration settings",
+        "title": "FMI integration",
+        "description": "Common settings",
         "data": {
-          "label": "Label for this sensor",
-          "sensor_type": "Type of this sensor",
-          "fmisid": "ID of the target location (FMISID)"
+          "language": "Language used when calling API"
         }
       },
-      "forecast": {
-        "title": "FMI forecast",
-        "description": "Forecast settings",
+      "query": {
+        "title": "FMI integration",
+        "description": "The easiest way to find observation stations that measure the data you are interested in is to use FMI's observation download service: https://en.ilmatieteenlaitos.fi/download-observations. Identifiers of your selected station can most easiest be found here: {url}. For STUK-queries FMISID doesn't work, use for example places-identifier instead.\n\n**Query settings**",
         "data": {
-          "step": "Time step between two values in minutes",
+          "query_label": "Selected query",
+          "target_type": "Observation station identifier type",
+          "target": "Observation station identifier"
+        }
+      },
+      "params": {
+        "title": "FMI integration",
+        "description": "Check the query results ({url}) for parameters that can be used with this query. Parameter names can be found from inside \"BsWfs:ParameterName\"-elements. Parameter descriptions are available here: {param_url}.\n\n**Parameter settings**",
+        "data": {
+          "label": "Name for the sensor created by this integration",
+          "forecast_step": "Time step between two forecast values in minutes",
           "forecast_hours": "Forecast hours to show",
-          "forecast_past_hours": "Forecast history to show (hours)"
+          "forecast_past_hours": "Forecast history to show (hours)",
+          "parameter": "Parameter to return"
         }
       }
     }
   },
   "options": {
-    "error": {
-      "connection_problem": "Could not retrieve FMI data",
-      "unknown": "Unknown error occured"
-    },
     "step": {
       "init": {
         "title": "FMI forecast",
         "description": "Forecast settings",
         "data": {
-          "step": "Time step between two values in minutes",
+          "forecast_step": "Time step between two forecast values in minutes",
           "forecast_hours": "Forecast hours to show",
           "forecast_past_hours": "Forecast history to show (hours)"
         }
-      }
-    }
-  },
-  "entity": {
-    "sensor": {
-      "UVI": {
-        "name": "UVI"
-      },
-      "Waterlevel": {
-        "name": "Waterlevel"
-      },
-      "Waterlevel forecast": {
-        "name": "Waterlevel forecast"
       }
     }
   }

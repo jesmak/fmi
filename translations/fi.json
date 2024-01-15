@@ -1,60 +1,52 @@
 {
   "config": {
     "error": {
-      "connection_problem": "Datan haku epäonnistui",
+      "connection_problem": "Datan haku epäonnistui (virheellinen FMISID?)",
       "unknown": "Tuntematon virhe"
     },
     "abort": {
-      "already_configured": "Tämä yhdistelmä on jo käytössä"
+      "already_configured": "Konfiguraatio samalla otsikolla on jo olemassa"
     },
     "step": {
       "user": {
-        "title": "FMI data",
-        "description": "Integraation asetukset",
+        "title": "FMI integraatio",
+        "description": "Yleiset asetukset",
         "data": {
-          "label": "Sensorin nimi",
-          "sensor_type": "Sensorin tyyppi",
-          "fmisid": "Kohdesijainnin tunniste (FMISID)"
+          "language": "Käytettävä kieli API-kutsuissa"
         }
       },
-      "forecast": {
-        "title": "FMI ennuste",
-        "description": "Ennusteasetukset",
+      "query": {
+        "title": "FMI integraatio",
+        "description": "Säähavaintoasemat jotka mittaavat haluamaasi dataa löydät helpoiten FMI:n latauspalvelusta: https://www.ilmatieteenlaitos.fi/havaintojen-lataus. Valitsemasi aseman tunnisteet löydät helpoiten täältä: {url}. Normaalisti järkevintä on käyttää FMISID:tä. STUK:n kyselyissä FMISID ei toimi vaan on käytettävä esim. place-tyyppiä.\n\n**Kyselyn asetukset**",
         "data": {
-          "step": "Aikaväli kahden mitta-arvon välillä minuuteissa",
-          "forecast_hours": "Näytettävien tuntien määrä",
-          "forecast_past_hours": "Näytettävä historia tunneissa"
+          "query_label": "Valittu kysely",
+          "target_type": "Säähavaintoaseman tunnisteen tyyppi",
+          "target": "Säähavaintoaseman tunniste"
+        }
+      },
+      "params": {
+        "title": "FMI integraatio",
+        "description": "Katso kyselyn tulossivulta ({url}) parametrien nimet joita voi käyttää valitun kyselyn kanssa. Parametrien nimet löydät \"BsWfs:ParameterName\"-elementtien sisältä. Parametrien kuvaukset löydät täältä: {param_url}.\n\n**Parametriasetukset**",
+        "data": {
+          "label": "Integraation luoman anturin nimi",
+          "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
+          "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
+          "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
+          "parameter": "Parametri"
         }
       }
     }
   },
   "options": {
-    "error": {
-      "connection_problem": "Datan haku epäonnistui",
-      "unknown": "Tuntematon virhe"
-    },
     "step": {
       "init": {
-        "title": "FMI ennuste",
+        "title": "FMI integraatio",
         "description": "Ennusteasetukset",
         "data": {
-          "step": "Aikaväli kahden mitta-arvon välillä minuuteissa",
-          "forecast_hours": "Näytettävien tuntien määrä",
-          "forecast_past_hours": "Näytettävä historia tunneissa"
+          "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
+          "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
+          "forecast_past_hours": "Näytettävä ennustehistoria tunneissa"
         }
-      }
-    }
-  },
-  "entity": {
-    "sensor": {
-      "UVI": {
-        "name": "UVI"
-      },
-      "Waterlevel": {
-        "name": "Vedenkorkeus"
-      },
-      "Waterlevel forecast": {
-        "name": "Vedenkorkeusennuste"
       }
     }
   }
