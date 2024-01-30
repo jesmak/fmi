@@ -7,6 +7,13 @@ other weather integrations, such as seawater level, UV-index, snow thickness etc
 
 ## Installation
 
+### With HACS
+
+1. Add this repository to HACS custom repositories
+2. Search for FMI in HACS and install with type integration
+3. Restart Home Assistant
+4. Enter your account credentials and configre other settings as you wish
+
 ### Manual
 
 1. Download source code from latest release tag
@@ -16,46 +23,64 @@ other weather integrations, such as seawater level, UV-index, snow thickness etc
 
 ### Integration settings
 
-| Name        | Type   | Requirement  | Description                                                           | Default    |
-|-------------|--------| ------------ |-----------------------------------------------------------------------|------------|
-| label       | string | **Required** | Label used for this configuration                                     | Empty      |
-| sensor_type | enum   | **Required** | Sensor type selection                                                 | Waterlevel |
-| fmisid      | int    | **Required** | ID of the target location. Check possible values from FMISID section. | 0          |
-| step        | int    | **Required** | Time step between two values in minutes                               | 20         |
-| overlap     | int    | **Required** | Overlap of forecast and observations in minutes                       | 120        |
+Configuring the integration to retrieve query data requires that you know what ID types and values can be used
+for which observation/forecast types. The wizard shows explanations and URLs for each step on how to find out
+the correct values.
 
-### Forecast settings
+## Step 1
 
-If you've selected a forecast type sensor, these are the additional options configurable in the next step.
+| Name        | Type | Requirement  | Description                                                           | Default    |
+|-------------|------| ------------ |-----------------------------------------------------------------------|------------|
+| language    | enum | **Required** | Language selection (eng/fin)                                          | `eng`      |
 
-| Name                | Type | Requirement  | Description                              | Default |
-|---------------------|------| ------------ |------------------------------------------|---------|
-| step                | int  | **Required** | Step between forecast entries in minutes | 30      |
-| forecast_hours      | int  | **Required** | Amount of future hours to show           | 48      |
-| forecast_past_hours | int  | **Required** | Amount of past hours to show             | 5       |
+# Step 2
+
+| Name        | Type   | Requirement  | Description             | Default                           |
+|-------------|--------| ------------ |-------------------------|-----------------------------------|
+| query_label | enum   | **Required** | Chosen query type       | `fmi::observations::wave::simple` |
+| target_type | enum   | **Required** | Type of identifier used | `fmisid`                          |
+| target      | string | **Required** | Identifier value        |                                   |
+
+# Step 3
+
+| Name                | Type   | Requirement  | Description                                                               | Default |
+|---------------------|--------| ------------ |---------------------------------------------------------------------------|---------|
+| label               | string | **Required** | Nane for the created sensor                                               |         |
+| parameter           | string | **Required** | Which parameter from query data to use                                    |         |
+| forecast_step       | int    | **Required** | Step between two values in minutes. Only shown for forecast type queries. | 30      |
+| forecast_hours      | int    | **Required** | How many hours of forecasts to retrieve (starting from current time)      | 36      |
+| forecast_past_hours | int    | **Required** | How many past hours of forecasts to retrieve (starting from current time) | 5       |
+
 
 ### State attributes
 
-For observation sensors, this integration returns current observation value as the sensor state. It also returns the following state attributes.
+All sensors return the following extra attributes.
 
-| Name          | Type          | Description                                                                      |
-|---------------|---------------|----------------------------------------------------------------------------------|
-| sensor_type   | string        | Type of the sensor                                                               |
-| latest_update | date          | Date of the latest observation                                                   |
-| fmisid        | int           | FMISID of the target location                                                    |
+| Name      | Type     | Description                              |
+|-----------|----------|------------------------------------------|
+| latitude  | float    | Latitude of the observation station      |
+| longitude | float    | Longitude of the observation station     |
+| query_id  | string   | Query ID set when configuring the sensor |
+| parameter | string   | Name of the returned parameter           |
 
-For forecast sensors, this integration returns the next forecast entry as the sensor state. It also returns the following state attributes.  
+Additionally, observation type sensors return the following extra attributes.
+Observation type sensors return the latest known value as sensor state.
 
-| Name          | Type          | Description                                                      |
-|---------------|---------------|------------------------------------------------------------------|
-| sensor_type   | string        | Type of the sensor                                               |
-| latest_update | date          | Date of the latest observation                                   |
-| fmisid        | int           | FMISID of the target location                                    |
-| forecast      | [date, float] | An array of forecasted sensor values for the selected location   |    
+| Name   | Type     | Description                     |
+|--------|----------|---------------------------------|
+| time   | datetime | Time of the latest observation  |
+| value  | string   | Value of the latest observation |
+
+Additionally, forecast type sensors return the following extra attributes.
+Forecast type sensors return the next known forecast value as sensor state.
+
+| Name          | Type             | Description                                                       |
+|---------------|------------------|-------------------------------------------------------------------|
+| forecast      | [{date, string}] | List of forecast values as objects containing time and value keys |
 
 ### Usage with apexcharts-card
 
-One use case for this integration could be to show waterlevel values with [apexcharts-card](https://github.com/RomRider/apexcharts-card).
+One example use case for this integration could be to show waterlevel values with [apexcharts-card](https://github.com/RomRider/apexcharts-card).
 
 Below is an example configuration for showing waterlevels (2 days of observations and 2 days of forecasts, 2 hour overlap).
 Same kind of configuration could of course be used for other observation/forecast types aswell.
@@ -90,13 +115,14 @@ series:
     stroke_width: 1
     float_precision: 3
     yaxis_id: waterlevel
-    name: Observerd
+    name: Mitattu
     color: orange
     unit: cm
+    extend_to: now
   - entity: sensor.fmi_waterlevel_forecast_hamina
     data_generator: |
       return entity.attributes.forecast.map((entry) => {
-        return [entry[0], entry[1]];
+        return [entry["time"], entry["value"]];
       });
     stroke_width: 1
     float_precision: 3
@@ -117,146 +143,3 @@ yaxis:
             return value.toFixed(1) + ' cm'; 
           }
 ```
-
-### FMISID
-
-Not every location supports every type of observation or forecast. Below is a list of known supported locations and
-their IDs by type. FMISID information is spread all around FMI documentation, and it's hard to find info on which
-location supports which kind of data. Some information is available for example [here](https://en.ilmatieteenlaitos.fi/open-data-manual-fmi-wfs-services),
-but the documentation is not very comprehensive and it doesn't seem to be very up to date. 
-
-Waterlevel observations and forecasts
-
-| Location                    | FMISID |
-|-----------------------------|--------|
-| Föglö, Degerby              | 134252 |
-| Hamina, Pitäjänsaari        | 134254 |
-| Hanko, Pikku Kolalahti      | 134253 |
-| Helsinki, Kaivopuisto       | 132310 |    
-| Kaskinen, Ådskär            | 134251 |
-| Kemi, Ajos                  | 100539 |
-| Oulu, Toppila               | 134248 |
-| Pietarsaari, Leppäluoto     | 134250 |
-| Pori, Mäntyluoto Kallo      | 134266 |
-| Porvoo, Emäsalo Vaarlahti   | 100669 |
-| Raahe, Lapaluoto            | 100540 |
-| Rauma, Petäjäs              | 134224 |
-| Turku, Ruissalo Saaronniemi | 134225 |
-| Vaasa, Vaskiluoto           | 134223 |
-
-UVI observations
-
-| Location                            | FMISID |
-|-------------------------------------|--------|
-| Helsinki, Kumpula                   | 101004 |
-| Jokioinen, Ilmala                   | 101104 |
-| Jyväskylä, lentoasema               | 101339 |
-| Parainen, Utö                       | 100908 |
-| Sodankylä, Tähtelä                  | 101932 |
-| Sotkamo, Kuolaniemi                 | 101756 |
-| Utsjoki, Kevo                       | 102035 |
-| Vantaa, Helsinki-Vantaan lentoasema | 100968 |
-
-Air quality observations
-
-| Location                     | FMISID |
-|------------------------------|--------|
-| Helsinki, Kumpula            | 101004 |
-| Ilomantsi, Pötsönvaara       | 101649 |
-| Inari, Raja-Jooseppi         | 102009 |
-| Juupajoki, Hyytiälä          | 101317 |
-| Kittilä, Matorova            | 101985 |
-| Kuopio, Puijo                | 101587 |                
-| Kuusamo, Juuma               | 101899 |
-| Muonio, Sammaltunturi        | 101983 |
-| Parainen, Utö                | 100908 |   
-| Sodankylä, Heikinheimo-masto | 101942 |
-| Utsjoki, Kevo                | 102035 |
-| Virolahti, Koivuniemi Ääpälä | 100656 |
-
-Air quality observations (urban)
-
-| Location                              | FMISID |
-|---------------------------------------|--------|
-| Espoo, Leppävaara Läkkisepänkuja      | 100691 |
-| Espoo, Luukki                         | 100723 |
-| Harjavalta, Kaleva                    | 103142 |
-| Harjavalta, Pirkkala                  | 103143 |
-| Heinola, Tiilitehtaankatu             | 105416 |
-| Helsinki, Kallio 2                    | 100662 |
-| Helsinki, Mannerheimintie             | 100742 |
-| Helsinki, Mäkelänkatu                 | 100762 |
-| Helsinki, Tapanila                    | 104074 |
-| Helsinki, Vartiokylä Huivipolku       | 100803 |
-| Hollola, Kuntotie                     | 107623 |
-| Hämeenlinna, Niittykatu               | 103109 |
-| Imatra, Mansikkala                    | 103118 |
-| Imatra, Pelkolan tulliasema Raja      | 103119 |
-| Imatra, Rautionkylä                   | 103121 |
-| Imatra, Teppanala                     | 103122 |
-| Joensuu, Koskikatu 1                  | 103148 |
-| Jyväskylä, Hannikaisenkatu            | 106796 |
-| Jyväskylä, Jyskä                      | 107401 |
-| Jämsä, Seppolantie                    | 103129 |
-| Kaarina, Kaarina                      | 100823 |
-| Kauniainen, Kauniaistentie            | 105405 |
-| Kemi, Biotuotetehdas                  | 107284 |
-| Kokkola, keskusta Pitkänsillankatu    | 103107 |
-| Kokkola, Ykspihlaja                   | 103108 |
-| Kotka, Kirjastotalo                   | 103105 |
-| Kotka, Tiutinen                       | 107622 |
-| Kouvola, Kankaan Koulu                | 104078 |
-| Kouvola, Kuusankoski Urheilukentäntie | 103112 |
-| Kuopio, Haminalahti                   | 100882 |
-| Kuopio, Maaherrankatu                 | 103093 |
-| Kuopio, Niirala                       | 104098 |
-| Kuopio, Savilahti KYS                 | 106954 |
-| Kuopio, Sorsasalo                     | 103094 |
-| Kuopio, Tasavallankatu                | 103095 |
-| Lahti, Laune Pohjoinen Liipolankatu   | 103131 |
-| Lahti, Saimaankatu                    | 103132 |
-| Lahti, Satulakatu                     | 103133 |
-| Lappeenranta, Ihalainen 2             | 107563 |
-| Lappeenranta, Joutsenon keskusta      | 103115 |
-| Lappeenranta, keskusta 4              | 103116 |
-| Lappeenranta, Lauritsala              | 103117 |
-| Lappeenranta, Ojala-Tuomela           | 107379 |
-| Lappeenranta, Pulp                    | 103120 |
-| Lappeenranta, Tirilä Pekkasenkatu     | 103123 |
-| Lohja, Harjula                        | 107147 |
-| Luoto, Vikarholmen                    | 103153 |
-| Naantali, keskusta Asematori          | 100824 |
-| Oulu, keskusta 2                      | 103125 |
-| Oulu, Nokela                          | 103124 |
-| Oulu, Pyykösjärvi                     | 103126 |
-| Parainen                              | 104064 |
-| Pietarsaari, Bottenviksvägen          | 103152 |
-| Pori, Paanakedonkatu                  | 106420 |
-| Pori, Pastuskeri                      | 103135 |
-| Porvoo, Mustijoki                     | 103139 |
-| Porvoo, Nyby                          | 103140 |
-| Porvoo, Svartbäck                     | 103141 |
-| Raahe, keskusta                       | 103147 |
-| Raahe, Lapaluoto                      | 103145 |
-| Raisio, Ihala                         | 106630 |
-| Rauma, Sinisaari                      | 778578 |
-| Rauma, Tarvonsaari Hallikatu          | 103113 |
-| Rovaniemi, Rovakatu                   | 103816 |
-| Savonlinna, Olavinkatu                | 104045 |
-| Seinäjoki, Vapaudentie 6a             | 103110 |
-| Siilinjärvi, Sorakuja                 | 104017 |
-| Sotkamo, Terrafame Taattola           | 107992 |
-| Tampere, Epila 2                      | 103096 |
-| Tampere, Kaleva                       | 103097 |
-| Tampere, Linja-autoasema              | 103098 |
-| Tampere, Pirkankatu                   | 103099 |
-| Turku, Kauppatori 2                   | 107569 |
-| Turku, Ruissalo Saarontie             | 100845 |
-| Vaasa, keskusta Vaasanpuistikko       | 103104 |
-| Vaasa, Vesitorni                      | 103103 |
-| Vantaa, Hämeenlinnanväylä             | 104083 |
-| Vantaa, Tikkurila Neilikkatie         | 100763 |
-| Varkaus, Kommila                      | 107382 |
-| Varkaus, Psaari 2                     | 103100 |
-| Varkaus, Taulumäki (toripaviljonki)   | 103102 |
-| Äänekoski, Paloasema                  | 107168 |
