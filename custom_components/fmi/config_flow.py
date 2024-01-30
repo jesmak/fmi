@@ -35,7 +35,7 @@ async def validate_input(hass: HomeAssistant, data: dict[str, any]) -> str:
         params = {"starttime": start_time, "endtime": end_time, "timestep": data.get(CONF_FORECAST_STEP),
                   "storedquery_id": data[CONF_QUERY_ID], data[CONF_TARGET_TYPE]: data[CONF_TARGET],
                   "parameters": data[CONF_PARAMETER]}
-        await hass.async_add_executor_job(api.get_feature, data[CONF_LANG], data[CONF_PARAMETER], params, is_forecast is False)
+        await hass.async_add_executor_job(api.get_feature, data[CONF_LANG], params, data[CONF_PARAMETER], is_forecast is False)
 
     except FMIException:
         raise ConnectionProblem
