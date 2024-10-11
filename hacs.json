@@ -1,5 +1,5 @@
 {
-  "name": "Posti package tracking",
+  "name": "FMI",
   "render_readme": true,
   "iot_class": "cloud_polling"
 }
