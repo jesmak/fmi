@@ -17,7 +17,7 @@
       },
       "query": {
         "title": "FMI integration",
-        "description": "The easiest way to find observation stations that measure the data you are interested in is to use FMI's observation download service: https://en.ilmatieteenlaitos.fi/download-observations. Identifiers of your selected station can most easiest be found here: {url}. For STUK-queries FMISID doesn't work, use for example places-identifier instead.\n\n**Query settings**",
+        "description": "The easiest way to find observation stations that measure the data you are interested in is to use FMI's observation download service: {download_url}. Identifiers of your selected station can most easiest be found here: {url}. For STUK-queries FMISID doesn't work, use for example places-identifier instead.\n\n**Query settings**",
         "data": {
           "query_label": "Selected query",
           "target_type": "Observation station identifier type",

@@ -17,7 +17,7 @@
       },
       "query": {
         "title": "FMI integraatio",
-        "description": "Säähavaintoasemat jotka mittaavat haluamaasi dataa löydät helpoiten FMI:n latauspalvelusta: https://www.ilmatieteenlaitos.fi/havaintojen-lataus. Valitsemasi aseman tunnisteet löydät helpoiten täältä: {url}. Normaalisti järkevintä on käyttää FMISID:tä. STUK:n kyselyissä FMISID ei toimi vaan on käytettävä esim. place-tyyppiä.\n\n**Kyselyn asetukset**",
+        "description": "Säähavaintoasemat jotka mittaavat haluamaasi dataa löydät helpoiten FMI:n latauspalvelusta: {download_url}. Valitsemasi aseman tunnisteet löydät helpoiten täältä: {url}. Normaalisti järkevintä on käyttää FMISID:tä. STUK:n kyselyissä FMISID ei toimi vaan on käytettävä esim. place-tyyppiä.\n\n**Kyselyn asetukset**",
         "data": {
           "query_label": "Valittu kysely",
           "target_type": "Säähavaintoaseman tunnisteen tyyppi",

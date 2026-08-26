@@ -13,7 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (DOMAIN, CONF_LABEL, CONF_LANG, CONF_QUERY_ID, CONF_QUERY_LABEL, CONF_FORECAST_HOURS, CONF_TARGET,
                     CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, LANGUAGES, CONF_PARAMETER, CONF_TARGET_TYPE,
-                    TARGET_TYPES)
+                    TARGET_TYPES, API_DOWNLOAD_OBSERVATIONS_URLS)
 from .session import FMISession, FMIException
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,7 +76,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             })
 
             return self.async_show_form(step_id="query", data_schema=schema, description_placeholders={
-                "url": f"https://opendata.fmi.fi/wfs/{self.data[CONF_LANG]}?request=getFeature&storedquery_id=fmi::ef::stations"})
+                "url": f"https://opendata.fmi.fi/wfs/{self.data[CONF_LANG]}?request=getFeature&storedquery_id=fmi::ef::stations",
+                "download_url": API_DOWNLOAD_OBSERVATIONS_URLS[self.data[CONF_LANG]]})
 
         user_input[CONF_QUERY_ID] = next(
             (query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]).startswith(query[1])), None)

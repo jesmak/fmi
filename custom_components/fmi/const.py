@@ -2,6 +2,10 @@ DOMAIN = "fmi"
 API_DESCRIBE_STORED_QUERIES_URL = "https://opendata.fmi.fi/wfs/${lang}?request=describeStoredQueries"
 API_GET_FEATURE_URL = "https://opendata.fmi.fi/wfs/${lang}?request=getFeature"
 API_GET_PARAMS_URL = "https://opendata.fmi.fi/meta?observableProperty=${property}&language=${lang}"
+API_DOWNLOAD_OBSERVATIONS_URLS = {
+    "eng": "https://en.ilmatieteenlaitos.fi/download-observations",
+    "fin": "https://www.ilmatieteenlaitos.fi/havaintojen-lataus",
+}
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.5249.62 Safari/537.36"
 DEFAULT_SCAN_INTERVAL = 5
 
