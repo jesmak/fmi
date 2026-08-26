@@ -6,6 +6,7 @@ from dateutil.relativedelta import relativedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_QUERY_ID, \
     CONF_LANG, CONF_FORECAST_STEP, CONF_TARGET, CONF_TARGET_TYPE, CONF_PARAMETER
@@ -18,7 +19,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     async def async_update_data():
-        now = datetime.utcnow()
+        now = dt_util.utcnow()
         query_id = str(entry.data[CONF_QUERY_ID])
         is_forecast = "::forecast" in query_id
         start_time = get_start_time(query_id, now, entry.data)
@@ -43,9 +44,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data[DOMAIN][entry.entry_id] = coord
 
+    # The options flow writes the new forecast settings straight into entry.data,
+    # so reload the entry to rebuild the coordinator and the sensor attributes.
+    entry.async_on_unload(entry.add_update_listener(async_update_listener))
+
     await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
 
     return True
+
+
+async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 def get_start_time(query_id: str, now: datetime, data: dict[str, Any]):

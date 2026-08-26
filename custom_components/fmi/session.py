@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC
 from typing import Any
 from xml.etree import ElementTree
 import requests
@@ -66,6 +67,10 @@ class FMISession:
                         continue
 
                     time = isoparse(item.find("./BsWfs:Time", namespaces).text)
+                    if time.tzinfo is None:
+                        # FMI reports UTC; make it explicit so the values stay
+                        # comparable with timezone-aware datetimes downstream.
+                        time = time.replace(tzinfo=UTC)
                     value = item.find("./BsWfs:ParameterValue", namespaces).text
 
                     if value != "NaN":

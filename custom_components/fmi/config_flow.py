@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import homeassistant.helpers.config_validation as cv
@@ -9,6 +9,7 @@ from homeassistant import config_entries
 from homeassistant.core import callback, HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util import dt as dt_util
 
 from .const import (DOMAIN, CONF_LABEL, CONF_LANG, CONF_QUERY_ID, CONF_QUERY_LABEL, CONF_FORECAST_HOURS, CONF_TARGET,
                     CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, LANGUAGES, CONF_PARAMETER, CONF_TARGET_TYPE,
@@ -16,6 +17,9 @@ from .const import (DOMAIN, CONF_LABEL, CONF_LANG, CONF_QUERY_ID, CONF_QUERY_LAB
 from .session import FMISession, FMIException
 
 _LOGGER = logging.getLogger(__name__)
+
+# %%20 renders as a literal "%20" once strftime is done with it.
+API_TIME_FORMAT = '%Y-%m-%d%%20%H:%M:%S'
 
 CONFIGURE_SCHEMA = vol.Schema(
     {
@@ -26,13 +30,14 @@ CONFIGURE_SCHEMA = vol.Schema(
 
 async def validate_input(hass: HomeAssistant, data: dict[str, any]) -> str:
     try:
-        now = datetime.utcnow()
+        now = dt_util.utcnow()
         is_forecast = "::forecast" in str(data[CONF_QUERY_ID])
         start_time = now - timedelta(
             hours=data[CONF_FORECAST_PAST_HOURS]) if is_forecast is True else now - timedelta(hours=1)
         end_time = now + timedelta(hours=data[CONF_FORECAST_HOURS]) if is_forecast is True else now
         api = FMISession()
-        params = {"starttime": start_time, "endtime": end_time, "timestep": data.get(CONF_FORECAST_STEP),
+        params = {"starttime": start_time.strftime(API_TIME_FORMAT), "endtime": end_time.strftime(API_TIME_FORMAT),
+                  "timestep": data.get(CONF_FORECAST_STEP),
                   "storedquery_id": data[CONF_QUERY_ID], data[CONF_TARGET_TYPE]: data[CONF_TARGET],
                   "parameters": data[CONF_PARAMETER]}
         await hass.async_add_executor_job(api.get_feature, data[CONF_LANG], params, data[CONF_PARAMETER], is_forecast is False)
@@ -96,7 +101,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             return self.async_show_form(step_id="params", data_schema=self.param_schema, last_step=True,
                                         description_placeholders={
-                                            "url": f"https://opendata.fmi.fi/wfs/{self.data[CONF_LANG]}?request=getFeature&storedquery_id={self.data[CONF_QUERY_ID]}&starttime={(datetime.utcnow() - timedelta(hours=1)).strftime('%Y-%m-%d%%20%H:%M:%S')}&endtime={datetime.utcnow().strftime('%Y-%m-%d%%20%H:%M:%S')}&{self.data[CONF_TARGET_TYPE]}={self.data[CONF_TARGET]}",
+                                            "url": f"https://opendata.fmi.fi/wfs/{self.data[CONF_LANG]}?request=getFeature&storedquery_id={self.data[CONF_QUERY_ID]}&starttime={(dt_util.utcnow() - timedelta(hours=1)).strftime('%Y-%m-%d%%20%H:%M:%S')}&endtime={dt_util.utcnow().strftime('%Y-%m-%d%%20%H:%M:%S')}&{self.data[CONF_TARGET_TYPE]}={self.data[CONF_TARGET]}",
                                             "param_url": f"https://opendata.fmi.fi/meta?observableProperty={'forecast' if '::forecast' in self.data[CONF_QUERY_ID] else 'observation'}&language={self.data[CONF_LANG]}",
                                         })
 
@@ -120,14 +125,22 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(step_id="params", data_schema=self.param_schema, last_step=True, errors=errors,
                                     description_placeholders={
-                                        "url": f"https://opendata.fmi.fi/wfs/{self.data[CONF_LANG]}?request=getFeature&storedquery_id={self.data[CONF_QUERY_ID]}&starttime={(datetime.utcnow() - timedelta(hours=1)).strftime('%Y-%m-%d%%20%H:%M:%S')}&endtime={datetime.utcnow().strftime('%Y-%m-%d%%20%H:%M:%S')}&{self.data[CONF_TARGET_TYPE]}={self.data[CONF_TARGET]}",
+                                        "url": f"https://opendata.fmi.fi/wfs/{self.data[CONF_LANG]}?request=getFeature&storedquery_id={self.data[CONF_QUERY_ID]}&starttime={(dt_util.utcnow() - timedelta(hours=1)).strftime('%Y-%m-%d%%20%H:%M:%S')}&endtime={dt_util.utcnow().strftime('%Y-%m-%d%%20%H:%M:%S')}&{self.data[CONF_TARGET_TYPE]}={self.data[CONF_TARGET]}",
                                         "param_url": f"https://opendata.fmi.fi/meta?observableProperty={'forecast' if '::forecast' in self.data[CONF_QUERY_ID] else 'observation'}&language={self.data[CONF_LANG]}",
                                     })
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        return OptionsFlowHandler(config_entry) if "::forecast" in config_entry.data[CONF_QUERY_ID] else None
+        return OptionsFlowHandler(config_entry)
+
+    @classmethod
+    @callback
+    def async_supports_options_flow(cls, config_entry: config_entries.ConfigEntry) -> bool:
+        # Only forecast queries have anything to configure. This has to be
+        # decided here rather than by returning None from async_get_options_flow,
+        # which HA turns into UnknownFlow("Flow was not created") and a 500.
+        return "::forecast" in config_entry.data[CONF_QUERY_ID]
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):

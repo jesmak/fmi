@@ -1,11 +1,15 @@
 {
-  "codeowners": ["@jesmak"],
+  "domain": "fmi",
+  "name": "FMI",
+  "codeowners": [
+    "@jesmak"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/jesmak/hass_fmi",
-  "domain": "fmi",
   "iot_class": "cloud_polling",
-  "name": "FMI",
-  "requirements": [],
-  "version": "1.0.2"
+  "requirements": [
+    "python-dateutil>=2.8.2"
+  ],
+  "version": "1.0.3"
 }
