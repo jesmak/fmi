@@ -14,13 +14,25 @@ class FMIException(Exception):
     """Base exception for FMI"""
 
 
+def normalize_value(value: str, negative_as_zero: bool) -> str:
+    # FMI reports "no measurable precipitation" as -1 rather than 0.
+    if negative_as_zero:
+        try:
+            if float(value) == -1:
+                return "0.0"
+        except (TypeError, ValueError):
+            pass
+    return value
+
+
 class FMISession:
     _timeout: int
 
     def __init__(self, timeout=20):
         self._timeout = timeout
 
-    def get_feature(self, lang: str, params: dict[str, str], target_param: str, get_latest: bool) -> Any:
+    def get_feature(self, lang: str, params: dict[str, str], target_param: str, get_latest: bool,
+                    negative_as_zero: bool = False) -> Any:
 
         try:
             url = API_GET_FEATURE_URL.replace("${lang}", lang)
@@ -74,6 +86,7 @@ class FMISession:
                     value = item.find("./BsWfs:ParameterValue", namespaces).text
 
                     if value != "NaN":
+                        value = normalize_value(value, negative_as_zero)
                         if get_latest and (len(result["data"]) == 0 or time > result["data"][0]["time"]):
                             result["data"] = []
                         result["data"].append({"time": time, "value": value})

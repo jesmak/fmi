@@ -32,7 +32,8 @@
           "forecast_step": "Time step between two forecast values in minutes",
           "forecast_hours": "Forecast hours to show",
           "forecast_past_hours": "Forecast history to show (hours)",
-          "parameter": "Parameter to return"
+          "parameter": "Parameter to return",
+          "negative_as_zero": "Report -1 as 0. Some parameters return -1 when there is no measurable value. For example, if there has been no rainfall today, -1 would be returned for precipitation. If you want to get 0 instead, check this."
         }
       }
     }
@@ -45,7 +46,8 @@
         "data": {
           "forecast_step": "Time step between two forecast values in minutes",
           "forecast_hours": "Forecast hours to show",
-          "forecast_past_hours": "Forecast history to show (hours)"
+          "forecast_past_hours": "Forecast history to show (hours)",
+          "negative_as_zero": "Report -1 as 0. Some parameters return -1 when there is no measurable value. For example, if there has been no rainfall today, -1 would be returned for precipitation. If you want to get 0 instead, check this."
         }
       }
     }

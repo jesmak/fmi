@@ -32,7 +32,8 @@
           "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
           "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
           "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
-          "parameter": "Parametri"
+          "parameter": "Parametri",
+          "negative_as_zero": "Ilmoita -1 arvona 0. Jotkut parametrit palauttavat -1, kun mitattavaa arvoa ei ole. Esimerkiksi jos tänään ei ole satanut, sademäärän arvo on -1. Jos haluat, että näissä tilanteissa palautetaan 0, kytke tämä asetus päälle."
         }
       }
     }
@@ -45,7 +46,8 @@
         "data": {
           "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
           "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
-          "forecast_past_hours": "Näytettävä ennustehistoria tunneissa"
+          "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
+          "negative_as_zero": "Ilmoita -1 arvona 0. Jotkut parametrit palauttavat -1, kun mitattavaa arvoa ei ole. Esimerkiksi jos tänään ei ole satanut, sademäärän arvo on -1. Jos haluat, että näissä tilanteissa palautetaan 0, kytke tämä asetus päälle."
         }
       }
     }

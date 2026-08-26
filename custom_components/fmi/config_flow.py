@@ -13,7 +13,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (DOMAIN, CONF_LABEL, CONF_LANG, CONF_QUERY_ID, CONF_QUERY_LABEL, CONF_FORECAST_HOURS, CONF_TARGET,
                     CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, LANGUAGES, CONF_PARAMETER, CONF_TARGET_TYPE,
-                    TARGET_TYPES, API_DOWNLOAD_OBSERVATIONS_URLS)
+                    TARGET_TYPES, API_DOWNLOAD_OBSERVATIONS_URLS, CONF_NEGATIVE_AS_ZERO)
 from .session import FMISession, FMIException
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,7 +40,8 @@ async def validate_input(hass: HomeAssistant, data: dict[str, any]) -> str:
                   "timestep": data.get(CONF_FORECAST_STEP),
                   "storedquery_id": data[CONF_QUERY_ID], data[CONF_TARGET_TYPE]: data[CONF_TARGET],
                   "parameters": data[CONF_PARAMETER]}
-        await hass.async_add_executor_job(api.get_feature, data[CONF_LANG], params, data[CONF_PARAMETER], is_forecast is False)
+        await hass.async_add_executor_job(api.get_feature, data[CONF_LANG], params, data[CONF_PARAMETER],
+                                          is_forecast is False, data.get(CONF_NEGATIVE_AS_ZERO, False))
 
     except FMIException:
         raise ConnectionProblem
@@ -90,7 +91,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             schema_params = {
                 vol.Required(CONF_LABEL): cv.string,
-                vol.Required(CONF_PARAMETER): cv.string
+                vol.Required(CONF_PARAMETER): cv.string,
+                vol.Required(CONF_NEGATIVE_AS_ZERO, default=False): cv.boolean
             }
 
             if "::forecast" in str(self.data[CONF_QUERY_ID]):
@@ -133,15 +135,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
+        # Must never return None: HA turns that into UnknownFlow("Flow was not
+        # created") and answers the options request with a 500.
         return OptionsFlowHandler(config_entry)
-
-    @classmethod
-    @callback
-    def async_supports_options_flow(cls, config_entry: config_entries.ConfigEntry) -> bool:
-        # Only forecast queries have anything to configure. This has to be
-        # decided here rather than by returning None from async_get_options_flow,
-        # which HA turns into UnknownFlow("Flow was not created") and a 500.
-        return "::forecast" in config_entry.data[CONF_QUERY_ID]
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
@@ -151,28 +147,29 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         if user_input is None:
-            return self.async_show_form(
-                step_id="init",
-                data_schema=vol.Schema(
-                    {
-                        vol.Required(CONF_FORECAST_STEP,
-                                     default=self._config_entry.data.get(CONF_FORECAST_STEP)): cv.positive_int,
-                        vol.Required(CONF_FORECAST_HOURS,
-                                     default=self._config_entry.data.get(CONF_FORECAST_HOURS)): cv.positive_int,
-                        vol.Required(CONF_FORECAST_PAST_HOURS,
-                                     default=self._config_entry.data.get(CONF_FORECAST_PAST_HOURS)): cv.positive_int,
-                    })
-            )
+            schema_params = {}
 
-        user_input[CONF_LANG] = self._config_entry.data[CONF_LANG]
-        user_input[CONF_QUERY_LABEL] = self._config_entry.data[CONF_QUERY_LABEL]
-        user_input[CONF_QUERY_ID] = self._config_entry.data[CONF_QUERY_ID]
-        user_input[CONF_PARAMETER] = self._config_entry.data[CONF_PARAMETER]
-        user_input[CONF_TARGET] = self._config_entry.data[CONF_TARGET]
-        user_input[CONF_TARGET_TYPE] = self._config_entry.data[CONF_TARGET_TYPE]
-        user_input[CONF_LABEL] = self._config_entry.data[CONF_LABEL]
+            if "::forecast" in str(self._config_entry.data[CONF_QUERY_ID]):
+                schema_params[vol.Required(
+                    CONF_FORECAST_STEP,
+                    default=self._config_entry.data.get(CONF_FORECAST_STEP))] = cv.positive_int
+                schema_params[vol.Required(
+                    CONF_FORECAST_HOURS,
+                    default=self._config_entry.data.get(CONF_FORECAST_HOURS))] = cv.positive_int
+                schema_params[vol.Required(
+                    CONF_FORECAST_PAST_HOURS,
+                    default=self._config_entry.data.get(CONF_FORECAST_PAST_HOURS))] = cv.positive_int
 
-        self.hass.config_entries.async_update_entry(self._config_entry, data=user_input,
+            schema_params[vol.Required(
+                CONF_NEGATIVE_AS_ZERO,
+                default=self._config_entry.data.get(CONF_NEGATIVE_AS_ZERO, False))] = cv.boolean
+
+            return self.async_show_form(step_id="init", data_schema=vol.Schema(schema_params))
+
+        # Merge over the existing data so keys absent from this form survive.
+        data = {**self._config_entry.data, **user_input}
+
+        self.hass.config_entries.async_update_entry(self._config_entry, data=data,
                                                     options=self._config_entry.options)
         return self.async_create_entry(title="", data={})
 

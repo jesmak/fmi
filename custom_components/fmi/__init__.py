@@ -9,7 +9,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_QUERY_ID, \
-    CONF_LANG, CONF_FORECAST_STEP, CONF_TARGET, CONF_TARGET_TYPE, CONF_PARAMETER
+    CONF_LANG, CONF_FORECAST_STEP, CONF_TARGET, CONF_TARGET_TYPE, CONF_PARAMETER, \
+    CONF_NEGATIVE_AS_ZERO
 from .session import FMISession
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,7 +31,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                   "timestep": entry.data.get(CONF_FORECAST_STEP), "storedquery_id": query_id,
                   entry.data[CONF_TARGET_TYPE]: entry.data[CONF_TARGET]}
         return await hass.async_add_executor_job(api.get_feature, entry.data[CONF_LANG], params,
-                                                 entry.data[CONF_PARAMETER], is_forecast is False)
+                                                 entry.data[CONF_PARAMETER], is_forecast is False,
+                                                 entry.data.get(CONF_NEGATIVE_AS_ZERO, False))
 
     coord = DataUpdateCoordinator(
         hass,
@@ -58,11 +60,14 @@ async def async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None
 
 
 def get_start_time(query_id: str, now: datetime, data: dict[str, Any]):
+    # Aggregate queries have to reach back past the current period: the running
+    # day/month/year is reported as NaN until it completes, and NaN values are
+    # discarded, which otherwise leaves the sensor permanently empty.
     return now - timedelta(hours=data[CONF_FORECAST_PAST_HOURS]) if "::forecast" in query_id else \
         now.replace(minute=0, second=0) - relativedelta(hours=1) if "::hourly" in query_id else \
-            now.replace(hour=0, minute=0, second=0) if "::daily" in query_id else \
-                now.replace(day=1, hour=0, minute=0, second=0) if "::monthly" in query_id else \
-                    now.replace(month=1, day=1, hour=0, minute=0, second=0) if "::yearly" in query_id else \
+            now.replace(hour=0, minute=0, second=0) - relativedelta(days=2) if "::daily" in query_id else \
+                now.replace(day=1, hour=0, minute=0, second=0) - relativedelta(months=2) if "::monthly" in query_id else \
+                    now.replace(month=1, day=1, hour=0, minute=0, second=0) - relativedelta(years=2) if "::yearly" in query_id else \
                         now - timedelta(hours=12) if not query_id.startswith("stuk::") else None
 
 
