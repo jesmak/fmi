@@ -1,0 +1,7 @@
+# Normalise all text files to LF in the repository and in the working tree.
+# The repo was previously developed on Windows with core.autocrlf=true, which
+# stored LF blobs but checked out CRLF; on Linux that showed every file as
+# modified. Pinning eol=lf keeps both platforms consistent.
+* text=auto eol=lf
+
+*.png binary
