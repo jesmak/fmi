@@ -71,7 +71,7 @@ class FMISensor(CoordinatorEntity, SensorEntity):
         self._attr_attribution = ATTRIBUTION
         self._attr_icon = "mdi:weather-cloudy"
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_unique_id = f"fmi_{label}"
+        self._attr_unique_id = entry.entry_id
         self._attr_name = f"FMI {label}"
 
         if coordinator.data["unit"] is not None:
@@ -104,7 +104,7 @@ class FMIForecastSensor(CoordinatorEntity, SensorEntity):
         self._attr_attribution = ATTRIBUTION
         self._attr_icon = "mdi:weather-cloudy-clock"
         self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_unique_id = f"fmi_{label}"
+        self._attr_unique_id = entry.entry_id
         self._attr_name = f"FMI {label}"
 
         if coordinator.data["unit"] is not None:

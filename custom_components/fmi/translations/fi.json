@@ -1,55 +1,88 @@
 {
   "config": {
     "error": {
-      "connection_problem": "Datan haku epäonnistui (virheellinen FMISID?)",
+      "connection_problem": "FMI ei palauttanut dataa tälle kyselylle, asemalle ja parametrille. Tarkista sijainti ja yritä uudelleen.",
       "unknown": "Tuntematon virhe"
     },
     "abort": {
-      "already_configured": "Konfiguraatio samalla otsikolla on jo olemassa"
+      "already_configured": "Anturi tälle kyselylle, asemalle ja parametrille on jo olemassa",
+      "reconfigure_successful": "Anturin asetukset päivitetty"
     },
     "step": {
       "user": {
         "title": "FMI integraatio",
-        "description": "Yleiset asetukset",
+        "description": "Valitse kieli jota FMI käyttää. Se vaikuttaa seuraavissa vaiheissa näytettäviin kyselyjen ja parametrien nimiin sekä FMI:n palauttaman datan kieleen.",
         "data": {
           "language": "Käytettävä kieli API-kutsuissa"
         }
       },
       "query": {
-        "title": "FMI integraatio",
-        "description": "Säähavaintoasemat jotka mittaavat haluamaasi dataa löydät helpoiten FMI:n latauspalvelusta: {download_url}. Valitsemasi aseman tunnisteet löydät helpoiten täältä: {url}. Normaalisti järkevintä on käyttää FMISID:tä. STUK:n kyselyissä FMISID ei toimi vaan on käytettävä esim. place-tyyppiä.\n\n**Kyselyn asetukset**",
+        "title": "Kysely",
+        "description": "Valitse mitä haluat mitata. Listassa on kaikki FMI:n julkaisemat havainto- ja ennustekyselyt.",
         "data": {
-          "query_label": "Valittu kysely",
-          "target_type": "Säähavaintoaseman tunnisteen tyyppi",
-          "target": "Säähavaintoaseman tunniste"
+          "query_label": "Valittu kysely"
         }
       },
       "params": {
-        "title": "FMI integraatio",
-        "description": "Katso kyselyn tulossivulta ({url}) parametrien nimet joita voi käyttää valitun kyselyn kanssa. Parametrien nimet löydät \"BsWfs:ParameterName\"-elementtien sisältä. Parametrien kuvaukset löydät täältä: {param_url}.\n\n**Parametriasetukset**",
+        "title": "Parametri",
+        "description": "Valitse luettava arvo. Listassa on vain ne parametrit joita tämä asema oikeasti raportoi, kuvauksineen ja yksiköineen.\n\nJos haluamasi puuttuu, voit kirjoittaa sen nimen. Kyselyn raakatulokset löytyvät osoitteesta {url}.",
         "data": {
-          "label": "Integraation luoman anturin nimi",
           "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
           "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
           "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
           "parameter": "Parametri",
-          "negative_as_zero": "Ilmoita -1 arvona 0. Jotkut parametrit palauttavat -1, kun mitattavaa arvoa ei ole. Esimerkiksi jos tänään ei ole satanut, sademäärän arvo on -1. Jos haluat, että näissä tilanteissa palautetaan 0, kytke tämä asetus päälle."
+          "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut."
+        }
+      },
+      "reconfigure": {
+        "title": "Kysely",
+        "description": "Vaihda anturin käyttämä kysely, asema tai parametri. Anturin historia säilyy, joten näin korjataan anturi jonka asema tai parametri on lakannut toimimasta.",
+        "data": {
+          "query_label": "Valittu kysely"
+        }
+      },
+      "reconfigure_params": {
+        "title": "Parametri",
+        "description": "Valitse luettava arvo. Listassa on vain ne parametrit joita tämä asema oikeasti raportoi, kuvauksineen ja yksiköineen.\n\nJos haluamasi puuttuu, voit kirjoittaa sen nimen. Kyselyn raakatulokset löytyvät osoitteesta {url}.",
+        "data": {
+          "parameter": "Parametri",
+          "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut.",
+          "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
+          "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
+          "forecast_past_hours": "Näytettävä ennustehistoria tunneissa"
+        }
+      },
+      "name": {
+        "title": "Nimi",
+        "description": "Ehdotettu nimi muodostuu valitsemastasi asemasta ja parametrista.",
+        "data": {
+          "label": "Integraation luoman anturin nimi"
+        }
+      },
+      "location": {
+        "title": "Sijainti",
+        "description": "Valitse asema jolta data luetaan. Asemat on järjestetty etäisyyden mukaan Home Assistant -sijainnistasi.\n\nHavaintokyselyissä listataan vain ne asemat jotka palvelevat valitsemaasi kyselyä. Ennustekyselyt eivät ole sidottu asemaan, joten niissä tarjotaan kaikki asemat.\n\nVoit myös kirjoittaa paikannimen tai koordinaatit muodossa leveysaste,pituusaste.",
+        "data": {
+          "target": "Asema, paikka tai koordinaatit"
+        }
+      },
+      "reconfigure_location": {
+        "title": "Sijainti",
+        "description": "Valitse asema jolta data luetaan. Asemat on järjestetty etäisyyden mukaan Home Assistant -sijainnistasi.\n\nHavaintokyselyissä listataan vain ne asemat jotka palvelevat valitsemaasi kyselyä. Ennustekyselyt eivät ole sidottu asemaan, joten niissä tarjotaan kaikki asemat.\n\nVoit myös kirjoittaa paikannimen tai koordinaatit muodossa leveysaste,pituusaste.",
+        "data": {
+          "target": "Asema, paikka tai koordinaatit"
         }
       }
     }
   },
-  "options": {
-    "step": {
-      "init": {
-        "title": "FMI integraatio",
-        "description": "Ennusteasetukset",
-        "data": {
-          "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
-          "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
-          "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
-          "negative_as_zero": "Ilmoita -1 arvona 0. Jotkut parametrit palauttavat -1, kun mitattavaa arvoa ei ole. Esimerkiksi jos tänään ei ole satanut, sademäärän arvo on -1. Jos haluat, että näissä tilanteissa palautetaan 0, kytke tämä asetus päälle."
-        }
-      }
+  "issues": {
+    "parameter_missing": {
+      "title": "FMI-anturi {label} ei enää saa dataa",
+      "description": "Asema ({target_type} {target}) ei enää raportoi parametria \"{parameter}\", joten anturille ei tule arvoa.\n\nParametrit joita asema tällä hetkellä raportoi: {available}\n\nMuuta anturin asetuksia käyttämään jotain näistä, tai poista anturi."
+    },
+    "no_data": {
+      "title": "FMI-anturi {label} ei enää saa dataa",
+      "description": "Kysely {query_id} ei palauta mitään kohteelle {target_type} {target}.\n\nAsema on voitu poistaa käytöstä tai sen tunniste on vaihtunut, tai asema ei palvele tätä kyselyä. Tarkista asema FMI:n havaintojen latauspalvelusta ja päivitä anturin asetukset toimivalla tunnisteella."
     }
   }
 }

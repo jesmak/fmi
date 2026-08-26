@@ -1,16 +1,22 @@
 DOMAIN = "fmi"
 API_DESCRIBE_STORED_QUERIES_URL = "https://opendata.fmi.fi/wfs/${lang}?request=describeStoredQueries"
 API_GET_FEATURE_URL = "https://opendata.fmi.fi/wfs/${lang}?request=getFeature"
+API_STATIONS_QUERY_ID = "fmi::ef::stations"
+# The station-listing queries return nothing without a bounding box; this one
+# covers Finland and its sea areas.
+API_FINLAND_BBOX = "19,59,32,71"
 API_GET_PARAMS_URL = "https://opendata.fmi.fi/meta?observableProperty=${property}&language=${lang}"
-API_DOWNLOAD_OBSERVATIONS_URLS = {
-    "eng": "https://en.ilmatieteenlaitos.fi/download-observations",
-    "fin": "https://www.ilmatieteenlaitos.fi/havaintojen-lataus",
-}
+# %%20 renders as a literal "%20" once strftime is done with it. FMI accepts a
+# space between date and time; an ISO "+00:00" offset would decode as a space
+# server-side and be rejected, so timestamps are always formatted, never str()d.
+API_TIME_FORMAT = '%Y-%m-%d%%20%H:%M:%S'
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.5249.62 Safari/537.36"
 DEFAULT_SCAN_INTERVAL = 5
+# Consecutive empty updates tolerated before reporting a repair issue. Empty
+# results are not necessarily a fault, so this debounces roughly an hour.
+EMPTY_UPDATES_BEFORE_ISSUE = 12
 
 LANGUAGES = ["eng", "fin"]
-TARGET_TYPES = ["fmisid", "place", "geoid", "latlon"]
 
 CONF_LABEL = "label"
 CONF_LANG = "language"

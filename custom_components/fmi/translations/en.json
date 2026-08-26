@@ -1,55 +1,88 @@
 {
   "config": {
     "error": {
-      "connection_problem": "Could not retrieve FMI data (invalid FMISID?)",
-      "unknown": "Unknown error occured"
+      "connection_problem": "FMI returned no data for this query, station and parameter. Check the location and try again.",
+      "unknown": "Unknown error"
     },
     "abort": {
-      "already_configured": "A configuration with this label already exists"
+      "already_configured": "A sensor for this query, station and parameter already exists",
+      "reconfigure_successful": "Sensor updated"
     },
     "step": {
       "user": {
         "title": "FMI integration",
-        "description": "Common settings",
+        "description": "Choose the language FMI uses. It affects the query and parameter names shown in the next steps, and the language of the data FMI returns.",
         "data": {
           "language": "Language used when calling API"
         }
       },
       "query": {
-        "title": "FMI integration",
-        "description": "The easiest way to find observation stations that measure the data you are interested in is to use FMI's observation download service: {download_url}. Identifiers of your selected station can most easiest be found here: {url}. For STUK-queries FMISID doesn't work, use for example places-identifier instead.\n\n**Query settings**",
+        "title": "Query",
+        "description": "Choose what you want to measure. The list contains every observation and forecast query FMI publishes.",
         "data": {
-          "query_label": "Selected query",
-          "target_type": "Observation station identifier type",
-          "target": "Observation station identifier"
+          "query_label": "Selected query"
         }
       },
       "params": {
-        "title": "FMI integration",
-        "description": "Check the query results ({url}) for parameters that can be used with this query. Parameter names can be found from inside \"BsWfs:ParameterName\"-elements. Parameter descriptions are available here: {param_url}.\n\n**Parameter settings**",
+        "title": "Parameter",
+        "description": "Pick the value to read. Only the parameters this station actually reports are listed, with their descriptions and units.\n\nIf the one you want is missing you can type its name. The raw query results are at {url}.",
         "data": {
-          "label": "Name for the sensor created by this integration",
           "forecast_step": "Time step between two forecast values in minutes",
           "forecast_hours": "Forecast hours to show",
           "forecast_past_hours": "Forecast history to show (hours)",
           "parameter": "Parameter to return",
-          "negative_as_zero": "Report -1 as 0. Some parameters return -1 when there is no measurable value. For example, if there has been no rainfall today, -1 would be returned for precipitation. If you want to get 0 instead, check this."
+          "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained."
+        }
+      },
+      "reconfigure": {
+        "title": "Query",
+        "description": "Point this sensor at a different query, station or parameter. The sensor keeps its history, so this is how to repair one whose station or parameter has stopped working.",
+        "data": {
+          "query_label": "Selected query"
+        }
+      },
+      "reconfigure_params": {
+        "title": "Parameter",
+        "description": "Pick the value to read. Only the parameters this station actually reports are listed, with their descriptions and units.\n\nIf the one you want is missing you can type its name. The raw query results are at {url}.",
+        "data": {
+          "parameter": "Parameter to return",
+          "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained.",
+          "forecast_step": "Time step between two forecast values in minutes",
+          "forecast_hours": "Forecast hours to show",
+          "forecast_past_hours": "Forecast history to show (hours)"
+        }
+      },
+      "name": {
+        "title": "Name",
+        "description": "The suggested name comes from the station and parameter you chose.",
+        "data": {
+          "label": "Name for the sensor created by this integration"
+        }
+      },
+      "location": {
+        "title": "Location",
+        "description": "Pick the station to read from. Stations are ordered by distance from your Home Assistant location.\n\nFor observation queries only the stations that serve the query you chose are listed. Forecast queries are not tied to a station, so every station is offered.\n\nYou can also type a place name, or coordinates as latitude,longitude.",
+        "data": {
+          "target": "Station, place or coordinates"
+        }
+      },
+      "reconfigure_location": {
+        "title": "Location",
+        "description": "Pick the station to read from. Stations are ordered by distance from your Home Assistant location.\n\nFor observation queries only the stations that serve the query you chose are listed. Forecast queries are not tied to a station, so every station is offered.\n\nYou can also type a place name, or coordinates as latitude,longitude.",
+        "data": {
+          "target": "Station, place or coordinates"
         }
       }
     }
   },
-  "options": {
-    "step": {
-      "init": {
-        "title": "FMI forecast",
-        "description": "Forecast settings",
-        "data": {
-          "forecast_step": "Time step between two forecast values in minutes",
-          "forecast_hours": "Forecast hours to show",
-          "forecast_past_hours": "Forecast history to show (hours)",
-          "negative_as_zero": "Report -1 as 0. Some parameters return -1 when there is no measurable value. For example, if there has been no rainfall today, -1 would be returned for precipitation. If you want to get 0 instead, check this."
-        }
-      }
+  "issues": {
+    "parameter_missing": {
+      "title": "FMI sensor {label} no longer gets data",
+      "description": "The station ({target_type} {target}) no longer reports \"{parameter}\", so the sensor has no value.\n\nParameters this station currently reports: {available}\n\nReconfigure the sensor to use one of these, or remove it."
+    },
+    "no_data": {
+      "title": "FMI sensor {label} no longer gets data",
+      "description": "The query {query_id} returns nothing at all for {target_type} {target}.\n\nThe station may have been decommissioned or renumbered, or it may not serve this query. Check the station in FMI's observation download service and reconfigure the sensor with a working identifier."
     }
   }
 }
