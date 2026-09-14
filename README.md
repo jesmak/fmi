@@ -76,6 +76,8 @@ coordinates, and anything else as a place name. This works for STUK queries too,
 | forecast_step       | int    | **Required** | Step between two values in minutes. Only shown for forecast type queries. | 30      |
 | forecast_hours      | int    | **Required** | How many hours of forecasts to retrieve (starting from current time)      | 36      |
 | forecast_past_hours | int    | **Required** | How many past hours of forecasts to retrieve (starting from current time) | 5       |
+| no_data_issue       | bool   | **Required** | Report a repair issue when the sensor stops getting data                  | `true`  |
+| no_data_issue_hours | int    | **Required** | How many hours without data before that issue is reported                 | 24      |
 
 Only the parameters the chosen station actually reports are offered, with their descriptions and units:
 
@@ -121,8 +123,22 @@ needs to be reconfigured.
 FMI removes parameters from stations, and stations are occasionally decommissioned or renumbered. Neither shows
 up as an error: the query simply returns nothing.
 
-If a sensor gets no data for about an hour, the integration reports a repair issue in Home Assistant telling you whether the station returns nothing at all, or whether it is still reporting but no longer publishes your parameter, in which case the parameters it does publish are listed. Use Reconfigure to move the sensor to a
-working station or parameter, and the issue clears itself.
+When the newest value FMI holds for a sensor is more than **no_data_issue_hours** old (24 hours by default),
+the integration reports a repair issue in Home Assistant telling you whether the station returns nothing at
+all, or whether it is still reporting but no longer publishes your parameter, in which case the parameters it
+does publish are listed. Use Reconfigure to move the sensor to a working station or parameter, and the issue
+clears itself.
+
+Stations do go quiet for a while without being broken, so the delay is deliberately generous. Shorten it with
+**no_data_issue_hours** if you want to hear about outages sooner, or turn **no_data_issue** off to silence the
+warning for a sensor entirely. Both are on the parameter step of the setup and Reconfigure flows.
+
+The age is read from FMI's own timestamp on the data, not from how long Home Assistant has been seeing empty
+updates. That matters in two ways. Restarting Home Assistant does not put the clock back to zero, so a sensor
+on a box that reboots nightly is still noticed. And because each query type looks back over a different window
+- twelve hours for the plain observation queries, two days for the daily ones, two years for the yearly ones -
+a station that had gone quiet used to keep returning its last value for the length of that window before it
+even looked empty. The setting now means the age of the data, whatever the query.
 
 ## State attributes
 
@@ -139,6 +155,8 @@ All sensors return the following extra attributes.
 | parameter     | string | Name of the returned parameter                              |
 | location_type | string | Type of identifier used (fmisid/place/latlon)                |
 | location_id   | string | Identifier value                                            |
+| no_data_issue | bool   | Whether the no-data repair issue is enabled                 |
+| no_data_issue_hours | int | Hours without data before that issue is reported          |
 
 Additionally, observation type sensors return the following extra attributes.
 Observation type sensors return the latest known value as sensor state.

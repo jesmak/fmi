@@ -8,7 +8,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Coor
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, CONF_LABEL, CONF_QUERY_ID, CONF_LANG, CONF_QUERY_LABEL, CONF_PARAMETER, \
-    CONF_TARGET_TYPE, CONF_TARGET, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP
+    CONF_TARGET_TYPE, CONF_TARGET, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, \
+    CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE_HOURS
 
 _LOGGER = logging.getLogger(__name__)
 ATTRIBUTION = "Data provided by Finnish Meteorological Institute (FMI)"
@@ -28,6 +29,8 @@ ATTR_LOCATION_ID = "location_id"
 ATTR_FORECAST_HOURS = "forecast_hours"
 ATTR_FORECAST_PAST_HOURS = "forecast_past_hours"
 ATTR_FORECAST_STEP = "forecast_step"
+ATTR_NO_DATA_ISSUE = "no_data_issue"
+ATTR_NO_DATA_ISSUE_HOURS = "no_data_issue_hours"
 
 
 def get_query_name(entry: ConfigEntry) -> str | None:
@@ -46,6 +49,8 @@ def get_config_attributes(entry: ConfigEntry) -> dict:
         ATTR_PARAMETER: entry.data.get(CONF_PARAMETER),
         ATTR_LOCATION_TYPE: entry.data.get(CONF_TARGET_TYPE),
         ATTR_LOCATION_ID: entry.data.get(CONF_TARGET),
+        ATTR_NO_DATA_ISSUE: entry.data.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE),
+        ATTR_NO_DATA_ISSUE_HOURS: entry.data.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS),
     }
 
     if "::forecast" in str(entry.data.get(CONF_QUERY_ID)):

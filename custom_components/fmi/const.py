@@ -12,9 +12,11 @@ API_GET_PARAMS_URL = "https://opendata.fmi.fi/meta?observableProperty=${property
 API_TIME_FORMAT = '%Y-%m-%d%%20%H:%M:%S'
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.5249.62 Safari/537.36"
 DEFAULT_SCAN_INTERVAL = 5
-# Consecutive empty updates tolerated before reporting a repair issue. Empty
-# results are not necessarily a fault, so this debounces roughly an hour.
-EMPTY_UPDATES_BEFORE_ISSUE = 12
+# A station can stop reporting for a while without being broken, so the no-data
+# warning is debounced. Both the switch and the delay are per-sensor settings;
+# these are the defaults for sensors that were configured before they existed.
+DEFAULT_NO_DATA_ISSUE = True
+DEFAULT_NO_DATA_ISSUE_HOURS = 24
 
 LANGUAGES = ["eng", "fin"]
 
@@ -29,3 +31,5 @@ CONF_FORECAST_HOURS = "forecast_hours"
 CONF_FORECAST_PAST_HOURS = "forecast_past_hours"
 CONF_FORECAST_STEP = "forecast_step"
 CONF_NEGATIVE_AS_ZERO = "negative_as_zero"
+CONF_NO_DATA_ISSUE = "no_data_issue"
+CONF_NO_DATA_ISSUE_HOURS = "no_data_issue_hours"

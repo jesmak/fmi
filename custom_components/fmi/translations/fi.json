@@ -31,7 +31,9 @@
           "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
           "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
           "parameter": "Parametri",
-          "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut."
+          "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut.",
+          "no_data_issue": "Varoita kun anturi lakkaa saamasta dataa",
+          "no_data_issue_hours": "Tunteja ilman dataa ennen varoitusta"
         }
       },
       "reconfigure": {
@@ -49,7 +51,9 @@
           "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut.",
           "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
           "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
-          "forecast_past_hours": "Näytettävä ennustehistoria tunneissa"
+          "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
+          "no_data_issue": "Varoita kun anturi lakkaa saamasta dataa",
+          "no_data_issue_hours": "Tunteja ilman dataa ennen varoitusta"
         }
       },
       "name": {

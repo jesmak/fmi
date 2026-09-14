@@ -11,7 +11,8 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_QUERY_ID, \
     CONF_LANG, CONF_FORECAST_STEP, CONF_TARGET, CONF_TARGET_TYPE, CONF_PARAMETER, \
-    CONF_NEGATIVE_AS_ZERO, EMPTY_UPDATES_BEFORE_ISSUE, API_TIME_FORMAT, CONF_LABEL
+    CONF_NEGATIVE_AS_ZERO, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE, \
+    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT, CONF_LABEL
 from .session import FMISession, FMIException
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,12 +22,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     issue_id = f"no_data_{entry.entry_id}"
-    empty_updates = {"count": 0}
+    # Whether this outage has been looked into already, so the probe in
+    # async_report_no_data runs once per outage rather than once per update.
+    no_data = {"reported": False}
 
-    def build_params(now: datetime, filter_parameter: bool) -> dict[str, Any]:
+    def build_params(now: datetime, filter_parameter: bool, start_time: datetime | None = None) -> dict[str, Any]:
         query_id = str(entry.data[CONF_QUERY_ID])
         is_forecast = "::forecast" in query_id
-        start_time = get_start_time(query_id, now, entry.data)
+        if start_time is None:
+            start_time = get_start_time(query_id, now, entry.data)
         end_time = now + timedelta(hours=entry.data[CONF_FORECAST_HOURS]) if is_forecast else None
         params = {"starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
                   "endtime": end_time.strftime(API_TIME_FORMAT) if end_time is not None else None,
@@ -40,6 +44,48 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         return params
 
+    async def async_is_stale(now: datetime, grace: timedelta, is_forecast: bool, result: dict[str, Any]) -> bool:
+        """Whether the newest value FMI holds for this sensor is older than the grace period.
+
+        The age comes from FMI's own timestamps rather than from how long this
+        run of Home Assistant has been seeing empty updates, so it is not reset
+        by a restart. Forecast values are stamped in the future, which makes
+        their age negative until the last forecast point falls into the past.
+        """
+        newest = max((item["time"] for item in result["data"]), default=None)
+
+        if newest is not None:
+            return now - newest >= grace
+
+        if no_data["reported"]:
+            # Already found to be stale, and the poll is still empty. Nothing
+            # has changed, and dating it again would cost a query every poll
+            # for as long as the outage lasts. Recovery shows up as data here.
+            return True
+
+        # An empty result only says that the poll window held nothing, and that
+        # window is an hour for the hourly queries, so on its own it dates
+        # nothing. Where the grace period reaches further back than the window,
+        # ask again over the whole of it before calling the sensor stale.
+        window_start = get_start_time(str(entry.data[CONF_QUERY_ID]), now, entry.data)
+
+        if window_start is None or window_start <= now - grace:
+            return True
+
+        try:
+            widened = await hass.async_add_executor_job(FMISession().get_feature, entry.data[CONF_LANG],
+                                                        build_params(now, True, now - grace),
+                                                        entry.data[CONF_PARAMETER], is_forecast is False,
+                                                        entry.data.get(CONF_NEGATIVE_AS_ZERO, False))
+        except FMIException as exception:
+            # Better to say nothing than to report an outage the network invented.
+            _LOGGER.debug(f"Could not date the last data for {entry.data[CONF_LABEL]}: {exception}")
+            return False
+
+        newest = max((item["time"] for item in widened["data"]), default=None)
+
+        return newest is None or now - newest >= grace
+
     async def async_update_data():
         now = dt_util.utcnow()
         is_forecast = "::forecast" in str(entry.data[CONF_QUERY_ID])
@@ -49,12 +95,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                                                    is_forecast is False,
                                                    entry.data.get(CONF_NEGATIVE_AS_ZERO, False))
 
-        if result["data"]:
-            empty_updates["count"] = 0
-            ir.async_delete_issue(hass, DOMAIN, issue_id)
-        else:
-            empty_updates["count"] += 1
-            if empty_updates["count"] == EMPTY_UPDATES_BEFORE_ISSUE:
+        if entry.data.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE):
+            grace = timedelta(hours=entry.data.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS))
+
+            if not await async_is_stale(now, grace, is_forecast, result):
+                no_data["reported"] = False
+                ir.async_delete_issue(hass, DOMAIN, issue_id)
+            elif not no_data["reported"]:
+                no_data["reported"] = True
                 await async_report_no_data(hass, entry, issue_id, build_params(now, False))
 
         return result

@@ -19,7 +19,8 @@ from . import build_unique_id, get_start_time
 
 from .const import (DOMAIN, CONF_LABEL, CONF_LANG, CONF_QUERY_ID, CONF_QUERY_LABEL, CONF_FORECAST_HOURS, CONF_TARGET,
                     CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, LANGUAGES, CONF_PARAMETER, CONF_TARGET_TYPE,
-                    CONF_NEGATIVE_AS_ZERO, API_TIME_FORMAT)
+                    CONF_NEGATIVE_AS_ZERO, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE,
+                    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT)
 from .session import FMISession, FMIException
 
 _LOGGER = logging.getLogger(__name__)
@@ -208,7 +209,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_show_form(step_id="query", data_schema=schema)
 
         user_input[CONF_QUERY_ID] = next(
-            (query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]).startswith(query[1])), None)
+            (query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
         self.data.update(user_input)
 
         return await self.async_step_location()
@@ -239,6 +240,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 schema_params[vol.Required(CONF_FORECAST_HOURS, default=36)] = cv.positive_int
                 schema_params[vol.Required(CONF_FORECAST_PAST_HOURS, default=5)] = cv.positive_int
                 schema_params[vol.Required(CONF_FORECAST_STEP, default=30)] = cv.positive_int
+
+            schema_params[vol.Required(CONF_NO_DATA_ISSUE, default=DEFAULT_NO_DATA_ISSUE)] = cv.boolean
+            schema_params[vol.Required(CONF_NO_DATA_ISSUE_HOURS,
+                                       default=DEFAULT_NO_DATA_ISSUE_HOURS)] = cv.positive_int
 
             self.param_schema = vol.Schema(schema_params)
 
@@ -318,7 +323,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_show_form(step_id="reconfigure", data_schema=schema)
 
         user_input[CONF_QUERY_ID] = next(
-            (query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]).startswith(query[1])), None)
+            (query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
         self.data.update(user_input)
 
         return await self.async_step_reconfigure_location()
@@ -358,6 +363,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             schema_params[vol.Required(
                 CONF_NEGATIVE_AS_ZERO,
                 default=self.data.get(CONF_NEGATIVE_AS_ZERO, False))] = cv.boolean
+            schema_params[vol.Required(
+                CONF_NO_DATA_ISSUE,
+                default=self.data.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE))] = cv.boolean
+            schema_params[vol.Required(
+                CONF_NO_DATA_ISSUE_HOURS,
+                default=self.data.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS))] = cv.positive_int
 
             self.param_schema = vol.Schema(schema_params)
 
