@@ -2,10 +2,11 @@
   "config": {
     "error": {
       "connection_problem": "FMI ei palauttanut dataa tälle kyselylle, asemalle ja parametrille. Tarkista sijainti ja yritä uudelleen.",
+      "no_warning_types": "Valitse vähintään yksi varoitustyyppi.",
       "unknown": "Tuntematon virhe"
     },
     "abort": {
-      "already_configured": "Anturi tälle kyselylle, asemalle ja parametrille on jo olemassa",
+      "already_configured": "Tämä anturi on jo olemassa",
       "reconfigure_successful": "Anturin asetukset päivitetty"
     },
     "step": {
@@ -14,6 +15,32 @@
         "description": "Valitse kieli jota FMI käyttää. Se vaikuttaa seuraavissa vaiheissa näytettäviin kyselyjen ja parametrien nimiin sekä FMI:n palauttaman datan kieleen.",
         "data": {
           "language": "Käytettävä kieli API-kutsuissa"
+        }
+      },
+      "kind": {
+        "title": "Mitä lisätään",
+        "description": "Anturi lukee yhden arvon, kuten merivedenkorkeuden tai lumensyvyyden, asemalta tai ennustepisteestä. Varoitukset seuraavat Ilmatieteen laitoksen säävaroituksia valitulle paikalle.",
+        "menu_options": {
+          "query": "Havainto- tai ennusteanturi",
+          "warnings": "Säävaroitukset paikalle"
+        }
+      },
+      "warnings": {
+        "title": "Säävaroitukset",
+        "description": "Valitse paikka kartalta. Varoitus otetaan mukaan, kun sen alue kattaa paikan tai ulottuu ympyrän säteen sisälle.\n\nSaarella tai rannalla kilometrin tai kahden säde varmistaa, että läheisen merialueen varoitukset tulevat mukaan.",
+        "data": {
+          "location": "Paikka",
+          "warning_types": "Varoitustyypit",
+          "label": "Nimi"
+        }
+      },
+      "reconfigure_warnings": {
+        "title": "Säävaroitukset",
+        "description": "Valitse paikka kartalta. Varoitus otetaan mukaan, kun sen alue kattaa paikan tai ulottuu ympyrän säteen sisälle.\n\nSaarella tai rannalla kilometrin tai kahden säde varmistaa, että läheisen merialueen varoitukset tulevat mukaan.",
+        "data": {
+          "location": "Paikka",
+          "warning_types": "Varoitustyypit",
+          "label": "Nimi"
         }
       },
       "query": {
@@ -33,7 +60,7 @@
           "parameter": "Parametri",
           "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut.",
           "no_data_issue": "Varoita kun anturi lakkaa saamasta dataa",
-          "no_data_issue_hours": "Tunteja ilman dataa ennen varoitusta"
+          "no_data_issue_hours": "Tunteja ilman dataa ennen kuin data on vanhentunutta"
         }
       },
       "reconfigure": {
@@ -53,7 +80,7 @@
           "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
           "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
           "no_data_issue": "Varoita kun anturi lakkaa saamasta dataa",
-          "no_data_issue_hours": "Tunteja ilman dataa ennen varoitusta"
+          "no_data_issue_hours": "Tunteja ilman dataa ennen kuin data on vanhentunutta"
         }
       },
       "name": {
@@ -75,6 +102,51 @@
         "description": "Valitse asema jolta data luetaan. Asemat on järjestetty etäisyyden mukaan Home Assistant -sijainnistasi.\n\nHavaintokyselyissä listataan vain ne asemat jotka palvelevat valitsemaasi kyselyä. Ennustekyselyt eivät ole sidottu asemaan, joten niissä tarjotaan kaikki asemat.\n\nVoit myös kirjoittaa paikannimen tai koordinaatit muodossa leveysaste,pituusaste.",
         "data": {
           "target": "Asema, paikka tai koordinaatit"
+        }
+      }
+    }
+  },
+  "selector": {
+    "warning_types": {
+      "options": {
+        "wind": "Tuulivaroitus maa-alueille",
+        "seaWind": "Tuulivaroitus merelle",
+        "thunderstorm": "Rajuilmavaroitus",
+        "seaThunderstorm": "Rajuilmavaroitus merelle",
+        "rain": "Rankkasadevaroitus",
+        "trafficWeather": "Liikennesäävaroitus",
+        "pedestrianSafety": "Jalankulkusäävaroitus",
+        "forestFireWeather": "Metsäpalovaroitus",
+        "hotWeather": "Hellevaroitus",
+        "coldWeather": "Pakkasvaroitus",
+        "uvNote": "UV-tiedote",
+        "seaWaveHeight": "Aallokkovaroitus",
+        "seaWaterHeight": "Merivedenkorkeusvaroitus",
+        "seaIcing": "Jäätämisvaroitus merelle"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "warning_level": {
+        "state": {
+          "none": "Ei varoitusta",
+          "yellow": "Keltainen",
+          "orange": "Oranssi",
+          "red": "Punainen"
+        }
+      }
+    },
+    "event": {
+      "warning": {
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "issued": "Annettu",
+              "updated": "Päivitetty",
+              "cancelled": "Peruttu"
+            }
+          }
         }
       }
     }

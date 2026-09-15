@@ -2,10 +2,11 @@
   "config": {
     "error": {
       "connection_problem": "FMI returned no data for this query, station and parameter. Check the location and try again.",
+      "no_warning_types": "Choose at least one warning type.",
       "unknown": "Unknown error"
     },
     "abort": {
-      "already_configured": "A sensor for this query, station and parameter already exists",
+      "already_configured": "This sensor already exists",
       "reconfigure_successful": "Sensor updated"
     },
     "step": {
@@ -14,6 +15,32 @@
         "description": "Choose the language FMI uses. It affects the query and parameter names shown in the next steps, and the language of the data FMI returns.",
         "data": {
           "language": "Language used when calling API"
+        }
+      },
+      "kind": {
+        "title": "What to add",
+        "description": "A sensor reads one value, such as sea level or snow depth, from a station or forecast point. Warnings follow FMI's weather warnings for a place.",
+        "menu_options": {
+          "query": "Observation or forecast sensor",
+          "warnings": "Weather warnings for a place"
+        }
+      },
+      "warnings": {
+        "title": "Weather warnings",
+        "description": "Pick the place on the map. A warning is included when its area covers the place, or comes within the circle's radius.\n\nOn an island or by the shore, a radius of a kilometre or two makes sure the warnings for the nearby sea area are included.",
+        "data": {
+          "location": "Place",
+          "warning_types": "Warning types",
+          "label": "Name"
+        }
+      },
+      "reconfigure_warnings": {
+        "title": "Weather warnings",
+        "description": "Pick the place on the map. A warning is included when its area covers the place, or comes within the circle's radius.\n\nOn an island or by the shore, a radius of a kilometre or two makes sure the warnings for the nearby sea area are included.",
+        "data": {
+          "location": "Place",
+          "warning_types": "Warning types",
+          "label": "Name"
         }
       },
       "query": {
@@ -33,7 +60,7 @@
           "parameter": "Parameter to return",
           "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained.",
           "no_data_issue": "Warn when the sensor stops getting data",
-          "no_data_issue_hours": "Hours without data before the warning is raised"
+          "no_data_issue_hours": "Hours without data before the data counts as stale"
         }
       },
       "reconfigure": {
@@ -53,7 +80,7 @@
           "forecast_hours": "Forecast hours to show",
           "forecast_past_hours": "Forecast history to show (hours)",
           "no_data_issue": "Warn when the sensor stops getting data",
-          "no_data_issue_hours": "Hours without data before the warning is raised"
+          "no_data_issue_hours": "Hours without data before the data counts as stale"
         }
       },
       "name": {
@@ -75,6 +102,51 @@
         "description": "Pick the station to read from. Stations are ordered by distance from your Home Assistant location.\n\nFor observation queries only the stations that serve the query you chose are listed. Forecast queries are not tied to a station, so every station is offered.\n\nYou can also type a place name, or coordinates as latitude,longitude.",
         "data": {
           "target": "Station, place or coordinates"
+        }
+      }
+    }
+  },
+  "selector": {
+    "warning_types": {
+      "options": {
+        "wind": "Wind warning for land areas",
+        "seaWind": "Wind warning for sea areas",
+        "thunderstorm": "Severe thunderstorm warning",
+        "seaThunderstorm": "Severe thunderstorm warning for sea areas",
+        "rain": "Heavy rain warning",
+        "trafficWeather": "Traffic weather warning",
+        "pedestrianSafety": "Pedestrian weather warning",
+        "forestFireWeather": "Wildfire warning",
+        "hotWeather": "Heat wave warning",
+        "coldWeather": "Cold warning",
+        "uvNote": "UV advisory",
+        "seaWaveHeight": "Wave height warning",
+        "seaWaterHeight": "Sea level warning",
+        "seaIcing": "Ice accretion warning"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "warning_level": {
+        "state": {
+          "none": "No warning",
+          "yellow": "Yellow",
+          "orange": "Orange",
+          "red": "Red"
+        }
+      }
+    },
+    "event": {
+      "warning": {
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "issued": "Issued",
+              "updated": "Updated",
+              "cancelled": "Cancelled"
+            }
+          }
         }
       }
     }

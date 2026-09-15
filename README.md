@@ -9,6 +9,9 @@ STUK through the same API is also available.
 Each sensor is one parameter from one observation station or forecast point. Add the integration once per value
 you want to follow.
 
+It can also follow FMI's weather warnings for a place, with a sensor for the warning level in force and an event
+entity for automations. See [Weather warnings](#weather-warnings).
+
 ## Installation
 
 ### With HACS
@@ -37,15 +40,21 @@ The wizard discovers what is available at each step, so you do not need to look 
 |----------|------|--------------|------------------------------|---------|
 | language | enum | **Required** | Language used in API calls   | `eng`   |
 
-The language affects the query titles and parameter descriptions returned by FMI.
+The language affects the query titles and parameter descriptions returned by FMI, and the language of warning
+texts.
 
-### Step 2 - query
+### Step 2 - what to add
+
+Choose **Observation or forecast sensor** to read one value from a station or forecast point, which continues
+with the steps below, or **Weather warnings for a place**, described in [Weather warnings](#weather-warnings).
+
+### Step 3 - query
 
 | Name        | Type | Requirement  | Description                                  | Default |
 |-------------|------|--------------|----------------------------------------------|---------|
 | query_label | enum | **Required** | Query type, listed from FMI's stored queries |         |
 
-### Step 3 - location
+### Step 4 - location
 
 | Name   | Type | Requirement  | Description                  | Default |
 |--------|------|--------------|------------------------------|---------|
@@ -67,7 +76,7 @@ what you enter, so there is nothing to choose: digits are treated as an FMISID, 
 coordinates, and anything else as a place name. This works for STUK queries too, which have their own stations.
 
 
-### Step 4 - parameter
+### Step 5 - parameter
 
 | Name                | Type   | Requirement  | Description                                                               | Default |
 |---------------------|--------|--------------|---------------------------------------------------------------------------|---------|
@@ -77,7 +86,7 @@ coordinates, and anything else as a place name. This works for STUK queries too,
 | forecast_hours      | int    | **Required** | How many hours of forecasts to retrieve (starting from current time)      | 36      |
 | forecast_past_hours | int    | **Required** | How many past hours of forecasts to retrieve (starting from current time) | 5       |
 | no_data_issue       | bool   | **Required** | Report a repair issue when the sensor stops getting data                  | `true`  |
-| no_data_issue_hours | int    | **Required** | How many hours without data before that issue is reported                 | 24      |
+| no_data_issue_hours | int    | **Required** | How many hours without data before the data counts as stale               | 24      |
 
 Only the parameters the chosen station actually reports are offered, with their descriptions and units:
 
@@ -93,7 +102,7 @@ Some parameters use `-1` to mean "no measurable value" rather than `0`. Daily pr
 case: a dry day reads `-1`, which distorts graphs and long term statistics. Enable **negative_as_zero** to
 report those as `0`. Only exactly `-1` is affected, so a genuine `-1` degree temperature is left alone.
 
-### Step 5 - name
+### Step 6 - name
 
 | Name  | Type   | Requirement  | Description                                 | Default                     |
 |-------|--------|--------------|---------------------------------------------|-----------------------------|
@@ -111,6 +120,14 @@ published.
 
 To rename a sensor, use Home Assistant's own entity settings. The name is not part of the sensor's identity, so
 renaming does not affect its history.
+
+## Changes in 2.1
+
+- Weather warnings for a place: a warning level sensor and an event entity for automations.
+- A diagnostic stale data binary sensor for every observation and forecast sensor.
+- The no-data repair issue can be made more or less patient with **no_data_issue_hours**, or switched off.
+
+Existing sensors keep working as they are; their stale data sensors appear after the update.
 
 ## Upgrading from 1.x
 
@@ -139,6 +156,106 @@ on a box that reboots nightly is still noticed. And because each query type look
 - twelve hours for the plain observation queries, two days for the daily ones, two years for the yearly ones -
 a station that had gone quiet used to keep returning its last value for the length of that window before it
 even looked empty. The setting now means the age of the data, whatever the query.
+
+### Stale data sensor
+
+Every observation and forecast sensor also has a diagnostic binary sensor, for example
+`binary_sensor.fmi_helsinki_kaisaniemi_air_temperature_stale_data` (`..._vanhentunut_data` with Finnish as the
+language). It is on while the newest data is older than **no_data_issue_hours**, and turns off by itself when data
+comes back. The repair issue is for you to notice; the binary sensor is for automations. It works whether or not the
+repair issue is enabled.
+
+## Weather warnings
+
+FMI issues weather warnings for land and sea areas up to five days ahead. A warnings entry follows them for one
+place: choose **Weather warnings for a place** in step 2.
+
+| Name          | Type     | Requirement  | Description                               | Default                   |
+|---------------|----------|--------------|-------------------------------------------|---------------------------|
+| location      | map      | **Required** | The place, and a radius around it         | Home, 1 km                |
+| warning_types | list     | **Required** | Which warning types to follow             | All                       |
+| label         | string   | **Required** | Name for the sensor and the event entity  | `Warnings`/`Varoitukset`  |
+
+A warning is included when one of its areas covers the place, or comes within the radius of it. Warning areas are
+the municipalities for warnings on land and the sea areas for warnings at sea. A sea area includes the islands in
+it, so a place on an island gets the warnings for its sea area. On the shore, a radius of a kilometre or two brings
+in the nearby sea area.
+
+The warning types are wind on land and at sea, severe thunderstorms on land and at sea, heavy rain, traffic weather,
+pedestrian weather, wildfire, heat wave, cold, UV, wave height, sea level and ice accretion.
+
+Use **Reconfigure** to move the place or change the radius, the warning types or the name.
+
+The warnings come from FMI's open [CAP warning feed](https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml), read every
+ten minutes.
+
+### Warning level sensor
+
+The state is the highest warning level in force now: `none`, `yellow`, `orange` or `red`.
+
+| Name            | Type        | Description                                                                  |
+|-----------------|-------------|------------------------------------------------------------------------------|
+| label           | string      | Name given to the entry                                                      |
+| language        | string      | Language of the warning texts                                                |
+| latitude        | float       | Latitude of the place                                                        |
+| longitude       | float       | Longitude of the place                                                       |
+| radius          | float       | Radius around the place in metres                                            |
+| warning_types   | list        | The warning types followed                                                   |
+| active_warnings | int         | Number of warnings in force now                                              |
+| warnings        | [warning]   | Every warning that concerns the place, in force or coming up, earliest first |
+
+Only the level is recorded in history; the `warnings` attribute is not.
+
+Each warning, in the `warnings` attribute and in the events below, has these fields:
+
+| Name        | Type     | Description                                                                         |
+|-------------|----------|-------------------------------------------------------------------------------------|
+| id          | string   | FMI's identifier for this version of the warning                                    |
+| type        | string   | Warning type, e.g. `seaWind` or `seaWaveHeight`                                     |
+| level       | string   | `yellow`, `orange` or `red`                                                         |
+| event       | string   | Name of the warning, e.g. `Tuulivaroitus merelle`                                   |
+| severity    | string   | `Moderate`, `Severe` or `Extreme`                                                   |
+| onset       | datetime | When the warning comes into force                                                   |
+| expires     | datetime | When it ends                                                                        |
+| headline    | string   | FMI's headline                                                                      |
+| description | string   | FMI's description                                                                   |
+| impacts     | string   | Typical impacts, e.g. `Mahdollisesti vaarallinen huviveneille.`                     |
+| probability | int      | Probability in percent, when FMI gives one                                          |
+| areas       | list     | The warning's areas that concern the place                                          |
+| parameters  | object   | Values for the warning type, e.g. `windIntensity: 14`, `windIntensityUom: m/s`, `windDirection: 180`, `waveHeight` |
+
+### Warning events
+
+The event entity fires when something happens to a warning that concerns the place:
+
+| Event type  | When                                                                  |
+|-------------|-----------------------------------------------------------------------|
+| `issued`    | A new warning concerns the place                                      |
+| `updated`   | A warning's level, validity, texts or values changed                  |
+| `cancelled` | A warning was withdrawn before it expired                             |
+
+The event data is the warning, with the fields above. FMI republishes its warnings regularly; a warning republished
+without changes fires nothing. A warning coming into force or running out changes the level sensor instead, and
+warnings already in force when Home Assistant starts do not fire `issued`.
+
+For example, a notification when a warning is issued for the cabin:
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: event.fmi_warnings_cabin
+    not_from: unavailable
+conditions:
+  - condition: state
+    entity_id: event.fmi_warnings_cabin
+    attribute: event_type
+    state: issued
+actions:
+  - action: notify.mobile_app_phone
+    data:
+      title: "{{ trigger.to_state.attributes.headline }}"
+      message: "{{ trigger.to_state.attributes.description }}"
+```
 
 ## State attributes
 

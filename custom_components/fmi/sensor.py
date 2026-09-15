@@ -7,12 +7,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
+from .cap import highest_level
 from .const import DOMAIN, CONF_LABEL, CONF_QUERY_ID, CONF_LANG, CONF_QUERY_LABEL, CONF_PARAMETER, \
     CONF_TARGET_TYPE, CONF_TARGET, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, \
-    CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE_HOURS
+    CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE_HOURS, ATTRIBUTION, \
+    CONF_ENTRY_TYPE, ENTRY_TYPE_WARNINGS, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_LEVELS
+from .warning_coordinator import FMIWarningsCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-ATTRIBUTION = "Data provided by Finnish Meteorological Institute (FMI)"
 
 ATTR_LATITUDE = "latitude"
 ATTR_LONGITUDE = "longitude"
@@ -31,6 +33,10 @@ ATTR_FORECAST_PAST_HOURS = "forecast_past_hours"
 ATTR_FORECAST_STEP = "forecast_step"
 ATTR_NO_DATA_ISSUE = "no_data_issue"
 ATTR_NO_DATA_ISSUE_HOURS = "no_data_issue_hours"
+ATTR_RADIUS = "radius"
+ATTR_WARNING_TYPES = "warning_types"
+ATTR_ACTIVE_WARNINGS = "active_warnings"
+ATTR_WARNINGS = "warnings"
 
 
 def get_query_name(entry: ConfigEntry) -> str | None:
@@ -61,11 +67,27 @@ def get_config_attributes(entry: ConfigEntry) -> dict:
     return attributes
 
 
+def get_warnings_config_attributes(entry: ConfigEntry) -> dict:
+    location = entry.data[CONF_LOCATION]
+    return {
+        ATTR_LABEL: entry.data.get(CONF_LABEL),
+        ATTR_LANGUAGE: entry.data.get(CONF_LANG),
+        ATTR_LATITUDE: location.get("latitude"),
+        ATTR_LONGITUDE: location.get("longitude"),
+        ATTR_RADIUS: location.get("radius") or 0,
+        ATTR_WARNING_TYPES: entry.data.get(CONF_WARNING_TYPES),
+    }
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     coord = hass.data[DOMAIN][entry.entry_id]
-    query_id = entry.data.get(CONF_QUERY_ID)
     label = entry.data.get(CONF_LABEL)
 
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_WARNINGS:
+        async_add_entities([FMIWarningLevelSensor(coord, entry, label)])
+        return
+
+    query_id = entry.data.get(CONF_QUERY_ID)
     sensor = FMIForecastSensor(coord, entry, label) if "::forecast" in query_id else FMISensor(coord, entry, label)
     async_add_entities([sensor], update_before_add=True)
 
@@ -144,3 +166,39 @@ class FMIForecastSensor(CoordinatorEntity, SensorEntity):
         return next(
             (entry["value"] for entry in self.coordinator.data["data"] if entry["time"] > now),
             None) if len(self.coordinator.data["data"]) > 0 else None
+
+
+class FMIWarningLevelSensor(CoordinatorEntity[FMIWarningsCoordinator], SensorEntity):
+    """The highest warning level in force now for the place: none, yellow, orange or red.
+
+    Every warning that concerns the place, in force or coming up in the next
+    few days, is listed in the attributes.
+    """
+
+    # The warning texts are long and repeat on every refresh; history only needs the level.
+    _unrecorded_attributes = frozenset({ATTR_WARNINGS})
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = WARNING_LEVELS
+    _attr_translation_key = "warning_level"
+
+    def __init__(self, coordinator: FMIWarningsCoordinator, entry: ConfigEntry, label: str):
+        super().__init__(coordinator)
+        self._attr_attribution = ATTRIBUTION
+        self._attr_icon = "mdi:alert"
+        self._attr_unique_id = entry.entry_id
+        self._attr_name = f"FMI {label}"
+        self._config_attributes = get_warnings_config_attributes(entry)
+
+    @property
+    def native_value(self) -> str:
+        return highest_level(self.coordinator.data.warnings, dt_util.utcnow())
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        now = dt_util.utcnow()
+        warnings = sorted(self.coordinator.data.warnings.values(), key=lambda warning: warning.onset or now)
+        return {
+            **self._config_attributes,
+            ATTR_ACTIVE_WARNINGS: sum(1 for warning in warnings if warning.is_active(now)),
+            ATTR_WARNINGS: [warning.as_dict() for warning in warnings],
+        }

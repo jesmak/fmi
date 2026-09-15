@@ -1,4 +1,5 @@
 DOMAIN = "fmi"
+ATTRIBUTION = "Data provided by Finnish Meteorological Institute (FMI)"
 API_DESCRIBE_STORED_QUERIES_URL = "https://opendata.fmi.fi/wfs/${lang}?request=describeStoredQueries"
 API_GET_FEATURE_URL = "https://opendata.fmi.fi/wfs/${lang}?request=getFeature"
 API_STATIONS_QUERY_ID = "fmi::ef::stations"
@@ -18,6 +19,11 @@ DEFAULT_SCAN_INTERVAL = 5
 DEFAULT_NO_DATA_ISSUE = True
 DEFAULT_NO_DATA_ISSUE_HOURS = 24
 
+# Every warning in force, 0-5 days ahead. The feed lists CAP documents; each one
+# has its texts in Finnish, Swedish and English, so one feed serves every language.
+API_WARNINGS_FEED_URL = "https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml"
+WARNINGS_SCAN_INTERVAL = 10
+
 LANGUAGES = ["eng", "fin"]
 
 CONF_LABEL = "label"
@@ -33,3 +39,35 @@ CONF_FORECAST_STEP = "forecast_step"
 CONF_NEGATIVE_AS_ZERO = "negative_as_zero"
 CONF_NO_DATA_ISSUE = "no_data_issue"
 CONF_NO_DATA_ISSUE_HOURS = "no_data_issue_hours"
+CONF_ENTRY_TYPE = "entry_type"
+CONF_LOCATION = "location"
+CONF_WARNING_TYPES = "warning_types"
+
+# What an entry is. Entries made before 2.1 have no entry type and are all query sensors.
+ENTRY_TYPE_QUERY = "query"
+ENTRY_TYPE_WARNINGS = "warnings"
+
+# The warning types of FMI's CAP profile, https://alerts.fmi.fi/cap/profile/v1.1.0
+WARNING_TYPES = [
+    "wind",
+    "seaWind",
+    "thunderstorm",
+    "seaThunderstorm",
+    "rain",
+    "trafficWeather",
+    "pedestrianSafety",
+    "forestFireWeather",
+    "hotWeather",
+    "coldWeather",
+    "uvNote",
+    "seaWaveHeight",
+    "seaWaterHeight",
+    "seaIcing",
+]
+# In rising order. "none" is the state when no warning is in force.
+WARNING_LEVELS = ["none", "yellow", "orange", "red"]
+DEFAULT_WARNINGS_RADIUS = 1000
+DEFAULT_WARNINGS_LABEL = {"eng": "Warnings", "fin": "Varoitukset"}
+
+# Name suffix of the diagnostic stale data sensor, in the entry's language.
+STALE_DATA_SUFFIX = {"eng": "stale data", "fin": "vanhentunut data"}

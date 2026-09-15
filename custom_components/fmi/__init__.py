@@ -12,14 +12,28 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN, DEFAULT_SCAN_INTERVAL, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_QUERY_ID, \
     CONF_LANG, CONF_FORECAST_STEP, CONF_TARGET, CONF_TARGET_TYPE, CONF_PARAMETER, \
     CONF_NEGATIVE_AS_ZERO, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE, \
-    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT, CONF_LABEL
+    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT, CONF_LABEL, CONF_ENTRY_TYPE, ENTRY_TYPE_WARNINGS, CONF_LOCATION, \
+    CONF_WARNING_TYPES
 from .session import FMISession, FMIException
+from .warning_coordinator import FMIWarningsCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+# An observation or forecast sensor comes with its diagnostic stale data sensor;
+# a warnings entry is a level sensor and an event entity.
+QUERY_PLATFORMS = ["sensor", "binary_sensor"]
+WARNINGS_PLATFORMS = ["sensor", "event"]
+
+
+def platforms_for(entry: ConfigEntry) -> list[str]:
+    return WARNINGS_PLATFORMS if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_WARNINGS else QUERY_PLATFORMS
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
+
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_WARNINGS:
+        return await async_setup_warnings_entry(hass, entry)
 
     issue_id = f"no_data_{entry.entry_id}"
     # Whether this outage has been looked into already, so the probe in
@@ -95,16 +109,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                                                    is_forecast is False,
                                                    entry.data.get(CONF_NEGATIVE_AS_ZERO, False))
 
-        if entry.data.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE):
-            grace = timedelta(hours=entry.data.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS))
+        # Staleness is always worked out, because the stale data binary sensor
+        # reports it; the repair issue is the part that can be switched off.
+        grace = timedelta(hours=entry.data.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS))
+        stale = await async_is_stale(now, grace, is_forecast, result)
 
-            if not await async_is_stale(now, grace, is_forecast, result):
-                no_data["reported"] = False
-                ir.async_delete_issue(hass, DOMAIN, issue_id)
-            elif not no_data["reported"]:
-                no_data["reported"] = True
+        if not stale:
+            no_data["reported"] = False
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
+        elif not no_data["reported"]:
+            no_data["reported"] = True
+            if entry.data.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE):
                 await async_report_no_data(hass, entry, issue_id, build_params(now, False))
 
+        result["stale"] = stale
         return result
 
     coord = DataUpdateCoordinator(
@@ -123,7 +141,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # so reload the entry to rebuild the coordinator and the sensor attributes.
     entry.async_on_unload(entry.add_update_listener(async_update_listener))
 
-    await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
+    await hass.config_entries.async_forward_entry_setups(entry, QUERY_PLATFORMS)
+
+    return True
+
+
+async def async_setup_warnings_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    coordinator = FMIWarningsCoordinator(hass, entry)
+    await coordinator.async_config_entry_first_refresh()
+
+    hass.data[DOMAIN][entry.entry_id] = coordinator
+    entry.async_on_unload(entry.add_update_listener(async_update_listener))
+
+    await hass.config_entries.async_forward_entry_setups(entry, WARNINGS_PLATFORMS)
 
     return True
 
@@ -179,6 +209,14 @@ def build_unique_id(data: dict[str, Any]) -> str:
                      str(data[CONF_TARGET]), str(data[CONF_PARAMETER])]).lower()
 
 
+def build_warnings_unique_id(data: dict[str, Any]) -> str:
+    """Identify a warnings entry by the place, radius and warning types it follows."""
+    location = data[CONF_LOCATION]
+    return "_".join(["warnings", f"{float(location['latitude']):.4f}", f"{float(location['longitude']):.4f}",
+                     str(round(float(location.get("radius") or 0))),
+                     ",".join(sorted(data[CONF_WARNING_TYPES]))]).lower()
+
+
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Move off label-derived identifiers (version 1) so sensors can be renamed."""
     if entry.version > 1:
@@ -214,7 +252,7 @@ def get_start_time(query_id: str, now: datetime, data: dict[str, Any]):
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    if unload_ok := await hass.config_entries.async_forward_entry_unload(entry, "sensor"):
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, platforms_for(entry)):
         hass.data[DOMAIN].pop(entry.entry_id)
         ir.async_delete_issue(hass, DOMAIN, f"no_data_{entry.entry_id}")
 

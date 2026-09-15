@@ -10,17 +10,18 @@ from homeassistant import config_entries
 from homeassistant.core import callback, HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.selector import (SelectOptionDict, SelectSelector, SelectSelectorConfig,
-                                            SelectSelectorMode)
+from homeassistant.helpers.selector import (LocationSelector, LocationSelectorConfig, SelectOptionDict, SelectSelector,
+                                            SelectSelectorConfig, SelectSelectorMode)
 from homeassistant.util import dt as dt_util
 from homeassistant.util.location import distance
 
-from . import build_unique_id, get_start_time
+from . import build_unique_id, build_warnings_unique_id, get_start_time
 
 from .const import (DOMAIN, CONF_LABEL, CONF_LANG, CONF_QUERY_ID, CONF_QUERY_LABEL, CONF_FORECAST_HOURS, CONF_TARGET,
                     CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, LANGUAGES, CONF_PARAMETER, CONF_TARGET_TYPE,
                     CONF_NEGATIVE_AS_ZERO, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE,
-                    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT)
+                    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT, CONF_ENTRY_TYPE, ENTRY_TYPE_WARNINGS, CONF_LOCATION,
+                    CONF_WARNING_TYPES, WARNING_TYPES, DEFAULT_WARNINGS_RADIUS, DEFAULT_WARNINGS_LABEL)
 from .session import FMISession, FMIException
 
 _LOGGER = logging.getLogger(__name__)
@@ -28,6 +29,16 @@ _LOGGER = logging.getLogger(__name__)
 CONFIGURE_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_LANG): vol.All(cv.string, vol.In(LANGUAGES)),
+    }
+)
+
+WARNINGS_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_LOCATION): LocationSelector(LocationSelectorConfig(radius=True, icon="mdi:alert")),
+        vol.Required(CONF_WARNING_TYPES): SelectSelector(
+            SelectSelectorConfig(options=WARNING_TYPES, multiple=True, translation_key=CONF_WARNING_TYPES,
+                                 mode=SelectSelectorMode.LIST)),
+        vol.Required(CONF_LABEL): cv.string,
     }
 )
 
@@ -51,6 +62,12 @@ async def validate_input(hass: HomeAssistant, data: dict[str, any]) -> str:
         raise ConnectionProblem
 
     return data[CONF_LABEL]
+
+
+def validate_warnings_input(data: dict[str, Any]) -> dict[str, str]:
+    if not data.get(CONF_WARNING_TYPES):
+        return {CONF_WARNING_TYPES: "no_warning_types"}
+    return {}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -193,7 +210,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_show_form(step_id="user", data_schema=CONFIGURE_SCHEMA)
 
         self.data = user_input
-        return await self.async_step_query()
+        return await self.async_step_kind()
+
+    async def async_step_kind(self, user_input: dict[str, any] = None) -> FlowResult:
+        """A sensor for one measured value, or the weather warnings for a place."""
+        return self.async_show_menu(step_id="kind", menu_options=["query", "warnings"])
 
     async def async_step_query(self, user_input: dict[str, any] = None) -> FlowResult:
 
@@ -213,6 +234,31 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.data.update(user_input)
 
         return await self.async_step_location()
+
+    async def async_step_warnings(self, user_input: dict[str, any] = None) -> FlowResult:
+        """Follow FMI's weather warnings for a place picked on a map."""
+        errors = {}
+
+        if user_input is not None:
+            errors = validate_warnings_input(user_input)
+
+            if not errors:
+                self.data.update(user_input)
+                self.data[CONF_ENTRY_TYPE] = ENTRY_TYPE_WARNINGS
+                await self.async_set_unique_id(build_warnings_unique_id(self.data))
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(title=self.data[CONF_LABEL], data=self.data)
+
+        values = user_input or {
+            CONF_LOCATION: {"latitude": self.hass.config.latitude, "longitude": self.hass.config.longitude,
+                            "radius": DEFAULT_WARNINGS_RADIUS},
+            CONF_WARNING_TYPES: WARNING_TYPES,
+            CONF_LABEL: DEFAULT_WARNINGS_LABEL.get(self.data[CONF_LANG], DEFAULT_WARNINGS_LABEL["eng"]),
+        }
+
+        return self.async_show_form(step_id="warnings",
+                                    data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values),
+                                    errors=errors, last_step=True)
 
     async def async_step_location(self, user_input: dict[str, any] = None) -> FlowResult:
 
@@ -306,6 +352,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """
         entry = self._get_reconfigure_entry()
 
+        if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_WARNINGS:
+            return await self.async_step_reconfigure_warnings(user_input)
+
         if user_input is None:
             self.data = dict(entry.data)
             session = FMISession()
@@ -327,6 +376,32 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self.data.update(user_input)
 
         return await self.async_step_reconfigure_location()
+
+    async def async_step_reconfigure_warnings(self, user_input: dict[str, any] = None) -> FlowResult:
+        """Move a warnings entry to another place, or change its radius, warning types or name."""
+        entry = self._get_reconfigure_entry()
+        errors = {}
+
+        if user_input is not None:
+            errors = validate_warnings_input(user_input)
+
+            if not errors:
+                updated = {**entry.data, **user_input}
+                unique_id = build_warnings_unique_id(updated)
+                clash = self.hass.config_entries.async_entry_for_domain_unique_id(DOMAIN, unique_id)
+
+                if clash is not None and clash.entry_id != entry.entry_id:
+                    return self.async_abort(reason="already_configured")
+
+                # The entry's update listener reloads it.
+                self.hass.config_entries.async_update_entry(entry, title=updated[CONF_LABEL], data=updated,
+                                                            unique_id=unique_id)
+                return self.async_abort(reason="reconfigure_successful")
+
+        return self.async_show_form(step_id="reconfigure_warnings",
+                                    data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA,
+                                                                                    user_input or dict(entry.data)),
+                                    errors=errors, last_step=True)
 
     async def async_step_reconfigure_location(self, user_input: dict[str, any] = None) -> FlowResult:
 

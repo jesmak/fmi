@@ -32,6 +32,31 @@ class FMISession:
     def __init__(self, timeout=20):
         self._timeout = timeout
 
+    def get_document(self, url: str) -> bytes:
+        """Download a document as it is, such as the warning feed or one warning in it."""
+
+        try:
+            _LOGGER.debug(f"Downloading from FMI (url={url})")
+
+            response = requests.get(
+                url=url,
+                headers={
+                    "User-Agent": USER_AGENT
+                },
+                timeout=self._timeout,
+            )
+
+            if response.status_code != 200:
+                raise FMIException(f"{response.status_code} is not valid")
+
+            return response.content
+
+        except ConnectTimeout as exception:
+            raise FMIException("Timeout error") from exception
+
+        except RequestException as exception:
+            raise FMIException(f"Communication error {exception}") from exception
+
     def get_feature(self, lang: str, params: dict[str, str], target_param: str, get_latest: bool,
                     negative_as_zero: bool = False) -> Any:
 
