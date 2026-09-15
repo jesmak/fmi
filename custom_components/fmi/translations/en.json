@@ -1,107 +1,144 @@
 {
   "config": {
-    "error": {
-      "connection_problem": "FMI returned no data for this query, station and parameter. Check the location and try again.",
-      "no_warning_types": "Choose at least one warning type.",
-      "unknown": "Unknown error"
-    },
     "abort": {
-      "already_configured": "This sensor already exists",
-      "reconfigure_successful": "Sensor updated"
+      "single_instance_allowed": "FMI is already set up. Add sensors and warnings places from its integration page.",
+      "reconfigure_successful": "Settings saved"
     },
     "step": {
       "user": {
         "title": "FMI integration",
-        "description": "Choose the language FMI uses. It affects the query and parameter names shown in the next steps, and the language of the data FMI returns.",
+        "description": "Choose the language FMI uses. It affects the query and parameter names shown when adding sensors, the language of the data FMI returns, and the language of warning texts.\n\nOnce this is set up, add sensors and warnings places from the integration page.",
         "data": {
           "language": "Language used when calling API"
         }
       },
-      "kind": {
-        "title": "What to add",
-        "description": "A sensor reads one value, such as sea level or snow depth, from a station or forecast point. Warnings follow FMI's weather warnings for a place.",
-        "menu_options": {
-          "query": "Observation or forecast sensor",
-          "warnings": "Weather warnings for a place"
-        }
-      },
-      "warnings": {
-        "title": "Weather warnings",
-        "description": "Pick the place on the map. A warning is included when its area covers the place, or comes within the circle's radius.\n\nOn an island or by the shore, a radius of a kilometre or two makes sure the warnings for the nearby sea area are included.",
-        "data": {
-          "location": "Place",
-          "warning_types": "Warning types",
-          "label": "Name"
-        }
-      },
-      "reconfigure_warnings": {
-        "title": "Weather warnings",
-        "description": "Pick the place on the map. A warning is included when its area covers the place, or comes within the circle's radius.\n\nOn an island or by the shore, a radius of a kilometre or two makes sure the warnings for the nearby sea area are included.",
-        "data": {
-          "location": "Place",
-          "warning_types": "Warning types",
-          "label": "Name"
-        }
-      },
-      "query": {
-        "title": "Query",
-        "description": "Choose what you want to measure. The list contains every observation and forecast query FMI publishes.",
-        "data": {
-          "query_label": "Selected query"
-        }
-      },
-      "params": {
-        "title": "Parameter",
-        "description": "Pick the value to read. Only the parameters this station actually reports are listed, with their descriptions and units.\n\nIf the one you want is missing you can type its name. The raw query results are at {url}.",
-        "data": {
-          "forecast_step": "Time step between two forecast values in minutes",
-          "forecast_hours": "Forecast hours to show",
-          "forecast_past_hours": "Forecast history to show (hours)",
-          "parameter": "Parameter to return",
-          "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained.",
-          "no_data_issue": "Warn when the sensor stops getting data",
-          "no_data_issue_hours": "Hours without data before the data counts as stale"
-        }
-      },
       "reconfigure": {
-        "title": "Query",
-        "description": "Point this sensor at a different query, station or parameter. The sensor keeps its history, so this is how to repair one whose station or parameter has stopped working.",
+        "title": "FMI integration",
+        "description": "The language for sensors and warnings places added from now on. Existing ones keep their language.",
         "data": {
-          "query_label": "Selected query"
+          "language": "Language used when calling API"
         }
-      },
-      "reconfigure_params": {
-        "title": "Parameter",
-        "description": "Pick the value to read. Only the parameters this station actually reports are listed, with their descriptions and units.\n\nIf the one you want is missing you can type its name. The raw query results are at {url}.",
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Stale data",
+        "description": "When a sensor's newest data is older than this, its stale data sensor turns on, and a repair issue can tell you what is wrong.\n\nThe setting applies to every sensor. Daily, monthly and yearly statistics are only reported once the period is over, so for those the limit is never shorter than three days, two months or two years.",
         "data": {
-          "parameter": "Parameter to return",
-          "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained.",
-          "forecast_step": "Time step between two forecast values in minutes",
-          "forecast_hours": "Forecast hours to show",
-          "forecast_past_hours": "Forecast history to show (hours)",
-          "no_data_issue": "Warn when the sensor stops getting data",
+          "no_data_issue": "Raise a repair issue when a sensor stops getting data",
           "no_data_issue_hours": "Hours without data before the data counts as stale"
         }
+      }
+    }
+  },
+  "config_subentries": {
+    "sensor": {
+      "entry_type": "Sensor",
+      "initiate_flow": {
+        "user": "Add sensor",
+        "reconfigure": "Change sensor"
       },
-      "name": {
-        "title": "Name",
-        "description": "The suggested name comes from the station and parameter you chose.",
-        "data": {
-          "label": "Name for the sensor created by this integration"
+      "error": {
+        "connection_problem": "FMI returned no data for this query, station and parameter. Check the location and try again.",
+        "unknown": "Unknown error"
+      },
+      "abort": {
+        "already_configured": "A sensor for this query, station and parameter already exists",
+        "reconfigure_successful": "Sensor updated"
+      },
+      "step": {
+        "user": {
+          "title": "Query",
+          "description": "Choose what you want to measure. The list contains every observation and forecast query FMI publishes.",
+          "data": {
+            "query_label": "Selected query"
+          }
+        },
+        "location": {
+          "title": "Location",
+          "description": "Pick the station to read from. Stations are ordered by distance from your Home Assistant location.\n\nFor observation queries only the stations that serve the query you chose are listed. Forecast queries are not tied to a station, so every station is offered.\n\nYou can also type a place name, or coordinates as latitude,longitude.",
+          "data": {
+            "target": "Station, place or coordinates"
+          }
+        },
+        "params": {
+          "title": "Parameter",
+          "description": "Pick the value to read. Only the parameters this station actually reports are listed, with their descriptions and units.\n\nIf the one you want is missing you can type its name. The raw query results are at {url}.",
+          "data": {
+            "forecast_step": "Time step between two forecast values in minutes",
+            "forecast_hours": "Forecast hours to show",
+            "forecast_past_hours": "Forecast history to show (hours)",
+            "parameter": "Parameter to return",
+            "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained."
+          }
+        },
+        "name": {
+          "title": "Name",
+          "description": "The suggested name comes from the station and parameter you chose.",
+          "data": {
+            "label": "Name for the sensor"
+          }
+        },
+        "reconfigure": {
+          "title": "Query",
+          "description": "Point this sensor at a different query, station or parameter. The sensor keeps its history, so this is how to repair one whose station or parameter has stopped working.",
+          "data": {
+            "query_label": "Selected query"
+          }
+        },
+        "reconfigure_location": {
+          "title": "Location",
+          "description": "Pick the station to read from. Stations are ordered by distance from your Home Assistant location.\n\nFor observation queries only the stations that serve the query you chose are listed. Forecast queries are not tied to a station, so every station is offered.\n\nYou can also type a place name, or coordinates as latitude,longitude.",
+          "data": {
+            "target": "Station, place or coordinates"
+          }
+        },
+        "reconfigure_params": {
+          "title": "Parameter",
+          "description": "Pick the value to read. Only the parameters this station actually reports are listed, with their descriptions and units.\n\nIf the one you want is missing you can type its name. The raw query results are at {url}.",
+          "data": {
+            "parameter": "Parameter to return",
+            "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained.",
+            "forecast_step": "Time step between two forecast values in minutes",
+            "forecast_hours": "Forecast hours to show",
+            "forecast_past_hours": "Forecast history to show (hours)"
+          }
         }
+      }
+    },
+    "warnings": {
+      "entry_type": "Weather warnings",
+      "initiate_flow": {
+        "user": "Add warnings place",
+        "reconfigure": "Change warnings place"
       },
-      "location": {
-        "title": "Location",
-        "description": "Pick the station to read from. Stations are ordered by distance from your Home Assistant location.\n\nFor observation queries only the stations that serve the query you chose are listed. Forecast queries are not tied to a station, so every station is offered.\n\nYou can also type a place name, or coordinates as latitude,longitude.",
-        "data": {
-          "target": "Station, place or coordinates"
-        }
+      "error": {
+        "no_warning_types": "Choose at least one warning type."
       },
-      "reconfigure_location": {
-        "title": "Location",
-        "description": "Pick the station to read from. Stations are ordered by distance from your Home Assistant location.\n\nFor observation queries only the stations that serve the query you chose are listed. Forecast queries are not tied to a station, so every station is offered.\n\nYou can also type a place name, or coordinates as latitude,longitude.",
-        "data": {
-          "target": "Station, place or coordinates"
+      "abort": {
+        "already_configured": "Warnings for this place and these warning types are already followed",
+        "reconfigure_successful": "Warnings place updated"
+      },
+      "step": {
+        "user": {
+          "title": "Weather warnings",
+          "description": "Pick the place on the map. A warning is included when its area covers the place, or comes within the circle's radius.\n\nOn an island or by the shore, a radius of a kilometre or two makes sure the warnings for the nearby sea area are included.",
+          "data": {
+            "location": "Place",
+            "warning_types": "Warning types",
+            "label": "Name"
+          }
+        },
+        "reconfigure": {
+          "title": "Weather warnings",
+          "description": "Pick the place on the map. A warning is included when its area covers the place, or comes within the circle's radius.\n\nOn an island or by the shore, a radius of a kilometre or two makes sure the warnings for the nearby sea area are included.",
+          "data": {
+            "location": "Place",
+            "warning_types": "Warning types",
+            "label": "Name"
+          }
         }
       }
     }

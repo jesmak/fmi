@@ -1,19 +1,19 @@
-"""A warnings entry end to end: the level sensor, its attributes and the event entity."""
+"""A warnings place end to end: the level sensor, its attributes and the event entity."""
 from pathlib import Path
 
 import pytest
+from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fmi.const import (
     API_WARNINGS_FEED_URL,
-    CONF_ENTRY_TYPE,
     CONF_LABEL,
     CONF_LANG,
     CONF_LOCATION,
     CONF_WARNING_TYPES,
     DOMAIN,
-    ENTRY_TYPE_WARNINGS,
+    SUBENTRY_WARNINGS,
     WARNING_TYPES,
 )
 from custom_components.fmi.session import FMIException
@@ -38,9 +38,11 @@ class FakeApi:
     def __init__(self, urls: list[str]):
         self.urls = urls
         self.failing: set[str] = set()
+        self.feed_requests = 0
 
     def get_document(self, url: str) -> bytes:
         if url == API_WARNINGS_FEED_URL:
+            self.feed_requests += 1
             entries = "".join(f'<entry><link type="application/cap+xml" href="{u}" /></entry>' for u in self.urls)
             return f'<feed xmlns="http://www.w3.org/2005/Atom">{entries}</feed>'.encode()
         if url in self.failing:
@@ -48,23 +50,32 @@ class FakeApi:
         return DOCUMENTS[url]
 
 
-async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi) -> MockConfigEntry:
-    monkeypatch.setattr("custom_components.fmi.warning_coordinator.FMISession", lambda *a, **kw: api)
-    entry = MockConfigEntry(domain=DOMAIN, version=2, unique_id="warnings_test", data={
-        CONF_ENTRY_TYPE: ENTRY_TYPE_WARNINGS,
+def warnings_place(label: str, latitude: float, longitude: float, radius: float = 0) -> ConfigSubentryData:
+    location = {"latitude": latitude, "longitude": longitude, "radius": radius}
+    return ConfigSubentryData(subentry_type=SUBENTRY_WARNINGS, title=label, unique_id=f"warnings_{label}", data={
         CONF_LANG: "fin",
-        CONF_LABEL: "Varoitukset Suomenlinna",
-        CONF_LOCATION: {"latitude": 60.146, "longitude": 24.988, "radius": 0},
+        CONF_LABEL: label,
+        CONF_LOCATION: location,
         CONF_WARNING_TYPES: WARNING_TYPES,
     })
+
+
+async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, *places: ConfigSubentryData) -> MockConfigEntry:
+    monkeypatch.setattr("custom_components.fmi.warning_coordinator.FMISession", lambda *a, **kw: api)
+    entry = MockConfigEntry(domain=DOMAIN, version=3, data={CONF_LANG: "fin"}, subentries_data=list(places) or [
+        warnings_place("Varoitukset Suomenlinna", 60.146, 24.988),
+    ])
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     return entry
 
 
-async def _refresh(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    await hass.data[DOMAIN][entry.entry_id].async_refresh()
+async def _refresh(hass: HomeAssistant, entry: MockConfigEntry, freezer) -> None:
+    # The places share one download of the feed for a moment; step past it.
+    freezer.tick(60)
+    for coordinator in entry.runtime_data.coordinators.values():
+        await coordinator.async_refresh()
     await hass.async_block_till_done()
 
 
@@ -106,15 +117,14 @@ async def test_issued_and_cancelled_events(hass: HomeAssistant, monkeypatch, fre
     assert hass.states.get(EVENT).state == "unknown"
 
     api.urls = [BOTHNIA, SEVERAL_AREAS]
-    await _refresh(hass, entry)
+    await _refresh(hass, entry, freezer)
     issued = hass.states.get(EVENT)
     assert issued.attributes["event_type"] == "issued"
     assert issued.attributes["type"] == "seaWind"
     assert issued.attributes["level"] == "yellow"
 
-    freezer.tick(60)
     api.urls = [BOTHNIA]
-    await _refresh(hass, entry)
+    await _refresh(hass, entry, freezer)
     cancelled = hass.states.get(EVENT)
     assert cancelled.attributes["event_type"] == "cancelled"
     assert cancelled.state != issued.state
@@ -128,7 +138,18 @@ async def test_a_warning_that_cannot_be_read_does_not_look_cancelled(hass: HomeA
 
     api.urls = [SEVERAL_AREAS, BOTHNIA]
     api.failing.add(BOTHNIA)
-    await _refresh(hass, entry)
+    await _refresh(hass, entry, freezer)
 
     assert hass.states.get(SENSOR).state == "yellow"
     assert hass.states.get(EVENT).state == event_before
+
+
+async def test_places_share_one_download_of_the_feed(hass: HomeAssistant, monkeypatch, freezer):
+    freezer.move_to("2026-09-16T12:00:00+03:00")
+    api = FakeApi([SEVERAL_AREAS, BOTHNIA])
+    await _setup(hass, monkeypatch, api, warnings_place("Varoitukset Suomenlinna", 60.146, 24.988),
+                 warnings_place("Varoitukset Hanko", 59.823, 22.968, 2000))
+
+    assert api.feed_requests == 1
+    assert hass.states.get("sensor.fmi_varoitukset_suomenlinna").state == "yellow"
+    assert hass.states.get("sensor.fmi_varoitukset_hanko") is not None

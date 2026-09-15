@@ -6,8 +6,8 @@ A custom component that integrates with Finnish Meteorological Institute to retr
 other weather integrations, such as seawater level, UV-index, snow thickness etc. Radiation data published by
 STUK through the same API is also available.
 
-Each sensor is one parameter from one observation station or forecast point. Add the integration once per value
-you want to follow.
+The integration is added once. Each sensor you then add to it is one parameter from one observation station or
+forecast point.
 
 It can also follow FMI's weather warnings for a place, with a sensor for the warning level in force and an event
 entity for automations. See [Weather warnings](#weather-warnings).
@@ -32,29 +32,30 @@ No account or API key is needed. FMI's open data service is used anonymously.
 
 ## Configuration
 
-The wizard discovers what is available at each step, so you do not need to look anything up by hand.
-
-### Step 1 - language
+### Setting up the integration
 
 | Name     | Type | Requirement  | Description                  | Default |
 |----------|------|--------------|------------------------------|---------|
 | language | enum | **Required** | Language used in API calls   | `eng`   |
 
 The language affects the query titles and parameter descriptions returned by FMI, and the language of warning
-texts.
+texts. It is the language of the sensors and warnings places added from then on; each keeps the language it was
+added with. Change it with **Reconfigure** on the integration.
 
-### Step 2 - what to add
+Then add sensors with **Add sensor**, and places to follow weather warnings for with **Add warnings place**, on the
+integration's page.
 
-Choose **Observation or forecast sensor** to read one value from a station or forecast point, which continues
-with the steps below, or **Weather warnings for a place**, described in [Weather warnings](#weather-warnings).
+## Adding a sensor
 
-### Step 3 - query
+The wizard discovers what is available at each step, so you do not need to look anything up by hand.
+
+### Step 1 - query
 
 | Name        | Type | Requirement  | Description                                  | Default |
 |-------------|------|--------------|----------------------------------------------|---------|
 | query_label | enum | **Required** | Query type, listed from FMI's stored queries |         |
 
-### Step 4 - location
+### Step 2 - location
 
 | Name   | Type | Requirement  | Description                  | Default |
 |--------|------|--------------|------------------------------|---------|
@@ -76,7 +77,7 @@ what you enter, so there is nothing to choose: digits are treated as an FMISID, 
 coordinates, and anything else as a place name. This works for STUK queries too, which have their own stations.
 
 
-### Step 5 - parameter
+### Step 3 - parameter
 
 | Name                | Type   | Requirement  | Description                                                               | Default |
 |---------------------|--------|--------------|---------------------------------------------------------------------------|---------|
@@ -85,8 +86,6 @@ coordinates, and anything else as a place name. This works for STUK queries too,
 | forecast_step       | int    | **Required** | Step between two values in minutes. Only shown for forecast type queries. | 30      |
 | forecast_hours      | int    | **Required** | How many hours of forecasts to retrieve (starting from current time)      | 36      |
 | forecast_past_hours | int    | **Required** | How many past hours of forecasts to retrieve (starting from current time) | 5       |
-| no_data_issue       | bool   | **Required** | Report a repair issue when the sensor stops getting data                  | `true`  |
-| no_data_issue_hours | int    | **Required** | How many hours without data before the data counts as stale               | 24      |
 
 Only the parameters the chosen station actually reports are offered, with their descriptions and units:
 
@@ -102,7 +101,7 @@ Some parameters use `-1` to mean "no measurable value" rather than `0`. Daily pr
 case: a dry day reads `-1`, which distorts graphs and long term statistics. Enable **negative_as_zero** to
 report those as `0`. Only exactly `-1` is affected, so a genuine `-1` degree temperature is left alone.
 
-### Step 6 - name
+### Step 4 - name
 
 | Name  | Type   | Requirement  | Description                                 | Default                     |
 |-------|--------|--------------|---------------------------------------------|-----------------------------|
@@ -113,13 +112,32 @@ renamed later without losing its history.
 
 ## Changing a sensor later
 
-Use **Reconfigure** from the sensor's menu to point an existing sensor at a different query, station or
-parameter, and to change the -1 handling and forecast settings. The entity keeps its identity and history, so
-this is the way to repair a sensor whose station has been decommissioned or whose parameter is no longer
-published.
+Use **Change sensor** from the sensor's menu on the integration page to point an existing sensor at a different
+query, station or parameter, and to change the -1 handling and forecast settings. The entity keeps its identity
+and history, so this is the way to repair a sensor whose station has been decommissioned or whose parameter is no
+longer published.
 
 To rename a sensor, use Home Assistant's own entity settings. The name is not part of the sensor's identity, so
 renaming does not affect its history.
+
+## Changes in 3.0
+
+- The integration is added once, and sensors and warnings places are added to it, instead of every sensor being
+  an integration entry of its own.
+- The stale data settings are shared by every sensor, under **Configure** on the integration.
+- Daily, monthly and yearly statistics are given a whole reporting period before their data counts as stale.
+- Warnings places share one download of FMI's warning feed.
+
+## Upgrading from 2.x
+
+The existing entries are merged into one on the first start after the update: each becomes a sensor or warnings
+place of the one FMI entry. Entity IDs do not change, so history, statistics, dashboards and automations keep
+working, and entities you had disabled stay disabled. Nothing needs to be reconfigured.
+
+The stale data settings most of your sensors had become the shared setting. Sensors that were set up before the
+setting existed used 24 hours, and use the shared setting from now on.
+
+Downgrading to 2.x after the merge is not supported: restore a backup instead.
 
 ## Changes in 2.1
 
@@ -127,13 +145,11 @@ renaming does not affect its history.
 - A diagnostic stale data binary sensor for every observation and forecast sensor.
 - The no-data repair issue can be made more or less patient with **no_data_issue_hours**, or switched off.
 
-Existing sensors keep working as they are; their stale data sensors appear after the update.
-
 ## Upgrading from 1.x
 
-Version 2 stops identifying sensors by their name, so that they can be renamed and repointed. Existing config
-entries are migrated automatically on first start and keep their entities, history and statistics. Nothing
-needs to be reconfigured.
+Version 2 stops identifying sensors by their name, so that they can be renamed and repointed. Entries from 1.x
+are migrated automatically on first start and keep their entities, history and statistics. Nothing needs to be
+reconfigured.
 
 ## When a station or parameter stops working
 
@@ -143,12 +159,21 @@ up as an error: the query simply returns nothing.
 When the newest value FMI holds for a sensor is more than **no_data_issue_hours** old (24 hours by default),
 the integration reports a repair issue in Home Assistant telling you whether the station returns nothing at
 all, or whether it is still reporting but no longer publishes your parameter, in which case the parameters it
-does publish are listed. Use Reconfigure to move the sensor to a working station or parameter, and the issue
-clears itself.
+does publish are listed. Use **Change sensor** to move the sensor to a working station or parameter, and the
+issue clears itself.
 
-Stations do go quiet for a while without being broken, so the delay is deliberately generous. Shorten it with
-**no_data_issue_hours** if you want to hear about outages sooner, or turn **no_data_issue** off to silence the
-warning for a sensor entirely. Both are on the parameter step of the setup and Reconfigure flows.
+| Name                | Type | Description                                                  | Default |
+|---------------------|------|--------------------------------------------------------------|---------|
+| no_data_issue       | bool | Report a repair issue when a sensor stops getting data       | `true`  |
+| no_data_issue_hours | int  | How many hours without data before the data counts as stale  | 24      |
+
+Both are under **Configure** on the integration, and apply to every sensor. Stations do go quiet for a while
+without being broken, so the delay is deliberately generous. Shorten it if you want to hear about outages sooner,
+or turn **no_data_issue** off to rely on the stale data sensors alone.
+
+Daily, monthly and yearly statistics are published only once the day, month or year is over, so their newest
+value can legitimately be a whole period old. For those the limit is never shorter than three days, 62 days or
+two years, whatever the setting.
 
 The age is read from FMI's own timestamp on the data, not from how long Home Assistant has been seeing empty
 updates. That matters in two ways. Restarting Home Assistant does not put the clock back to zero, so a sensor
@@ -161,14 +186,14 @@ even looked empty. The setting now means the age of the data, whatever the query
 
 Every observation and forecast sensor also has a diagnostic binary sensor, for example
 `binary_sensor.fmi_helsinki_kaisaniemi_air_temperature_stale_data` (`..._vanhentunut_data` with Finnish as the
-language). It is on while the newest data is older than **no_data_issue_hours**, and turns off by itself when data
-comes back. The repair issue is for you to notice; the binary sensor is for automations. It works whether or not the
+language). It is on while the newest data is older than the limit above, and turns off by itself when data comes
+back. The repair issue is for you to notice; the binary sensor is for automations. It works whether or not the
 repair issue is enabled.
 
 ## Weather warnings
 
-FMI issues weather warnings for land and sea areas up to five days ahead. A warnings entry follows them for one
-place: choose **Weather warnings for a place** in step 2.
+FMI issues weather warnings for land and sea areas up to five days ahead. A warnings place follows them for one
+place: choose **Add warnings place** on the integration page.
 
 | Name          | Type     | Requirement  | Description                               | Default                   |
 |---------------|----------|--------------|-------------------------------------------|---------------------------|
@@ -184,7 +209,7 @@ in the nearby sea area.
 The warning types are wind on land and at sea, severe thunderstorms on land and at sea, heavy rain, traffic weather,
 pedestrian weather, wildfire, heat wave, cold, UV, wave height, sea level and ice accretion.
 
-Use **Reconfigure** to move the place or change the radius, the warning types or the name.
+Use **Change warnings place** to move the place or change the radius, the warning types or the name.
 
 The warnings come from FMI's open [CAP warning feed](https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml), read every
 ten minutes.
@@ -195,7 +220,7 @@ The state is the highest warning level in force now: `none`, `yellow`, `orange` 
 
 | Name            | Type        | Description                                                                  |
 |-----------------|-------------|------------------------------------------------------------------------------|
-| label           | string      | Name given to the entry                                                      |
+| label           | string      | Name given to the place                                                      |
 | language        | string      | Language of the warning texts                                                |
 | latitude        | float       | Latitude of the place                                                        |
 | longitude       | float       | Longitude of the place                                                       |
@@ -273,7 +298,7 @@ All sensors return the following extra attributes.
 | location_type | string | Type of identifier used (fmisid/place/latlon)                |
 | location_id   | string | Identifier value                                            |
 | no_data_issue | bool   | Whether the no-data repair issue is enabled                 |
-| no_data_issue_hours | int | Hours without data before that issue is reported          |
+| no_data_issue_hours | int | Hours without data before the data counts as stale, after the minimum for the query type |
 
 Additionally, observation type sensors return the following extra attributes.
 Observation type sensors return the latest known value as sensor state.

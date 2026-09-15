@@ -1,107 +1,144 @@
 {
   "config": {
-    "error": {
-      "connection_problem": "FMI ei palauttanut dataa tälle kyselylle, asemalle ja parametrille. Tarkista sijainti ja yritä uudelleen.",
-      "no_warning_types": "Valitse vähintään yksi varoitustyyppi.",
-      "unknown": "Tuntematon virhe"
-    },
     "abort": {
-      "already_configured": "Tämä anturi on jo olemassa",
-      "reconfigure_successful": "Anturin asetukset päivitetty"
+      "single_instance_allowed": "FMI on jo käytössä. Lisää anturit ja varoituspaikat integraation sivulta.",
+      "reconfigure_successful": "Asetukset tallennettu"
     },
     "step": {
       "user": {
         "title": "FMI integraatio",
-        "description": "Valitse kieli jota FMI käyttää. Se vaikuttaa seuraavissa vaiheissa näytettäviin kyselyjen ja parametrien nimiin sekä FMI:n palauttaman datan kieleen.",
+        "description": "Valitse kieli jota FMI käyttää. Se vaikuttaa antureita lisättäessä näytettäviin kyselyjen ja parametrien nimiin, FMI:n palauttaman datan kieleen ja varoitustekstien kieleen.\n\nKun tämä on valmis, lisää anturit ja varoituspaikat integraation sivulta.",
         "data": {
           "language": "Käytettävä kieli API-kutsuissa"
         }
       },
-      "kind": {
-        "title": "Mitä lisätään",
-        "description": "Anturi lukee yhden arvon, kuten merivedenkorkeuden tai lumensyvyyden, asemalta tai ennustepisteestä. Varoitukset seuraavat Ilmatieteen laitoksen säävaroituksia valitulle paikalle.",
-        "menu_options": {
-          "query": "Havainto- tai ennusteanturi",
-          "warnings": "Säävaroitukset paikalle"
-        }
-      },
-      "warnings": {
-        "title": "Säävaroitukset",
-        "description": "Valitse paikka kartalta. Varoitus otetaan mukaan, kun sen alue kattaa paikan tai ulottuu ympyrän säteen sisälle.\n\nSaarella tai rannalla kilometrin tai kahden säde varmistaa, että läheisen merialueen varoitukset tulevat mukaan.",
-        "data": {
-          "location": "Paikka",
-          "warning_types": "Varoitustyypit",
-          "label": "Nimi"
-        }
-      },
-      "reconfigure_warnings": {
-        "title": "Säävaroitukset",
-        "description": "Valitse paikka kartalta. Varoitus otetaan mukaan, kun sen alue kattaa paikan tai ulottuu ympyrän säteen sisälle.\n\nSaarella tai rannalla kilometrin tai kahden säde varmistaa, että läheisen merialueen varoitukset tulevat mukaan.",
-        "data": {
-          "location": "Paikka",
-          "warning_types": "Varoitustyypit",
-          "label": "Nimi"
-        }
-      },
-      "query": {
-        "title": "Kysely",
-        "description": "Valitse mitä haluat mitata. Listassa on kaikki FMI:n julkaisemat havainto- ja ennustekyselyt.",
-        "data": {
-          "query_label": "Valittu kysely"
-        }
-      },
-      "params": {
-        "title": "Parametri",
-        "description": "Valitse luettava arvo. Listassa on vain ne parametrit joita tämä asema oikeasti raportoi, kuvauksineen ja yksiköineen.\n\nJos haluamasi puuttuu, voit kirjoittaa sen nimen. Kyselyn raakatulokset löytyvät osoitteesta {url}.",
-        "data": {
-          "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
-          "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
-          "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
-          "parameter": "Parametri",
-          "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut.",
-          "no_data_issue": "Varoita kun anturi lakkaa saamasta dataa",
-          "no_data_issue_hours": "Tunteja ilman dataa ennen kuin data on vanhentunutta"
-        }
-      },
       "reconfigure": {
-        "title": "Kysely",
-        "description": "Vaihda anturin käyttämä kysely, asema tai parametri. Anturin historia säilyy, joten näin korjataan anturi jonka asema tai parametri on lakannut toimimasta.",
+        "title": "FMI integraatio",
+        "description": "Kieli tästä eteenpäin lisättäville antureille ja varoituspaikoille. Olemassa olevat säilyttävät kielensä.",
         "data": {
-          "query_label": "Valittu kysely"
+          "language": "Käytettävä kieli API-kutsuissa"
         }
-      },
-      "reconfigure_params": {
-        "title": "Parametri",
-        "description": "Valitse luettava arvo. Listassa on vain ne parametrit joita tämä asema oikeasti raportoi, kuvauksineen ja yksiköineen.\n\nJos haluamasi puuttuu, voit kirjoittaa sen nimen. Kyselyn raakatulokset löytyvät osoitteesta {url}.",
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Vanhentunut data",
+        "description": "Kun anturin uusin data on tätä vanhempaa, sen vanhentuneen datan anturi menee päälle, ja korjausilmoitus voi kertoa mikä on vialla.\n\nAsetus koskee kaikkia antureita. Vuorokausi-, kuukausi- ja vuositilastot julkaistaan vasta jakson päätyttyä, joten niille raja ei ole koskaan lyhyempi kuin kolme vuorokautta, kaksi kuukautta tai kaksi vuotta.",
         "data": {
-          "parameter": "Parametri",
-          "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut.",
-          "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
-          "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
-          "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
-          "no_data_issue": "Varoita kun anturi lakkaa saamasta dataa",
+          "no_data_issue": "Tee korjausilmoitus kun anturi lakkaa saamasta dataa",
           "no_data_issue_hours": "Tunteja ilman dataa ennen kuin data on vanhentunutta"
         }
+      }
+    }
+  },
+  "config_subentries": {
+    "sensor": {
+      "entry_type": "Anturi",
+      "initiate_flow": {
+        "user": "Lisää anturi",
+        "reconfigure": "Muokkaa anturia"
       },
-      "name": {
-        "title": "Nimi",
-        "description": "Ehdotettu nimi muodostuu valitsemastasi asemasta ja parametrista.",
-        "data": {
-          "label": "Integraation luoman anturin nimi"
+      "error": {
+        "connection_problem": "FMI ei palauttanut dataa tälle kyselylle, asemalle ja parametrille. Tarkista sijainti ja yritä uudelleen.",
+        "unknown": "Tuntematon virhe"
+      },
+      "abort": {
+        "already_configured": "Anturi tälle kyselylle, asemalle ja parametrille on jo olemassa",
+        "reconfigure_successful": "Anturin asetukset päivitetty"
+      },
+      "step": {
+        "user": {
+          "title": "Kysely",
+          "description": "Valitse mitä haluat mitata. Listassa on kaikki FMI:n julkaisemat havainto- ja ennustekyselyt.",
+          "data": {
+            "query_label": "Valittu kysely"
+          }
+        },
+        "location": {
+          "title": "Sijainti",
+          "description": "Valitse asema jolta data luetaan. Asemat on järjestetty etäisyyden mukaan Home Assistant -sijainnistasi.\n\nHavaintokyselyissä listataan vain ne asemat jotka palvelevat valitsemaasi kyselyä. Ennustekyselyt eivät ole sidottu asemaan, joten niissä tarjotaan kaikki asemat.\n\nVoit myös kirjoittaa paikannimen tai koordinaatit muodossa leveysaste,pituusaste.",
+          "data": {
+            "target": "Asema, paikka tai koordinaatit"
+          }
+        },
+        "params": {
+          "title": "Parametri",
+          "description": "Valitse luettava arvo. Listassa on vain ne parametrit joita tämä asema oikeasti raportoi, kuvauksineen ja yksiköineen.\n\nJos haluamasi puuttuu, voit kirjoittaa sen nimen. Kyselyn raakatulokset löytyvät osoitteesta {url}.",
+          "data": {
+            "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
+            "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
+            "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
+            "parameter": "Parametri",
+            "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut."
+          }
+        },
+        "name": {
+          "title": "Nimi",
+          "description": "Ehdotettu nimi muodostuu valitsemastasi asemasta ja parametrista.",
+          "data": {
+            "label": "Anturin nimi"
+          }
+        },
+        "reconfigure": {
+          "title": "Kysely",
+          "description": "Vaihda anturin käyttämä kysely, asema tai parametri. Anturin historia säilyy, joten näin korjataan anturi jonka asema tai parametri on lakannut toimimasta.",
+          "data": {
+            "query_label": "Valittu kysely"
+          }
+        },
+        "reconfigure_location": {
+          "title": "Sijainti",
+          "description": "Valitse asema jolta data luetaan. Asemat on järjestetty etäisyyden mukaan Home Assistant -sijainnistasi.\n\nHavaintokyselyissä listataan vain ne asemat jotka palvelevat valitsemaasi kyselyä. Ennustekyselyt eivät ole sidottu asemaan, joten niissä tarjotaan kaikki asemat.\n\nVoit myös kirjoittaa paikannimen tai koordinaatit muodossa leveysaste,pituusaste.",
+          "data": {
+            "target": "Asema, paikka tai koordinaatit"
+          }
+        },
+        "reconfigure_params": {
+          "title": "Parametri",
+          "description": "Valitse luettava arvo. Listassa on vain ne parametrit joita tämä asema oikeasti raportoi, kuvauksineen ja yksiköineen.\n\nJos haluamasi puuttuu, voit kirjoittaa sen nimen. Kyselyn raakatulokset löytyvät osoitteesta {url}.",
+          "data": {
+            "parameter": "Parametri",
+            "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut.",
+            "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
+            "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
+            "forecast_past_hours": "Näytettävä ennustehistoria tunneissa"
+          }
         }
+      }
+    },
+    "warnings": {
+      "entry_type": "Säävaroitukset",
+      "initiate_flow": {
+        "user": "Lisää varoituspaikka",
+        "reconfigure": "Muokkaa varoituspaikkaa"
       },
-      "location": {
-        "title": "Sijainti",
-        "description": "Valitse asema jolta data luetaan. Asemat on järjestetty etäisyyden mukaan Home Assistant -sijainnistasi.\n\nHavaintokyselyissä listataan vain ne asemat jotka palvelevat valitsemaasi kyselyä. Ennustekyselyt eivät ole sidottu asemaan, joten niissä tarjotaan kaikki asemat.\n\nVoit myös kirjoittaa paikannimen tai koordinaatit muodossa leveysaste,pituusaste.",
-        "data": {
-          "target": "Asema, paikka tai koordinaatit"
-        }
+      "error": {
+        "no_warning_types": "Valitse vähintään yksi varoitustyyppi."
       },
-      "reconfigure_location": {
-        "title": "Sijainti",
-        "description": "Valitse asema jolta data luetaan. Asemat on järjestetty etäisyyden mukaan Home Assistant -sijainnistasi.\n\nHavaintokyselyissä listataan vain ne asemat jotka palvelevat valitsemaasi kyselyä. Ennustekyselyt eivät ole sidottu asemaan, joten niissä tarjotaan kaikki asemat.\n\nVoit myös kirjoittaa paikannimen tai koordinaatit muodossa leveysaste,pituusaste.",
-        "data": {
-          "target": "Asema, paikka tai koordinaatit"
+      "abort": {
+        "already_configured": "Tämän paikan ja näiden varoitustyyppien varoituksia seurataan jo",
+        "reconfigure_successful": "Varoituspaikka päivitetty"
+      },
+      "step": {
+        "user": {
+          "title": "Säävaroitukset",
+          "description": "Valitse paikka kartalta. Varoitus otetaan mukaan, kun sen alue kattaa paikan tai ulottuu ympyrän säteen sisälle.\n\nSaarella tai rannalla kilometrin tai kahden säde varmistaa, että läheisen merialueen varoitukset tulevat mukaan.",
+          "data": {
+            "location": "Paikka",
+            "warning_types": "Varoitustyypit",
+            "label": "Nimi"
+          }
+        },
+        "reconfigure": {
+          "title": "Säävaroitukset",
+          "description": "Valitse paikka kartalta. Varoitus otetaan mukaan, kun sen alue kattaa paikan tai ulottuu ympyrän säteen sisälle.\n\nSaarella tai rannalla kilometrin tai kahden säde varmistaa, että läheisen merialueen varoitukset tulevat mukaan.",
+          "data": {
+            "location": "Paikka",
+            "warning_types": "Varoitustyypit",
+            "label": "Nimi"
+          }
         }
       }
     }

@@ -1,17 +1,16 @@
 import logging
 
 from homeassistant.components.sensor import SensorStateClass, SensorEntity, SensorDeviceClass
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, CoordinatorEntity
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .cap import highest_level
-from .const import DOMAIN, CONF_LABEL, CONF_QUERY_ID, CONF_LANG, CONF_QUERY_LABEL, CONF_PARAMETER, \
-    CONF_TARGET_TYPE, CONF_TARGET, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, \
-    CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE_HOURS, ATTRIBUTION, \
-    CONF_ENTRY_TYPE, ENTRY_TYPE_WARNINGS, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_LEVELS
+from .const import (CONF_LABEL, CONF_QUERY_ID, CONF_LANG, CONF_QUERY_LABEL, CONF_PARAMETER, CONF_TARGET_TYPE,
+                    CONF_TARGET, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, CONF_NO_DATA_ISSUE,
+                    DEFAULT_NO_DATA_ISSUE, ATTRIBUTION, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_LEVELS)
+from .query_coordinator import FMIQueryCoordinator
 from .warning_coordinator import FMIWarningsCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -39,133 +38,121 @@ ATTR_ACTIVE_WARNINGS = "active_warnings"
 ATTR_WARNINGS = "warnings"
 
 
-def get_query_name(entry: ConfigEntry) -> str | None:
+def get_query_name(data) -> str | None:
     # The config flow stores the label as "<title> (<query id>)"; the id is
     # already exposed separately, so keep only the title here.
-    label = entry.data.get(CONF_QUERY_LABEL)
-    return label.removesuffix(f" ({entry.data.get(CONF_QUERY_ID)})") if label is not None else None
+    label = data.get(CONF_QUERY_LABEL)
+    return label.removesuffix(f" ({data.get(CONF_QUERY_ID)})") if label is not None else None
 
 
-def get_config_attributes(entry: ConfigEntry) -> dict:
+def get_config_attributes(coordinator: FMIQueryCoordinator) -> dict:
+    data = coordinator.subentry.data
     attributes = {
-        ATTR_LABEL: entry.data.get(CONF_LABEL),
-        ATTR_LANGUAGE: entry.data.get(CONF_LANG),
-        ATTR_QUERY_ID: entry.data.get(CONF_QUERY_ID),
-        ATTR_QUERY_NAME: get_query_name(entry),
-        ATTR_PARAMETER: entry.data.get(CONF_PARAMETER),
-        ATTR_LOCATION_TYPE: entry.data.get(CONF_TARGET_TYPE),
-        ATTR_LOCATION_ID: entry.data.get(CONF_TARGET),
-        ATTR_NO_DATA_ISSUE: entry.data.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE),
-        ATTR_NO_DATA_ISSUE_HOURS: entry.data.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS),
+        ATTR_LABEL: data.get(CONF_LABEL),
+        ATTR_LANGUAGE: data.get(CONF_LANG),
+        ATTR_QUERY_ID: data.get(CONF_QUERY_ID),
+        ATTR_QUERY_NAME: get_query_name(data),
+        ATTR_PARAMETER: data.get(CONF_PARAMETER),
+        ATTR_LOCATION_TYPE: data.get(CONF_TARGET_TYPE),
+        ATTR_LOCATION_ID: data.get(CONF_TARGET),
+        ATTR_NO_DATA_ISSUE: coordinator.config_entry.options.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE),
+        ATTR_NO_DATA_ISSUE_HOURS: coordinator.stale_after_hours,
     }
 
-    if "::forecast" in str(entry.data.get(CONF_QUERY_ID)):
-        attributes[ATTR_FORECAST_HOURS] = entry.data.get(CONF_FORECAST_HOURS)
-        attributes[ATTR_FORECAST_PAST_HOURS] = entry.data.get(CONF_FORECAST_PAST_HOURS)
-        attributes[ATTR_FORECAST_STEP] = entry.data.get(CONF_FORECAST_STEP)
+    if "::forecast" in str(data.get(CONF_QUERY_ID)):
+        attributes[ATTR_FORECAST_HOURS] = data.get(CONF_FORECAST_HOURS)
+        attributes[ATTR_FORECAST_PAST_HOURS] = data.get(CONF_FORECAST_PAST_HOURS)
+        attributes[ATTR_FORECAST_STEP] = data.get(CONF_FORECAST_STEP)
 
     return attributes
 
 
-def get_warnings_config_attributes(entry: ConfigEntry) -> dict:
-    location = entry.data[CONF_LOCATION]
+def get_warnings_config_attributes(coordinator: FMIWarningsCoordinator) -> dict:
+    data = coordinator.subentry.data
+    location = data[CONF_LOCATION]
     return {
-        ATTR_LABEL: entry.data.get(CONF_LABEL),
-        ATTR_LANGUAGE: entry.data.get(CONF_LANG),
+        ATTR_LABEL: data.get(CONF_LABEL),
+        ATTR_LANGUAGE: data.get(CONF_LANG),
         ATTR_LATITUDE: location.get("latitude"),
         ATTR_LONGITUDE: location.get("longitude"),
         ATTR_RADIUS: location.get("radius") or 0,
-        ATTR_WARNING_TYPES: entry.data.get(CONF_WARNING_TYPES),
+        ATTR_WARNING_TYPES: data.get(CONF_WARNING_TYPES),
     }
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
-    coord = hass.data[DOMAIN][entry.entry_id]
-    label = entry.data.get(CONF_LABEL)
-
-    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_WARNINGS:
-        async_add_entities([FMIWarningLevelSensor(coord, entry, label)])
-        return
-
-    query_id = entry.data.get(CONF_QUERY_ID)
-    sensor = FMIForecastSensor(coord, entry, label) if "::forecast" in query_id else FMISensor(coord, entry, label)
-    async_add_entities([sensor], update_before_add=True)
+async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
+    for subentry_id, coordinator in entry.runtime_data.coordinators.items():
+        if isinstance(coordinator, FMIWarningsCoordinator):
+            sensor = FMIWarningLevelSensor(coordinator)
+        elif "::forecast" in str(coordinator.subentry.data[CONF_QUERY_ID]):
+            sensor = FMIForecastSensor(coordinator)
+        else:
+            sensor = FMISensor(coordinator)
+        async_add_entities([sensor], config_subentry_id=subentry_id)
 
 
-class FMISensor(CoordinatorEntity, SensorEntity):
-    def __init__(self, coordinator: DataUpdateCoordinator, entry: ConfigEntry, label: str):
+class FMIQuerySensor(CoordinatorEntity[FMIQueryCoordinator], SensorEntity):
+    """What observation and forecast sensors have in common."""
+
+    _attr_attribution = ATTRIBUTION
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator: FMIQueryCoordinator):
         super().__init__(coordinator)
-        self._attr_attribution = ATTRIBUTION
-        self._attr_icon = "mdi:weather-cloudy"
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_unique_id = entry.entry_id
-        self._attr_name = f"FMI {label}"
+        data = coordinator.subentry.data
+        self._attr_unique_id = coordinator.subentry.subentry_id
+        self._attr_name = f"FMI {data.get(CONF_LABEL, coordinator.subentry.title)}"
+        self._config_attributes = get_config_attributes(coordinator)
 
-        if coordinator.data["unit"] is not None:
-            self._attr_native_unit_of_measurement = coordinator.data["unit"]
+    @property
+    def _values(self) -> list[dict]:
+        return self.coordinator.data["data"] if self.coordinator.data else []
 
-        self._attr_extra_state_attributes = {
-            ATTR_LATITUDE: coordinator.data.get("latitude"),
-            ATTR_LONGITUDE: coordinator.data.get("longitude"),
-            **get_config_attributes(entry),
-            ATTR_TIME: coordinator.data["data"][0]["time"] if len(coordinator.data["data"]) > 0 else None,
-            ATTR_VALUE: coordinator.data["data"][0]["value"] if len(coordinator.data["data"]) > 0 else None,
-        }
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        return self.coordinator.data.get("unit") if self.coordinator.data else None
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        self._attr_extra_state_attributes[ATTR_TIME] = self.coordinator.data["data"][0]["time"] if len(
-            self.coordinator.data["data"]) > 0 else None
-        self._attr_extra_state_attributes[ATTR_VALUE] = self.coordinator.data["data"][0]["value"] if len(
-            self.coordinator.data["data"]) > 0 else None
-        self.async_write_ha_state()
+    def _location_attributes(self) -> dict:
+        data = self.coordinator.data or {}
+        return {ATTR_LATITUDE: data.get("latitude"), ATTR_LONGITUDE: data.get("longitude")}
+
+
+class FMISensor(FMIQuerySensor):
+    """The latest observed value."""
+
+    _attr_icon = "mdi:weather-cloudy"
 
     @property
     def native_value(self):
-        return self.coordinator.data["data"][0]["value"] if len(self.coordinator.data["data"]) > 0 else None
+        return self._values[0]["value"] if self._values else None
 
-
-class FMIForecastSensor(CoordinatorEntity, SensorEntity):
-    def __init__(self, coordinator: DataUpdateCoordinator, entry: ConfigEntry, label: str):
-        super().__init__(coordinator)
-        self._attr_attribution = ATTRIBUTION
-        self._attr_icon = "mdi:weather-cloudy-clock"
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-        self._attr_unique_id = entry.entry_id
-        self._attr_name = f"FMI {label}"
-
-        if coordinator.data["unit"] is not None:
-            self._attr_native_unit_of_measurement = coordinator.data["unit"]
-
-        self._attr_extra_state_attributes = {
-            ATTR_LATITUDE: coordinator.data.get("latitude"),
-            ATTR_LONGITUDE: coordinator.data.get("longitude"),
-            **get_config_attributes(entry),
-            ATTR_FORECAST: []
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            **self._location_attributes(),
+            **self._config_attributes,
+            ATTR_TIME: self._values[0]["time"] if self._values else None,
+            ATTR_VALUE: self._values[0]["value"] if self._values else None,
         }
 
-        if len(coordinator.data["data"]) > 0:
-            for entry in coordinator.data["data"]:
-                self._attr_extra_state_attributes[ATTR_FORECAST].append(
-                    {ATTR_TIME: entry["time"], ATTR_VALUE: entry["value"]})
 
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        self._attr_extra_state_attributes[ATTR_FORECAST] = []
+class FMIForecastSensor(FMIQuerySensor):
+    """The next forecast value, with the whole forecast in the attributes."""
 
-        if len(self.coordinator.data["data"]) > 0:
-            for entry in self.coordinator.data["data"]:
-                self._attr_extra_state_attributes[ATTR_FORECAST].append(
-                    {ATTR_TIME: entry["time"], ATTR_VALUE: entry["value"]})
-
-        self.async_write_ha_state()
+    _attr_icon = "mdi:weather-cloudy-clock"
 
     @property
     def native_value(self):
         now = dt_util.utcnow()
-        return next(
-            (entry["value"] for entry in self.coordinator.data["data"] if entry["time"] > now),
-            None) if len(self.coordinator.data["data"]) > 0 else None
+        return next((item["value"] for item in self._values if item["time"] > now), None)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            **self._location_attributes(),
+            **self._config_attributes,
+            ATTR_FORECAST: [{ATTR_TIME: item["time"], ATTR_VALUE: item["value"]} for item in self._values],
+        }
 
 
 class FMIWarningLevelSensor(CoordinatorEntity[FMIWarningsCoordinator], SensorEntity):
@@ -177,26 +164,29 @@ class FMIWarningLevelSensor(CoordinatorEntity[FMIWarningsCoordinator], SensorEnt
 
     # The warning texts are long and repeat on every refresh; history only needs the level.
     _unrecorded_attributes = frozenset({ATTR_WARNINGS})
+    _attr_attribution = ATTRIBUTION
     _attr_device_class = SensorDeviceClass.ENUM
+    _attr_icon = "mdi:alert"
     _attr_options = WARNING_LEVELS
     _attr_translation_key = "warning_level"
 
-    def __init__(self, coordinator: FMIWarningsCoordinator, entry: ConfigEntry, label: str):
+    def __init__(self, coordinator: FMIWarningsCoordinator):
         super().__init__(coordinator)
-        self._attr_attribution = ATTRIBUTION
-        self._attr_icon = "mdi:alert"
-        self._attr_unique_id = entry.entry_id
-        self._attr_name = f"FMI {label}"
-        self._config_attributes = get_warnings_config_attributes(entry)
+        self._attr_unique_id = coordinator.subentry.subentry_id
+        self._attr_name = f"FMI {coordinator.subentry.data.get(CONF_LABEL, coordinator.subentry.title)}"
+        self._config_attributes = get_warnings_config_attributes(coordinator)
 
     @property
-    def native_value(self) -> str:
+    def native_value(self) -> str | None:
+        if self.coordinator.data is None:
+            return None
         return highest_level(self.coordinator.data.warnings, dt_util.utcnow())
 
     @property
     def extra_state_attributes(self) -> dict:
         now = dt_util.utcnow()
-        warnings = sorted(self.coordinator.data.warnings.values(), key=lambda warning: warning.onset or now)
+        warnings = sorted(self.coordinator.data.warnings.values(),
+                          key=lambda warning: warning.onset or now) if self.coordinator.data else []
         return {
             **self._config_attributes,
             ATTR_ACTIVE_WARNINGS: sum(1 for warning in warnings if warning.is_active(now)),

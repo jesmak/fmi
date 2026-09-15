@@ -1,3 +1,9 @@
+"""Config flow.
+
+The config entry holds the language, and its options the stale data settings
+shared by every sensor. Sensors and warnings places are subentries, added and
+changed from the integration page.
+"""
 import logging
 import re
 from datetime import timedelta
@@ -6,29 +12,31 @@ from typing import Any
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 
-from homeassistant import config_entries
+from homeassistant.config_entries import (ConfigEntry, ConfigFlow, ConfigFlowResult, ConfigSubentryFlow, OptionsFlow,
+                                          SubentryFlowResult)
 from homeassistant.core import callback, HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import (LocationSelector, LocationSelectorConfig, SelectOptionDict, SelectSelector,
                                             SelectSelectorConfig, SelectSelectorMode)
 from homeassistant.util import dt as dt_util
 from homeassistant.util.location import distance
 
-from . import build_unique_id, build_warnings_unique_id, get_start_time
-
 from .const import (DOMAIN, CONF_LABEL, CONF_LANG, CONF_QUERY_ID, CONF_QUERY_LABEL, CONF_FORECAST_HOURS, CONF_TARGET,
                     CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, LANGUAGES, CONF_PARAMETER, CONF_TARGET_TYPE,
                     CONF_NEGATIVE_AS_ZERO, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE,
-                    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT, CONF_ENTRY_TYPE, ENTRY_TYPE_WARNINGS, CONF_LOCATION,
-                    CONF_WARNING_TYPES, WARNING_TYPES, DEFAULT_WARNINGS_RADIUS, DEFAULT_WARNINGS_LABEL)
+                    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_TYPES,
+                    DEFAULT_WARNINGS_RADIUS, DEFAULT_WARNINGS_LABEL, SUBENTRY_SENSOR, SUBENTRY_WARNINGS)
+from .migration import TITLE, VERSION
+from .query_coordinator import build_unique_id, get_start_time
 from .session import FMISession, FMIException
+from .warning_coordinator import build_warnings_unique_id
 
 _LOGGER = logging.getLogger(__name__)
 
-CONFIGURE_SCHEMA = vol.Schema(
+STALE_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_LANG): vol.All(cv.string, vol.In(LANGUAGES)),
+        vol.Required(CONF_NO_DATA_ISSUE): cv.boolean,
+        vol.Required(CONF_NO_DATA_ISSUE_HOURS): cv.positive_int,
     }
 )
 
@@ -41,6 +49,10 @@ WARNINGS_SCHEMA = vol.Schema(
         vol.Required(CONF_LABEL): cv.string,
     }
 )
+
+
+def language_schema(default: str) -> vol.Schema:
+    return vol.Schema({vol.Required(CONF_LANG, default=default): vol.All(cv.string, vol.In(LANGUAGES))})
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, any]) -> str:
@@ -70,13 +82,71 @@ def validate_warnings_input(data: dict[str, Any]) -> dict[str, str]:
     return {}
 
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    VERSION = 2
-    data = None
-    queries = None
-    param_schema = None
-    stations = None
-    descriptions = None
+def unique_id_taken(entry: ConfigEntry, unique_id: str, except_subentry_id: str | None = None) -> bool:
+    return any(subentry.unique_id == unique_id and subentry.subentry_id != except_subentry_id
+               for subentry in entry.subentries.values())
+
+
+class ConfigFlow(ConfigFlow, domain=DOMAIN):
+    VERSION = VERSION
+
+    async def async_step_user(self, user_input: dict[str, any] = None) -> ConfigFlowResult:
+
+        if user_input is not None:
+            return self.async_create_entry(
+                title=TITLE,
+                data=user_input,
+                options={CONF_NO_DATA_ISSUE: DEFAULT_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS: DEFAULT_NO_DATA_ISSUE_HOURS},
+            )
+
+        default = "fin" if self.hass.config.language.startswith("fi") else "eng"
+        return self.async_show_form(step_id="user", data_schema=language_schema(default))
+
+    async def async_step_reconfigure(self, user_input: dict[str, any] = None) -> ConfigFlowResult:
+        """Change the default language for new sensors and warnings places."""
+        entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            # The entry's update listener reloads it.
+            self.hass.config_entries.async_update_entry(entry, data={**entry.data, **user_input})
+            return self.async_abort(reason="reconfigure_successful")
+
+        return self.async_show_form(step_id="reconfigure", data_schema=language_schema(entry.data[CONF_LANG]))
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return StaleDataOptionsFlow()
+
+    @classmethod
+    @callback
+    def async_get_supported_subentry_types(cls, config_entry: ConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
+        return {SUBENTRY_SENSOR: SensorSubentryFlow, SUBENTRY_WARNINGS: WarningsSubentryFlow}
+
+
+class StaleDataOptionsFlow(OptionsFlow):
+    """When data counts as stale, and whether a repair issue is raised. Shared by every sensor."""
+
+    async def async_step_init(self, user_input: dict[str, any] = None) -> ConfigFlowResult:
+
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        values = {CONF_NO_DATA_ISSUE: DEFAULT_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS: DEFAULT_NO_DATA_ISSUE_HOURS,
+                  **self.config_entry.options}
+        return self.async_show_form(step_id="init",
+                                    data_schema=self.add_suggested_values_to_schema(STALE_DATA_SCHEMA, values))
+
+
+class SensorSubentryFlow(ConfigSubentryFlow):
+    """One parameter of one query at one station or forecast point."""
+
+    def __init__(self):
+        self.data: dict[str, Any] = {}
+        self.queries: list[list[str]] | None = None
+        self.param_schema: vol.Schema | None = None
+        self.stations: list[dict[str, Any]] | None = None
+        self.descriptions: dict[str, tuple[str, str]] | None = None
 
     async def _async_stations_for_query(self) -> list[dict[str, any]]:
         """Stations that serve the chosen query, or all of them as a fallback.
@@ -145,7 +215,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return SelectSelector(SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN,
                                                    custom_value=True, sort=False))
 
-
     async def _async_build_parameter_selector(self):
         """Offer the parameters the chosen query and station actually report.
 
@@ -176,8 +245,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return cv.string
 
         try:
-            self.descriptions = descriptions = await self.hass.async_add_executor_job(api.get_parameter_descriptions,
-                                                             self.data[CONF_LANG], query_id)
+            self.descriptions = descriptions = await self.hass.async_add_executor_job(
+                api.get_parameter_descriptions, self.data[CONF_LANG], query_id)
         except Exception:  # noqa: BLE001 - labels are cosmetic, fall back to bare names
             self.descriptions = descriptions = {}
 
@@ -191,7 +260,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return SelectSelector(SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN,
                                                    custom_value=True, sort=False))
 
-
     @callback
     def _params_placeholders(self) -> dict[str, str]:
         now = dt_util.utcnow()
@@ -204,69 +272,69 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                    f"&{self.data[CONF_TARGET_TYPE]}={self.data[CONF_TARGET]}",
         }
 
-    async def async_step_user(self, user_input: dict[str, any] = None) -> FlowResult:
+    async def _async_query_form(self, step_id: str, current: str | None = None) -> SubentryFlowResult:
+        self.queries = await self.hass.async_add_executor_job(FMISession().list_stored_queries,
+                                                              self.data[CONF_LANG], "::simple")
+        choices = [f"{query[1]} ({query[0]})" for query in self.queries]
+        default = next((choice for choice, query in zip(choices, self.queries, strict=True) if query[0] == current),
+                       None)
+        schema = vol.Schema({
+            vol.Required(CONF_QUERY_LABEL, **({"default": default} if default else {})): vol.All(cv.string,
+                                                                                               vol.In(choices)),
+        })
+        return self.async_show_form(step_id=step_id, data_schema=schema)
+
+    def _chosen_query_id(self, user_input: dict[str, any]) -> str | None:
+        return next((query[0] for query in self.queries
+                     if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
+
+    def _params_schema(self, parameter_selector, values: dict[str, any]) -> vol.Schema:
+        schema_params = {
+            vol.Required(CONF_PARAMETER, **({"default": values[CONF_PARAMETER]} if values.get(CONF_PARAMETER) else {})):
+                parameter_selector,
+            vol.Required(CONF_NEGATIVE_AS_ZERO, default=values.get(CONF_NEGATIVE_AS_ZERO, False)): cv.boolean,
+        }
+
+        if "::forecast" in str(self.data[CONF_QUERY_ID]):
+            schema_params[vol.Required(CONF_FORECAST_HOURS, default=values.get(CONF_FORECAST_HOURS, 36))] = \
+                cv.positive_int
+            schema_params[vol.Required(CONF_FORECAST_PAST_HOURS, default=values.get(CONF_FORECAST_PAST_HOURS, 5))] = \
+                cv.positive_int
+            schema_params[vol.Required(CONF_FORECAST_STEP, default=values.get(CONF_FORECAST_STEP, 30))] = \
+                cv.positive_int
+
+        return vol.Schema(schema_params)
+
+    async def _async_validated(self, user_input: dict[str, any]) -> dict[str, str]:
+        """Errors from test-reading the sensor with the chosen settings; empty when it works."""
+        try:
+            await validate_input(self.hass, {CONF_LABEL: "", **self.data, **user_input})
+        except ConnectionProblem:
+            return {"base": "connection_problem"}
+        except Exception:
+            _LOGGER.exception("Unexpected exception")
+            return {"base": "unknown"}
+        return {}
+
+    # ---------------- adding a sensor ----------------
+
+    async def async_step_user(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+        """Choose the query. The language comes from the integration's settings."""
+        if not self.data:
+            self.data = {CONF_LANG: self._get_entry().data[CONF_LANG]}
 
         if user_input is None:
-            return self.async_show_form(step_id="user", data_schema=CONFIGURE_SCHEMA)
+            return await self._async_query_form("user")
 
-        self.data = user_input
-        return await self.async_step_kind()
-
-    async def async_step_kind(self, user_input: dict[str, any] = None) -> FlowResult:
-        """A sensor for one measured value, or the weather warnings for a place."""
-        return self.async_show_menu(step_id="kind", menu_options=["query", "warnings"])
-
-    async def async_step_query(self, user_input: dict[str, any] = None) -> FlowResult:
-
-        if user_input is None:
-            session = FMISession()
-            self.queries = await self.hass.async_add_executor_job(session.list_stored_queries, self.data[CONF_LANG],
-                                                                  "::simple")
-            schema = vol.Schema({
-                vol.Required(CONF_QUERY_LABEL): vol.All(cv.string,
-                                                        vol.In([f"{query[1]} ({query[0]})" for query in self.queries])),
-            })
-
-            return self.async_show_form(step_id="query", data_schema=schema)
-
-        user_input[CONF_QUERY_ID] = next(
-            (query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
+        user_input[CONF_QUERY_ID] = self._chosen_query_id(user_input)
         self.data.update(user_input)
 
         return await self.async_step_location()
 
-    async def async_step_warnings(self, user_input: dict[str, any] = None) -> FlowResult:
-        """Follow FMI's weather warnings for a place picked on a map."""
-        errors = {}
-
-        if user_input is not None:
-            errors = validate_warnings_input(user_input)
-
-            if not errors:
-                self.data.update(user_input)
-                self.data[CONF_ENTRY_TYPE] = ENTRY_TYPE_WARNINGS
-                await self.async_set_unique_id(build_warnings_unique_id(self.data))
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(title=self.data[CONF_LABEL], data=self.data)
-
-        values = user_input or {
-            CONF_LOCATION: {"latitude": self.hass.config.latitude, "longitude": self.hass.config.longitude,
-                            "radius": DEFAULT_WARNINGS_RADIUS},
-            CONF_WARNING_TYPES: WARNING_TYPES,
-            CONF_LABEL: DEFAULT_WARNINGS_LABEL.get(self.data[CONF_LANG], DEFAULT_WARNINGS_LABEL["eng"]),
-        }
-
-        return self.async_show_form(step_id="warnings",
-                                    data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values),
-                                    errors=errors, last_step=True)
-
-    async def async_step_location(self, user_input: dict[str, any] = None) -> FlowResult:
+    async def async_step_location(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
 
         if user_input is None:
-            schema = vol.Schema({
-                vol.Required(CONF_TARGET): await self._async_build_target_selector(),
-            })
-
+            schema = vol.Schema({vol.Required(CONF_TARGET): await self._async_build_target_selector()})
             return self.async_show_form(step_id="location", data_schema=schema)
 
         user_input[CONF_TARGET_TYPE] = self._target_type_for(user_input[CONF_TARGET])
@@ -274,44 +342,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_params()
 
-    async def async_step_params(self, user_input: dict[str, any] = None) -> FlowResult:
+    async def async_step_params(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
 
         if user_input is None:
-            schema_params = {
-                vol.Required(CONF_PARAMETER): await self._async_build_parameter_selector(),
-                vol.Required(CONF_NEGATIVE_AS_ZERO, default=False): cv.boolean
-            }
-
-            if "::forecast" in str(self.data[CONF_QUERY_ID]):
-                schema_params[vol.Required(CONF_FORECAST_HOURS, default=36)] = cv.positive_int
-                schema_params[vol.Required(CONF_FORECAST_PAST_HOURS, default=5)] = cv.positive_int
-                schema_params[vol.Required(CONF_FORECAST_STEP, default=30)] = cv.positive_int
-
-            schema_params[vol.Required(CONF_NO_DATA_ISSUE, default=DEFAULT_NO_DATA_ISSUE)] = cv.boolean
-            schema_params[vol.Required(CONF_NO_DATA_ISSUE_HOURS,
-                                       default=DEFAULT_NO_DATA_ISSUE_HOURS)] = cv.positive_int
-
-            self.param_schema = vol.Schema(schema_params)
-
+            self.param_schema = self._params_schema(await self._async_build_parameter_selector(), {})
             return self.async_show_form(step_id="params", data_schema=self.param_schema,
                                         description_placeholders=self._params_placeholders())
 
-        errors = {}
+        errors = await self._async_validated(user_input)
 
-        try:
-            all_data = self.data.copy()
-            all_data.update(user_input)
-            all_data[CONF_LABEL] = ""
-            await validate_input(self.hass, all_data)
-        except ConnectionProblem:
-            errors["base"] = "connection_problem"
-        except Exception:
-            _LOGGER.exception("Unexpected exception")
-            errors["base"] = "unknown"
-        else:
+        if not errors:
             self.data.update(user_input)
-            await self.async_set_unique_id(build_unique_id(self.data))
-            self._abort_if_unique_id_configured()
+            if unique_id_taken(self._get_entry(), build_unique_id(self.data)):
+                return self.async_abort(reason="already_configured")
             return await self.async_step_name()
 
         return self.async_show_form(step_id="params", data_schema=self.param_schema, errors=errors,
@@ -334,7 +377,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return f"{source} {measurement}".strip()
 
-    async def async_step_name(self, user_input: dict[str, any] = None) -> FlowResult:
+    async def async_step_name(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
 
         if user_input is None:
             schema = vol.Schema({vol.Required(CONF_LABEL, default=self._default_label()): cv.string})
@@ -342,75 +385,34 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         self.data.update(user_input)
 
-        return self.async_create_entry(title=self.data[CONF_LABEL], data=self.data)
+        return self.async_create_entry(title=self.data[CONF_LABEL], data=self.data,
+                                       unique_id=build_unique_id(self.data))
 
-    async def async_step_reconfigure(self, user_input: dict[str, any] = None) -> FlowResult:
+    # ---------------- changing a sensor ----------------
+
+    async def async_step_reconfigure(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
         """Repoint an existing sensor at a different station, query or parameter.
 
-        The name is not editable here: entities are keyed on the config entry,
-        so renaming is a plain entity rename and needs no flow of its own.
+        The name is not editable here: renaming is a plain entity rename and
+        needs no flow of its own.
         """
-        entry = self._get_reconfigure_entry()
-
-        if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_WARNINGS:
-            return await self.async_step_reconfigure_warnings(user_input)
+        subentry = self._get_reconfigure_subentry()
 
         if user_input is None:
-            self.data = dict(entry.data)
-            session = FMISession()
-            self.queries = await self.hass.async_add_executor_job(session.list_stored_queries,
-                                                                  self.data[CONF_LANG], "::simple")
-            choices = [f"{query[1]} ({query[0]})" for query in self.queries]
-            current = next((choice for choice, query in zip(choices, self.queries)
-                            if query[0] == self.data.get(CONF_QUERY_ID)), None)
+            self.data = dict(subentry.data)
+            return await self._async_query_form("reconfigure", self.data.get(CONF_QUERY_ID))
 
-            schema = vol.Schema({
-                vol.Required(CONF_QUERY_LABEL, **({"default": current} if current else {})):
-                    vol.All(cv.string, vol.In(choices)),
-            })
-
-            return self.async_show_form(step_id="reconfigure", data_schema=schema)
-
-        user_input[CONF_QUERY_ID] = next(
-            (query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
+        user_input[CONF_QUERY_ID] = self._chosen_query_id(user_input)
         self.data.update(user_input)
 
         return await self.async_step_reconfigure_location()
 
-    async def async_step_reconfigure_warnings(self, user_input: dict[str, any] = None) -> FlowResult:
-        """Move a warnings entry to another place, or change its radius, warning types or name."""
-        entry = self._get_reconfigure_entry()
-        errors = {}
-
-        if user_input is not None:
-            errors = validate_warnings_input(user_input)
-
-            if not errors:
-                updated = {**entry.data, **user_input}
-                unique_id = build_warnings_unique_id(updated)
-                clash = self.hass.config_entries.async_entry_for_domain_unique_id(DOMAIN, unique_id)
-
-                if clash is not None and clash.entry_id != entry.entry_id:
-                    return self.async_abort(reason="already_configured")
-
-                # The entry's update listener reloads it.
-                self.hass.config_entries.async_update_entry(entry, title=updated[CONF_LABEL], data=updated,
-                                                            unique_id=unique_id)
-                return self.async_abort(reason="reconfigure_successful")
-
-        return self.async_show_form(step_id="reconfigure_warnings",
-                                    data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA,
-                                                                                    user_input or dict(entry.data)),
-                                    errors=errors, last_step=True)
-
-    async def async_step_reconfigure_location(self, user_input: dict[str, any] = None) -> FlowResult:
+    async def async_step_reconfigure_location(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
 
         if user_input is None:
             schema = vol.Schema({
-                vol.Required(CONF_TARGET, default=self.data.get(CONF_TARGET)):
-                    await self._async_build_target_selector(),
+                vol.Required(CONF_TARGET, default=self.data.get(CONF_TARGET)): await self._async_build_target_selector(),
             })
-
             return self.async_show_form(step_id="reconfigure_location", data_schema=schema)
 
         user_input[CONF_TARGET_TYPE] = self._target_type_for(user_input[CONF_TARGET])
@@ -418,60 +420,82 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_reconfigure_params()
 
-    async def async_step_reconfigure_params(self, user_input: dict[str, any] = None) -> FlowResult:
-        entry = self._get_reconfigure_entry()
+    async def async_step_reconfigure_params(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+        subentry = self._get_reconfigure_subentry()
 
         if user_input is None:
-            schema_params = {
-                vol.Required(CONF_PARAMETER, default=self.data.get(CONF_PARAMETER)):
-                    await self._async_build_parameter_selector(),
-            }
-
-            if "::forecast" in str(self.data[CONF_QUERY_ID]):
-                schema_params[vol.Required(
-                    CONF_FORECAST_HOURS, default=self.data.get(CONF_FORECAST_HOURS, 36))] = cv.positive_int
-                schema_params[vol.Required(
-                    CONF_FORECAST_PAST_HOURS, default=self.data.get(CONF_FORECAST_PAST_HOURS, 5))] = cv.positive_int
-                schema_params[vol.Required(
-                    CONF_FORECAST_STEP, default=self.data.get(CONF_FORECAST_STEP, 30))] = cv.positive_int
-
-            schema_params[vol.Required(
-                CONF_NEGATIVE_AS_ZERO,
-                default=self.data.get(CONF_NEGATIVE_AS_ZERO, False))] = cv.boolean
-            schema_params[vol.Required(
-                CONF_NO_DATA_ISSUE,
-                default=self.data.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE))] = cv.boolean
-            schema_params[vol.Required(
-                CONF_NO_DATA_ISSUE_HOURS,
-                default=self.data.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS))] = cv.positive_int
-
-            self.param_schema = vol.Schema(schema_params)
-
+            self.param_schema = self._params_schema(await self._async_build_parameter_selector(), self.data)
             return self.async_show_form(step_id="reconfigure_params", data_schema=self.param_schema,
                                         last_step=True, description_placeholders=self._params_placeholders())
 
-        errors = {}
+        errors = await self._async_validated(user_input)
 
-        try:
-            await validate_input(self.hass, {**self.data, **user_input})
-        except ConnectionProblem:
-            errors["base"] = "connection_problem"
-        except Exception:
-            _LOGGER.exception("Unexpected exception")
-            errors["base"] = "unknown"
-        else:
+        if not errors:
             updated = {**self.data, **user_input}
             unique_id = build_unique_id(updated)
-            clash = self.hass.config_entries.async_entry_for_domain_unique_id(DOMAIN, unique_id)
 
-            if clash is not None and clash.entry_id != entry.entry_id:
+            if unique_id_taken(self._get_entry(), unique_id, except_subentry_id=subentry.subentry_id):
                 return self.async_abort(reason="already_configured")
 
-            return self.async_update_reload_and_abort(entry, data=updated, unique_id=unique_id)
+            return self.async_update_and_abort(self._get_entry(), subentry, data=updated, unique_id=unique_id)
 
-        return self.async_show_form(step_id="reconfigure_params", data_schema=self.param_schema,
-                                    last_step=True, errors=errors,
-                                    description_placeholders=self._params_placeholders())
+        return self.async_show_form(step_id="reconfigure_params", data_schema=self.param_schema, last_step=True,
+                                    errors=errors, description_placeholders=self._params_placeholders())
+
+
+class WarningsSubentryFlow(ConfigSubentryFlow):
+    """FMI's weather warnings for a place picked on a map."""
+
+    async def async_step_user(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+        entry = self._get_entry()
+        errors = {}
+
+        if user_input is not None:
+            errors = validate_warnings_input(user_input)
+
+            if not errors:
+                data = {**user_input, CONF_LANG: entry.data[CONF_LANG]}
+                unique_id = build_warnings_unique_id(data)
+                if unique_id_taken(entry, unique_id):
+                    return self.async_abort(reason="already_configured")
+                return self.async_create_entry(title=data[CONF_LABEL], data=data, unique_id=unique_id)
+
+        language = entry.data[CONF_LANG]
+        values = user_input or {
+            CONF_LOCATION: {"latitude": self.hass.config.latitude, "longitude": self.hass.config.longitude,
+                            "radius": DEFAULT_WARNINGS_RADIUS},
+            CONF_WARNING_TYPES: WARNING_TYPES,
+            CONF_LABEL: DEFAULT_WARNINGS_LABEL.get(language, DEFAULT_WARNINGS_LABEL["eng"]),
+        }
+
+        return self.async_show_form(step_id="user",
+                                    data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values),
+                                    errors=errors)
+
+    async def async_step_reconfigure(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+        """Move the place, or change its radius, warning types or name."""
+        entry = self._get_entry()
+        subentry = self._get_reconfigure_subentry()
+        errors = {}
+
+        if user_input is not None:
+            errors = validate_warnings_input(user_input)
+
+            if not errors:
+                updated = {**subentry.data, **user_input}
+                unique_id = build_warnings_unique_id(updated)
+
+                if unique_id_taken(entry, unique_id, except_subentry_id=subentry.subentry_id):
+                    return self.async_abort(reason="already_configured")
+
+                return self.async_update_and_abort(entry, subentry, title=updated[CONF_LABEL], data=updated,
+                                                   unique_id=unique_id)
+
+        return self.async_show_form(step_id="reconfigure",
+                                    data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA,
+                                                                                    user_input or dict(subentry.data)),
+                                    errors=errors)
+
 
 class ConnectionProblem(HomeAssistantError):
     """Error to indicate there is an issue with the connection"""

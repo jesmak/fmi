@@ -7,6 +7,7 @@ get_feature directly and move the timestamps around.
 from datetime import timedelta
 
 import pytest
+from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
@@ -23,7 +24,9 @@ from custom_components.fmi.const import (
     CONF_TARGET,
     CONF_TARGET_TYPE,
     DOMAIN,
+    SUBENTRY_SENSOR,
 )
+from custom_components.fmi.query_coordinator import FMIQueryCoordinator
 
 # The harness has no asyncio_mode config of its own, so mark the module.
 pytestmark = pytest.mark.asyncio
@@ -82,17 +85,29 @@ def _parse(stamp: str):
     return datetime.strptime(stamp.replace("%20", " "), "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
 
 
+# Shared by every sensor, so they are options of the config entry rather than sensor data.
+STALE_DATA_SETTINGS = (CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS)
+
+
 async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, **overrides) -> MockConfigEntry:
-    monkeypatch.setattr("custom_components.fmi.FMISession", lambda *a, **kw: api)
-    entry = MockConfigEntry(domain=DOMAIN, data={**ENTRY_DATA, **overrides}, unique_id="test", version=2)
+    monkeypatch.setattr("custom_components.fmi.query_coordinator.FMISession", lambda *a, **kw: api)
+    options = {key: value for key, value in overrides.items() if key in STALE_DATA_SETTINGS}
+    data = {**ENTRY_DATA, **{key: value for key, value in overrides.items() if key not in STALE_DATA_SETTINGS}}
+    entry = MockConfigEntry(domain=DOMAIN, data={CONF_LANG: "eng"}, options=options, version=3, subentries_data=[
+        ConfigSubentryData(data=data, subentry_type=SUBENTRY_SENSOR, title=data[CONF_LABEL], unique_id="test"),
+    ])
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     return entry
 
 
+def _coordinator(entry: MockConfigEntry) -> FMIQueryCoordinator:
+    return entry.runtime_data.coordinators[next(iter(entry.subentries))]
+
+
 def _issue(hass: HomeAssistant, entry: MockConfigEntry):
-    return ir.async_get(hass).async_get_issue(DOMAIN, f"no_data_{entry.entry_id}")
+    return ir.async_get(hass).async_get_issue(DOMAIN, f"no_data_{next(iter(entry.subentries))}")
 
 
 async def test_recent_observation_raises_nothing(hass: HomeAssistant, monkeypatch):
@@ -155,7 +170,7 @@ async def test_issue_clears_when_data_comes_back(hass: HomeAssistant, monkeypatc
     assert _issue(hass, entry) is not None
 
     api.age = timedelta(minutes=10)
-    await hass.data[DOMAIN][entry.entry_id].async_refresh()
+    await _coordinator(entry).async_refresh()
     await hass.async_block_till_done()
 
     assert _issue(hass, entry) is None
@@ -167,7 +182,7 @@ async def test_probe_runs_once_per_outage(hass: HomeAssistant, monkeypatch):
     entry = await _setup(hass, monkeypatch, api, **{CONF_NO_DATA_ISSUE_HOURS: 24})
     calls = len(api.windows)
 
-    await hass.data[DOMAIN][entry.entry_id].async_refresh()
+    await _coordinator(entry).async_refresh()
     await hass.async_block_till_done()
 
     # One more plain poll only: no widened query, no second probe.
