@@ -147,19 +147,19 @@
     "warning_types": {
       "options": {
         "wind": "Tuulivaroitus maa-alueille",
-        "seaWind": "Tuulivaroitus merelle",
+        "sea_wind": "Tuulivaroitus merelle",
         "thunderstorm": "Rajuilmavaroitus",
-        "seaThunderstorm": "Rajuilmavaroitus merelle",
+        "sea_thunderstorm": "Rajuilmavaroitus merelle",
         "rain": "Rankkasadevaroitus",
-        "trafficWeather": "Liikennesäävaroitus",
-        "pedestrianSafety": "Jalankulkusäävaroitus",
-        "forestFireWeather": "Metsäpalovaroitus",
-        "hotWeather": "Hellevaroitus",
-        "coldWeather": "Pakkasvaroitus",
-        "uvNote": "UV-tiedote",
-        "seaWaveHeight": "Aallokkovaroitus",
-        "seaWaterHeight": "Merivedenkorkeusvaroitus",
-        "seaIcing": "Jäätämisvaroitus merelle"
+        "traffic_weather": "Liikennesäävaroitus",
+        "pedestrian_safety": "Jalankulkusäävaroitus",
+        "forest_fire_weather": "Metsäpalovaroitus",
+        "hot_weather": "Hellevaroitus",
+        "cold_weather": "Pakkasvaroitus",
+        "uv_note": "UV-tiedote",
+        "sea_wave_height": "Aallokkovaroitus",
+        "sea_water_height": "Merivedenkorkeusvaroitus",
+        "sea_icing": "Jäätämisvaroitus merelle"
       }
     }
   },

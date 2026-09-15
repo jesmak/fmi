@@ -1,3 +1,5 @@
+import re
+
 DOMAIN = "fmi"
 ATTRIBUTION = "Data provided by Finnish Meteorological Institute (FMI)"
 API_DESCRIBE_STORED_QUERIES_URL = "https://opendata.fmi.fi/wfs/${lang}?request=describeStoredQueries"
@@ -75,6 +77,11 @@ WARNING_TYPES = [
     "seaWaterHeight",
     "seaIcing",
 ]
+# The same types as translation keys, which must be lower case: "seaWind" is "sea_wind" in the warnings form.
+# Subentries store FMI's own names.
+WARNING_TYPE_KEYS = {
+    warning_type: re.sub(r"(?<!^)(?=[A-Z])", "_", warning_type).lower() for warning_type in WARNING_TYPES
+}
 # In rising order. "none" is the state when no warning is in force.
 WARNING_LEVELS = ["none", "yellow", "orange", "red"]
 DEFAULT_WARNINGS_RADIUS = 1000

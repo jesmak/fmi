@@ -147,19 +147,19 @@
     "warning_types": {
       "options": {
         "wind": "Wind warning for land areas",
-        "seaWind": "Wind warning for sea areas",
+        "sea_wind": "Wind warning for sea areas",
         "thunderstorm": "Severe thunderstorm warning",
-        "seaThunderstorm": "Severe thunderstorm warning for sea areas",
+        "sea_thunderstorm": "Severe thunderstorm warning for sea areas",
         "rain": "Heavy rain warning",
-        "trafficWeather": "Traffic weather warning",
-        "pedestrianSafety": "Pedestrian weather warning",
-        "forestFireWeather": "Wildfire warning",
-        "hotWeather": "Heat wave warning",
-        "coldWeather": "Cold warning",
-        "uvNote": "UV advisory",
-        "seaWaveHeight": "Wave height warning",
-        "seaWaterHeight": "Sea level warning",
-        "seaIcing": "Ice accretion warning"
+        "traffic_weather": "Traffic weather warning",
+        "pedestrian_safety": "Pedestrian weather warning",
+        "forest_fire_weather": "Wildfire warning",
+        "hot_weather": "Heat wave warning",
+        "cold_weather": "Cold warning",
+        "uv_note": "UV advisory",
+        "sea_wave_height": "Wave height warning",
+        "sea_water_height": "Sea level warning",
+        "sea_icing": "Ice accretion warning"
       }
     }
   },

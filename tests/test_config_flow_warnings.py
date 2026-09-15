@@ -18,7 +18,8 @@ from test_warning_entities import SEVERAL_AREAS, FakeApi
 pytestmark = pytest.mark.asyncio
 
 HANKO = {"latitude": 59.823, "longitude": 22.968, "radius": 2000}
-FORM = {CONF_LOCATION: HANKO, CONF_WARNING_TYPES: ["seaWind", "seaWaveHeight"], CONF_LABEL: "Varoitukset Hanko"}
+# The form uses lower-case keys for the warning types; subentries store FMI's names for them.
+FORM = {CONF_LOCATION: HANKO, CONF_WARNING_TYPES: ["sea_wind", "sea_wave_height"], CONF_LABEL: "Varoitukset Hanko"}
 
 
 @pytest.fixture(autouse=True)
@@ -58,6 +59,7 @@ async def test_adding_a_warnings_place(hass: HomeAssistant, entry: MockConfigEnt
     assert subentry.title == "Varoitukset Hanko"
     assert subentry.subentry_type == SUBENTRY_WARNINGS
     assert subentry.data[CONF_LOCATION] == HANKO
+    assert subentry.data[CONF_WARNING_TYPES] == ["seaWind", "seaWaveHeight"]
     # The language comes from the integration's settings.
     assert subentry.data[CONF_LANG] == "fin"
     assert hass.states.get("sensor.fmi_varoitukset_hanko") is not None
@@ -89,6 +91,8 @@ async def test_reconfiguring_a_warnings_place(hass: HomeAssistant, entry: MockCo
         context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry.subentry_id})
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "reconfigure"
+    warning_types = next(key for key in result["data_schema"].schema if key == CONF_WARNING_TYPES)
+    assert warning_types.description["suggested_value"] == ["sea_wind", "sea_wave_height"]
 
     result = await hass.config_entries.subentries.async_configure(
         result["flow_id"], {**FORM, CONF_LOCATION: {**HANKO, "radius": 5000}})
@@ -97,4 +101,5 @@ async def test_reconfiguring_a_warnings_place(hass: HomeAssistant, entry: MockCo
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.subentries[subentry.subentry_id].data[CONF_LOCATION]["radius"] == 5000
+    assert entry.subentries[subentry.subentry_id].data[CONF_WARNING_TYPES] == ["seaWind", "seaWaveHeight"]
     assert hass.states.get("sensor.fmi_varoitukset_hanko").attributes["radius"] == 5000

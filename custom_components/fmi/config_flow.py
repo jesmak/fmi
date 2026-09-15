@@ -24,7 +24,7 @@ from homeassistant.util.location import distance
 from .const import (DOMAIN, CONF_LABEL, CONF_LANG, CONF_QUERY_ID, CONF_QUERY_LABEL, CONF_FORECAST_HOURS, CONF_TARGET,
                     CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, LANGUAGES, CONF_PARAMETER, CONF_TARGET_TYPE,
                     CONF_NEGATIVE_AS_ZERO, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE,
-                    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_TYPES,
+                    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_TYPE_KEYS,
                     DEFAULT_WARNINGS_RADIUS, DEFAULT_WARNINGS_LABEL, SUBENTRY_SENSOR, SUBENTRY_WARNINGS)
 from .migration import TITLE, VERSION
 from .query_coordinator import build_unique_id, get_start_time
@@ -44,8 +44,8 @@ WARNINGS_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_LOCATION): LocationSelector(LocationSelectorConfig(radius=True, icon="mdi:alert")),
         vol.Required(CONF_WARNING_TYPES): SelectSelector(
-            SelectSelectorConfig(options=WARNING_TYPES, multiple=True, translation_key=CONF_WARNING_TYPES,
-                                 mode=SelectSelectorMode.LIST)),
+            SelectSelectorConfig(options=list(WARNING_TYPE_KEYS.values()), multiple=True,
+                                 translation_key=CONF_WARNING_TYPES, mode=SelectSelectorMode.LIST)),
         vol.Required(CONF_LABEL): cv.string,
     }
 )
@@ -74,6 +74,17 @@ async def validate_input(hass: HomeAssistant, data: dict[str, any]) -> str:
         raise ConnectionProblem
 
     return data[CONF_LABEL]
+
+
+def warning_types_from_form(data: dict[str, Any]) -> dict[str, Any]:
+    """The form's lower-case warning type keys as FMI's warning types, which subentries store."""
+    types_by_key = {key: warning_type for warning_type, key in WARNING_TYPE_KEYS.items()}
+    return {**data, CONF_WARNING_TYPES: [types_by_key.get(key, key) for key in data.get(CONF_WARNING_TYPES) or []]}
+
+
+def warning_types_for_form(data: dict[str, Any]) -> dict[str, Any]:
+    """Stored warning types as the form's lower-case keys."""
+    return {**data, CONF_WARNING_TYPES: [WARNING_TYPE_KEYS.get(t, t) for t in data.get(CONF_WARNING_TYPES) or []]}
 
 
 def validate_warnings_input(data: dict[str, Any]) -> dict[str, str]:
@@ -454,7 +465,7 @@ class WarningsSubentryFlow(ConfigSubentryFlow):
             errors = validate_warnings_input(user_input)
 
             if not errors:
-                data = {**user_input, CONF_LANG: entry.data[CONF_LANG]}
+                data = {**warning_types_from_form(user_input), CONF_LANG: entry.data[CONF_LANG]}
                 unique_id = build_warnings_unique_id(data)
                 if unique_id_taken(entry, unique_id):
                     return self.async_abort(reason="already_configured")
@@ -464,7 +475,7 @@ class WarningsSubentryFlow(ConfigSubentryFlow):
         values = user_input or {
             CONF_LOCATION: {"latitude": self.hass.config.latitude, "longitude": self.hass.config.longitude,
                             "radius": DEFAULT_WARNINGS_RADIUS},
-            CONF_WARNING_TYPES: WARNING_TYPES,
+            CONF_WARNING_TYPES: list(WARNING_TYPE_KEYS.values()),
             CONF_LABEL: DEFAULT_WARNINGS_LABEL.get(language, DEFAULT_WARNINGS_LABEL["eng"]),
         }
 
@@ -482,7 +493,7 @@ class WarningsSubentryFlow(ConfigSubentryFlow):
             errors = validate_warnings_input(user_input)
 
             if not errors:
-                updated = {**subentry.data, **user_input}
+                updated = {**subentry.data, **warning_types_from_form(user_input)}
                 unique_id = build_warnings_unique_id(updated)
 
                 if unique_id_taken(entry, unique_id, except_subentry_id=subentry.subentry_id):
@@ -491,9 +502,9 @@ class WarningsSubentryFlow(ConfigSubentryFlow):
                 return self.async_update_and_abort(entry, subentry, title=updated[CONF_LABEL], data=updated,
                                                    unique_id=unique_id)
 
+        values = user_input or warning_types_for_form(dict(subentry.data))
         return self.async_show_form(step_id="reconfigure",
-                                    data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA,
-                                                                                    user_input or dict(subentry.data)),
+                                    data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values),
                                     errors=errors)
 
 

@@ -6,11 +6,12 @@
   ],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/jesmak/hass_fmi",
+  "documentation": "https://github.com/jesmak/fmi",
   "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/jesmak/fmi/issues",
   "requirements": [
     "python-dateutil>=2.8.2"
   ],
   "single_config_entry": true,
-  "version": "3.0.0"
+  "version": "3.0.1"
 }
