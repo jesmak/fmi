@@ -1,5 +1,17 @@
 # FMI data for Home Assistant
 
+Home Assistant integration for Finnish Meteorological Institute observations, forecasts and weather warnings.
+
+[![GitHub Release][releases-shield]][releases]
+[![License][license-shield]](LICENSE)
+[![GitHub Activity][commits-shield]][commits]
+
+## Support
+
+Hey dude! Help me out for a couple of :beers: or a :coffee:!
+
+[![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://www.buymeacoffee.com/jesmak)
+
 ## What is it?
 
 A custom component that integrates with Finnish Meteorological Institute to retrieve data not typically part of
@@ -383,3 +395,9 @@ yaxis:
             return value.toFixed(1) + ' cm'; 
           }
 ```
+
+[commits-shield]: https://img.shields.io/github/commit-activity/y/jesmak/fmi.svg?style=for-the-badge
+[commits]: https://github.com/jesmak/fmi/commits/main
+[license-shield]: https://img.shields.io/github/license/jesmak/fmi.svg?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/jesmak/fmi.svg?style=for-the-badge
+[releases]: https://github.com/jesmak/fmi/releases
