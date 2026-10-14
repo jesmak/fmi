@@ -1,6 +1,6 @@
 {
-  "domain": "fmi",
-  "name": "FMI",
+  "domain": "fmi_open_data",
+  "name": "FMI Open Data",
   "codeowners": [
     "@jesmak"
   ],

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from custom_components.fmi.session import FMIException, FMISession
+from custom_components.fmi_open_data.session import FMIException, FMISession
 
 FIXTURES = Path(__file__).parent / "fixtures"
 QUERY = {"storedquery_id": "fmi::observations::weather::simple", "fmisid": "100971"}

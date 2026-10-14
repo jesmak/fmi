@@ -11,20 +11,16 @@ from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import issue_registry as ir
-from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN, SUBENTRY_SENSOR, SUBENTRY_WARNINGS
-from .migration import async_migrate_to_subentries
+from .migration import CONF_MOVE_FROM, async_check_old_folder, async_move_old_entries
 from .query_coordinator import FMIQueryCoordinator
 from .warning_coordinator import FMIWarningsCoordinator, WarningFeed
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor", "binary_sensor", "event"]
-
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 @dataclass
@@ -37,14 +33,11 @@ class FMIRuntimeData:
 type FMIConfigEntry = ConfigEntry[FMIRuntimeData]
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    # Runs before any entry is set up, so the old one-entry-per-sensor entries
-    # are merged before Home Assistant would try to set them up one by one.
-    await async_migrate_to_subentries(hass)
-    return True
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> bool:
+    if CONF_MOVE_FROM in entry.data:
+        await async_move_old_entries(hass, entry)
+    await async_check_old_folder(hass)
+
     feed = WarningFeed(hass)
     coordinators = {}
 
@@ -85,8 +78,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> None
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    # Entries from before 3.0 are merged into one in async_setup, which runs first.
-    # A newer version than this means Home Assistant was downgraded.
+    # Every entry of this domain is created at version 3, and a newer one means Home Assistant was downgraded.
     return entry.version <= 3
 
 

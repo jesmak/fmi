@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from test_no_data import FakeApi, _setup
 
-from custom_components.fmi.const import CONF_LANG, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DOMAIN
+from custom_components.fmi_open_data.const import CONF_LANG, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DOMAIN
 
 pytestmark = pytest.mark.asyncio
 

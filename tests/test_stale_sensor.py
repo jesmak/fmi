@@ -9,8 +9,8 @@ from datetime import timedelta
 from homeassistant.core import HomeAssistant
 from test_no_data import FakeApi, _coordinator, _issue, _setup
 
-from custom_components.fmi.const import CONF_LANG, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, CONF_QUERY_ID
-from custom_components.fmi.query_coordinator import stale_after_hours
+from custom_components.fmi_open_data.const import CONF_LANG, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, CONF_QUERY_ID
+from custom_components.fmi_open_data.query_coordinator import stale_after_hours
 
 STALE_SENSOR = "binary_sensor.fmi_kaisaniemi_air_temperature_stale_data"
 

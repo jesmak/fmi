@@ -1,6 +1,6 @@
 import re
 
-DOMAIN = "fmi"
+DOMAIN = "fmi_open_data"
 ATTRIBUTION = "Data provided by Finnish Meteorological Institute (FMI)"
 API_DESCRIBE_STORED_QUERIES_URL = "https://opendata.fmi.fi/wfs/${lang}?request=describeStoredQueries"
 API_GET_FEATURE_URL = "https://opendata.fmi.fi/wfs/${lang}?request=getFeature"

@@ -4,8 +4,8 @@ from datetime import UTC, datetime
 
 import pytest
 
-from custom_components.fmi.const import CONF_FORECAST_PAST_HOURS
-from custom_components.fmi.query_coordinator import get_start_time
+from custom_components.fmi_open_data.const import CONF_FORECAST_PAST_HOURS
+from custom_components.fmi_open_data.query_coordinator import get_start_time
 
 NOW = datetime(2026, 3, 15, 10, 30, 0, tzinfo=UTC)
 

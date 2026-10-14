@@ -52,7 +52,7 @@ from .const import (
     SUBENTRY_WARNINGS,
     WARNING_TYPE_KEYS,
 )
-from .migration import TITLE, VERSION
+from .migration import TITLE, VERSION, moved_entry, old_entries
 from .query_coordinator import build_unique_id, get_start_time, query_params
 from .session import FMIException, FMISession
 from .warning_coordinator import build_warnings_unique_id
@@ -133,6 +133,24 @@ class FMIConfigFlow(ConfigFlow, domain=DOMAIN):
                 options={CONF_NO_DATA_ISSUE: DEFAULT_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS: DEFAULT_NO_DATA_ISSUE_HOURS},
             )
 
+        if old_entries(self.hass):
+            return await self.async_step_old_setup()
+        return await self.async_step_new()
+
+    async def async_step_old_setup(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """The old `fmi` domain has a setup of this integration: move it, or set up a new one beside it."""
+        return self.async_show_menu(step_id="old_setup", menu_options=["move", "new"])
+
+    async def async_step_move(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """Take over the setup of the old `fmi` domain. The new entry's setup moves the entities."""
+        entries = old_entries(self.hass)
+        if not entries:
+            return await self.async_step_new()
+        data, options, subentries = moved_entry(entries)
+        return self.async_create_entry(title=TITLE, data=data, options=options, subentries=subentries)
+
+    async def async_step_new(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        """A new setup, beside the old one if there is one. The form is submitted to the user step."""
         default = "fin" if self.hass.config.language.startswith("fi") else "eng"
         return self.async_show_form(step_id="user", data_schema=language_schema(default))
 

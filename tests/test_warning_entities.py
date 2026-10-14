@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.fmi.const import (
+from custom_components.fmi_open_data.const import (
     API_WARNINGS_FEED_URL,
     CONF_LABEL,
     CONF_LANG,
@@ -18,7 +18,7 @@ from custom_components.fmi.const import (
     SUBENTRY_WARNINGS,
     WARNING_TYPES,
 )
-from custom_components.fmi.session import FMIException
+from custom_components.fmi_open_data.session import FMIException
 
 pytestmark = pytest.mark.asyncio
 
@@ -68,7 +68,7 @@ def warnings_place(label: str, latitude: float, longitude: float, radius: float 
 
 
 async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, *places: ConfigSubentryData) -> MockConfigEntry:
-    monkeypatch.setattr("custom_components.fmi.warning_coordinator.FMISession", lambda *a, **kw: api)
+    monkeypatch.setattr("custom_components.fmi_open_data.warning_coordinator.FMISession", lambda *a, **kw: api)
     entry = MockConfigEntry(
         domain=DOMAIN,
         version=3,

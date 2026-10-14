@@ -9,7 +9,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.fmi.const import (
+from custom_components.fmi_open_data.const import (
     CONF_FORECAST_HOURS,
     CONF_FORECAST_PAST_HOURS,
     CONF_FORECAST_STEP,
@@ -24,8 +24,8 @@ from custom_components.fmi.const import (
     DOMAIN,
     SUBENTRY_SENSOR,
 )
-from custom_components.fmi.query_coordinator import build_unique_id
-from custom_components.fmi.session import FMIException
+from custom_components.fmi_open_data.query_coordinator import build_unique_id
+from custom_components.fmi_open_data.session import FMIException
 
 pytestmark = pytest.mark.asyncio
 
@@ -87,8 +87,8 @@ class FakeApi:
 @pytest.fixture
 def api(monkeypatch) -> FakeApi:
     api = FakeApi()
-    monkeypatch.setattr("custom_components.fmi.config_flow.FMISession", lambda *a, **kw: api)
-    monkeypatch.setattr("custom_components.fmi.query_coordinator.FMISession", lambda *a, **kw: api)
+    monkeypatch.setattr("custom_components.fmi_open_data.config_flow.FMISession", lambda *a, **kw: api)
+    monkeypatch.setattr("custom_components.fmi_open_data.query_coordinator.FMISession", lambda *a, **kw: api)
     return api
 
 

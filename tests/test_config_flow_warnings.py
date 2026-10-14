@@ -7,7 +7,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from test_warning_entities import SEVERAL_AREAS, FakeApi
 
-from custom_components.fmi.const import (
+from custom_components.fmi_open_data.const import (
     CONF_LABEL,
     CONF_LANG,
     CONF_LOCATION,
@@ -25,7 +25,7 @@ FORM = {CONF_LOCATION: HANKO, CONF_WARNING_TYPES: ["sea_wind", "sea_wave_height"
 
 @pytest.fixture(autouse=True)
 def fake_feed(monkeypatch):
-    monkeypatch.setattr("custom_components.fmi.warning_coordinator.FMISession", lambda *a, **kw: FakeApi([SEVERAL_AREAS]))
+    monkeypatch.setattr("custom_components.fmi_open_data.warning_coordinator.FMISession", lambda *a, **kw: FakeApi([SEVERAL_AREAS]))
 
 
 @pytest.fixture

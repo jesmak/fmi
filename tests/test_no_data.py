@@ -14,7 +14,7 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.fmi.const import (
+from custom_components.fmi_open_data.const import (
     CONF_LABEL,
     CONF_LANG,
     CONF_NEGATIVE_AS_ZERO,
@@ -27,7 +27,7 @@ from custom_components.fmi.const import (
     DOMAIN,
     SUBENTRY_SENSOR,
 )
-from custom_components.fmi.query_coordinator import FMIQueryCoordinator
+from custom_components.fmi_open_data.query_coordinator import FMIQueryCoordinator
 
 # The harness has no asyncio_mode config of its own, so mark the module.
 pytestmark = pytest.mark.asyncio
@@ -101,7 +101,7 @@ STALE_DATA_SETTINGS = (CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS)
 
 
 async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, **overrides) -> MockConfigEntry:
-    monkeypatch.setattr("custom_components.fmi.query_coordinator.FMISession", lambda *a, **kw: api)
+    monkeypatch.setattr("custom_components.fmi_open_data.query_coordinator.FMISession", lambda *a, **kw: api)
     options = {key: value for key, value in overrides.items() if key in STALE_DATA_SETTINGS}
     data = {**ENTRY_DATA, **{key: value for key, value in overrides.items() if key not in STALE_DATA_SETTINGS}}
     entry = MockConfigEntry(

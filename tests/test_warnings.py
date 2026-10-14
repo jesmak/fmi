@@ -9,7 +9,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from custom_components.fmi.cap import (
+from custom_components.fmi_open_data.cap import (
     WarningsFilter,
     distance_to_outline_m,
     highest_level,
@@ -20,7 +20,7 @@ from custom_components.fmi.cap import (
     warning_changes,
     warnings_for,
 )
-from custom_components.fmi.const import WARNING_TYPES
+from custom_components.fmi_open_data.const import WARNING_TYPES
 
 FIXTURES = Path(__file__).parent / "fixtures"
 FINNISH_TIME = timezone(timedelta(hours=3))
