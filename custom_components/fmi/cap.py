@@ -18,8 +18,6 @@ from datetime import datetime
 from typing import Any
 from xml.etree import ElementTree
 
-from dateutil.parser import isoparse
-
 from .const import CONF_LANG, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_LEVELS, WARNING_TYPES
 
 ATOM_NAMESPACES = {"atom": "http://www.w3.org/2005/Atom"}
@@ -156,7 +154,7 @@ def _text(element: ElementTree.Element, name: str) -> str:
 
 def _time(text: str) -> datetime | None:
     try:
-        return isoparse(text) if text else None
+        return datetime.fromisoformat(text) if text else None
     except ValueError:
         return None
 

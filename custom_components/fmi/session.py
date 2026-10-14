@@ -1,10 +1,9 @@
 import logging
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import Any
 from xml.etree import ElementTree
 
 import requests
-from dateutil.parser import isoparse
 from requests import ConnectTimeout, RequestException
 
 from .const import (
@@ -112,7 +111,7 @@ class FMISession:
                     if name.lower() != target_param.lower():
                         continue
 
-                    time = isoparse(item.find("./BsWfs:Time", namespaces).text)
+                    time = datetime.fromisoformat(item.find("./BsWfs:Time", namespaces).text)
                     if time.tzinfo is None:
                         # FMI reports UTC; make it explicit so the values stay
                         # comparable with timezone-aware datetimes downstream.

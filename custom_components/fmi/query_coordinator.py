@@ -4,7 +4,6 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from dateutil.relativedelta import relativedelta
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
@@ -46,25 +45,24 @@ def build_unique_id(data: dict[str, Any]) -> str:
     return "_".join([str(data[CONF_QUERY_ID]), str(data[CONF_TARGET_TYPE]), str(data[CONF_TARGET]), str(data[CONF_PARAMETER])]).lower()
 
 
-def get_start_time(query_id: str, now: datetime, data: dict[str, Any]):
+def get_start_time(query_id: str, now: datetime, data: dict[str, Any]) -> datetime | None:
     # Aggregate queries have to reach back past the current period: the running
     # day/month/year is reported as NaN until it completes, and NaN values are
     # discarded, which otherwise leaves the sensor permanently empty.
-    return (
-        now - timedelta(hours=data[CONF_FORECAST_PAST_HOURS])
-        if "::forecast" in query_id
-        else now.replace(minute=0, second=0) - relativedelta(hours=1)
-        if "::hourly" in query_id
-        else now.replace(hour=0, minute=0, second=0) - relativedelta(days=2)
-        if "::daily" in query_id
-        else now.replace(day=1, hour=0, minute=0, second=0) - relativedelta(months=2)
-        if "::monthly" in query_id
-        else now.replace(month=1, day=1, hour=0, minute=0, second=0) - relativedelta(years=2)
-        if "::yearly" in query_id
-        else now - timedelta(hours=12)
-        if not query_id.startswith("stuk::")
-        else None
-    )
+    if "::forecast" in query_id:
+        return now - timedelta(hours=data[CONF_FORECAST_PAST_HOURS])
+    if "::hourly" in query_id:
+        return now.replace(minute=0, second=0) - timedelta(hours=1)
+    if "::daily" in query_id:
+        return now.replace(hour=0, minute=0, second=0) - timedelta(days=2)
+    if "::monthly" in query_id:
+        months = now.year * 12 + now.month - 1 - 2
+        return now.replace(year=months // 12, month=months % 12 + 1, day=1, hour=0, minute=0, second=0)
+    if "::yearly" in query_id:
+        return now.replace(year=now.year - 2, month=1, day=1, hour=0, minute=0, second=0)
+    if query_id.startswith("stuk::"):
+        return None
+    return now - timedelta(hours=12)
 
 
 def stale_after_hours(query_id: str, configured_hours: int) -> int:
