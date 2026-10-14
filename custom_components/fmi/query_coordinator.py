@@ -156,19 +156,24 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # reports it; the repair issue is the part that can be switched off.
         stale = await self._async_is_stale(now, timedelta(hours=self.stale_after_hours), is_forecast, result)
 
+        issue_enabled = self.config_entry.options.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE)
         if not stale:
             self._reported = False
+        if not stale or not issue_enabled:
+            # Also clears an issue raised before the user switched them off.
             ir.async_delete_issue(self.hass, DOMAIN, self.issue_id)
         elif not self._reported:
             self._reported = True
-            if self.config_entry.options.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE):
-                await self._async_report_no_data(self._params(now, False))
+            await self._async_report_no_data(self._params(now, False))
 
         result["stale"] = stale
         return result
 
     async def _async_is_stale(self, now: datetime, grace: timedelta, is_forecast: bool, result: dict[str, Any]) -> bool:
         """Whether the newest value FMI holds for this sensor is older than the grace period.
+
+        When the poll came back empty but a value within the grace period exists,
+        that value goes into the result.
 
         The age comes from FMI's own timestamps rather than from how long this
         run of Home Assistant has been seeing empty updates, so it is not reset
@@ -211,6 +216,9 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return False
 
         newest = max((item["time"] for item in widened["data"]), default=None)
+        if newest is not None:
+            # The poll window missed the latest value, which the wider query found. Show it.
+            result["data"] = widened["data"]
 
         return newest is None or now - newest >= grace
 

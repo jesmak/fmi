@@ -20,6 +20,8 @@ _LOGGER = logging.getLogger(__name__)
 
 # Every place refreshes on the same schedule, so one download serves them all.
 FEED_REUSE_TIME = timedelta(seconds=30)
+# How long the last complete warnings are kept while some of FMI's messages cannot be read.
+INCOMPLETE_GRACE = timedelta(hours=1)
 
 
 def build_warnings_unique_id(data: dict[str, Any]) -> str:
@@ -43,12 +45,12 @@ class WarningFeed:
         self._hass = hass
         # A CAP message never changes once published, so each is downloaded once, by address.
         self._alerts: dict[str, CapAlert] = {}
-        self._complete = False
+        self._unreadable: list[str] = []
         self._fetched_at: datetime | None = None
         self._lock = asyncio.Lock()
 
-    async def async_alerts(self) -> tuple[list[CapAlert], bool]:
-        """The messages in the feed, and whether every one of them could be read.
+    async def async_alerts(self) -> tuple[list[CapAlert], list[str]]:
+        """The messages in the feed, and the addresses of those that could not be read.
 
         Raises FMIException or ParseError when the feed itself cannot be read.
         """
@@ -57,13 +59,13 @@ class WarningFeed:
             if self._fetched_at is None or now - self._fetched_at >= FEED_REUSE_TIME:
                 await self._async_download()
                 self._fetched_at = now
-            return list(self._alerts.values()), self._complete
+            return list(self._alerts.values()), list(self._unreadable)
 
     async def _async_download(self) -> None:
         api = FMISession()
         urls = parse_warning_feed(await self._hass.async_add_executor_job(api.get_document, API_WARNINGS_FEED_URL))
 
-        complete = True
+        unreadable = []
         for url in urls:
             if url in self._alerts:
                 continue
@@ -71,10 +73,10 @@ class WarningFeed:
                 self._alerts[url] = parse_alert(await self._hass.async_add_executor_job(api.get_document, url))
             except (FMIException, ParseError) as exception:
                 _LOGGER.debug(f"Could not read warning {url}: {exception}")
-                complete = False
+                unreadable.append(url)
 
         self._alerts = {url: alert for url, alert in self._alerts.items() if url in urls}
-        self._complete = complete
+        self._unreadable = unreadable
 
 
 @dataclass(frozen=True)
@@ -101,21 +103,33 @@ class FMIWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
         self.warnings_filter = WarningsFilter.from_entry_data(subentry.data)
         self._feed = feed
         self._previous: dict[str, FMIWarning] | None = None
+        self._incomplete_since: datetime | None = None
+        self._warned = False
 
     async def _async_update_data(self) -> WarningsData:
         try:
-            alerts, complete = await self._feed.async_alerts()
+            alerts, unreadable = await self._feed.async_alerts()
         except (FMIException, ParseError) as exception:
             raise UpdateFailed(f"Could not read FMI's warning feed: {exception}") from exception
 
-        if not complete:
+        now = dt_util.utcnow()
+        if not unreadable:
+            self._incomplete_since = None
+            self._warned = False
+        elif self._incomplete_since is None:
+            self._incomplete_since = now
+
+        if unreadable and now - self._incomplete_since < INCOMPLETE_GRACE:
             # Without every message, a warning could look cancelled when it is not.
             # Keep what was known and try again at the next refresh.
             if self.data is None:
                 raise UpdateFailed("Could not read all of FMI's warnings")
             return WarningsData(self.data.warnings, [], self.data.updated)
 
-        now = dt_util.utcnow()
+        if unreadable and not self._warned:
+            self._warned = True
+            _LOGGER.warning(f"Some of FMI's warnings have been unreadable for an hour, showing the rest: {', '.join(unreadable)}")
+
         current = warnings_for(alerts, self.warnings_filter, now)
         # The first refresh only learns what is already in force: announcing
         # it as new would repeat on every restart of Home Assistant.

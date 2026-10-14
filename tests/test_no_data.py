@@ -154,6 +154,8 @@ async def test_data_just_outside_the_poll_window_is_not_reported(hass: HomeAssis
     assert _issue(hass, entry) is None
     # The plain 12 h poll came back empty, so a second, wider window was asked for.
     assert len(api.windows) > 1
+    # And the value it found is shown rather than nothing.
+    assert hass.states.get("sensor.fmi_kaisaniemi_air_temperature").state == "1.5"
 
 
 async def test_silence_beyond_the_grace_period_is_reported(hass: HomeAssistant, monkeypatch):
@@ -213,3 +215,14 @@ async def test_the_unit_is_looked_up_once(hass: HomeAssistant, monkeypatch):
 
     assert api.unit_lookups == 1
     assert _coordinator(entry).data["unit"] == "°C"
+
+
+async def test_switching_the_issues_off_clears_one_already_raised(hass: HomeAssistant, monkeypatch):
+    api = FakeApi(age=None, parameters=[])
+    entry = await _setup(hass, monkeypatch, api, **{CONF_NO_DATA_ISSUE_HOURS: 24})
+    assert _issue(hass, entry) is not None
+
+    hass.config_entries.async_update_entry(entry, options={**entry.options, CONF_NO_DATA_ISSUE: False})
+    await hass.async_block_till_done()
+
+    assert _issue(hass, entry) is None

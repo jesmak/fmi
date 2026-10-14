@@ -77,6 +77,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> bool
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
+async def async_remove_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> None:
+    # Repair issues are not persistent, but they would stay until a restart.
+    for domain, issue_id in list(ir.async_get(hass).issues):
+        if domain == DOMAIN:
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
+
+
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Entries from before 3.0 are merged into one in async_setup, which runs first.
     # A newer version than this means Home Assistant was downgraded.

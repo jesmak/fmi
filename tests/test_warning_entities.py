@@ -1,5 +1,6 @@
 """A warnings place end to end: the level sensor, its attributes and the event entity."""
 
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -154,6 +155,26 @@ async def test_a_warning_that_cannot_be_read_does_not_look_cancelled(hass: HomeA
 
     assert hass.states.get(SENSOR).state == "yellow"
     assert hass.states.get(EVENT).state == event_before
+
+
+async def test_a_message_unreadable_for_an_hour_no_longer_holds_up_the_rest(hass: HomeAssistant, monkeypatch, freezer, caplog):
+    freezer.move_to("2026-09-16T12:00:00+03:00")
+    broken = "https://alerts.fmi.fi/cap/test/broken.xml"
+    api = FakeApi([])
+    entry = await _setup(hass, monkeypatch, api)
+    before = hass.states.get(SENSOR).state
+
+    api.urls = [SEVERAL_AREAS, broken]
+    api.failing.add(broken)
+    await _refresh(hass, entry, freezer)
+    assert hass.states.get(SENSOR).state == before
+
+    freezer.tick(timedelta(hours=1))
+    await _refresh(hass, entry, freezer)
+    await _refresh(hass, entry, freezer)
+
+    assert hass.states.get(SENSOR).state == "yellow"
+    assert caplog.text.count("unreadable for an hour") == 1
 
 
 async def test_places_share_one_download_of_the_feed(hass: HomeAssistant, monkeypatch, freezer):

@@ -18,7 +18,7 @@ from datetime import datetime
 from typing import Any
 from xml.etree import ElementTree
 
-from .const import CONF_LANG, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_LEVELS, WARNING_TYPES
+from .const import CONF_LANG, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_LEVELS
 
 ATOM_NAMESPACES = {"atom": "http://www.w3.org/2005/Atom"}
 CAP_NAMESPACES = {"cap": "urn:oasis:names:tc:emergency:cap:1.2"}
@@ -221,7 +221,7 @@ class WarningsFilter:
             latitude=float(location["latitude"]),
             longitude=float(location["longitude"]),
             radius_m=float(location.get("radius") or 0),
-            types=frozenset(data.get(CONF_WARNING_TYPES) or WARNING_TYPES),
+            types=frozenset(data[CONF_WARNING_TYPES]),
             language=data[CONF_LANG],
         )
 
