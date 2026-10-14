@@ -190,6 +190,47 @@ async def test_two_entries_measuring_the_same_thing_become_one_subentry(hass: Ho
     assert hass.states.get("sensor.fmi_kaisaniemi_air_temperature").state == "1.5"
 
 
+async def test_a_migration_that_crashed_on_a_twin_finishes_without_losing_the_first_sensor(hass: HomeAssistant):
+    # 3.0.0 got this far before the twin's unique id clash stopped it: the first entry
+    # still at version 2, but with its subentry made and its entity already moved onto it.
+    subentry_data = {key: value for key, value in KAISANIEMI.items() if key not in (CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS)}
+    first = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        title=KAISANIEMI[CONF_LABEL],
+        data=KAISANIEMI,
+        unique_id=build_unique_id(KAISANIEMI),
+        subentries_data=[
+            ConfigSubentryData(
+                data=subentry_data, subentry_type=SUBENTRY_SENSOR, title=KAISANIEMI[CONF_LABEL], unique_id=build_unique_id(KAISANIEMI)
+            ),
+        ],
+    )
+    first.add_to_hass(hass)
+    [subentry] = first.subentries.values()
+    er.async_get(hass).async_get_or_create(
+        "sensor",
+        DOMAIN,
+        subentry.subentry_id,
+        config_entry=first,
+        config_subentry_id=subentry.subentry_id,
+        suggested_object_id="my_renamed_temperature",
+    )
+    _old_entry(hass, {**KAISANIEMI, CONF_LABEL: "Helsinki temperature"}, "fmi_helsinki_temperature", ["sensor.fmi_helsinki_temperature"])
+
+    await _start(hass)
+
+    [entry] = hass.config_entries.async_entries(DOMAIN)
+    assert entry.version == 3
+    registry = er.async_get(hass)
+    assert registry.async_get("sensor.my_renamed_temperature").config_subentry_id == subentry.subentry_id
+    assert registry.async_get("sensor.fmi_helsinki_temperature") is None
+    # No new sensor was made in place of the one that was kept.
+    assert [item.entity_id for item in er.async_entries_for_config_entry(registry, entry.entry_id) if item.domain == "sensor"] == [
+        "sensor.my_renamed_temperature"
+    ]
+
+
 async def test_a_current_entry_is_left_alone(hass: HomeAssistant):
     parent = MockConfigEntry(
         domain=DOMAIN, version=3, title="FMI", data={CONF_LANG: "eng"}, options={CONF_NO_DATA_ISSUE: False, CONF_NO_DATA_ISSUE_HOURS: 48}

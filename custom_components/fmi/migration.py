@@ -59,7 +59,8 @@ async def async_migrate_to_subentries(hass: HomeAssistant) -> None:
             hass.config_entries.async_add_subentry(parent, subentry)
 
         for registered in er.async_entries_for_config_entry(registry, entry.entry_id):
-            if registry.async_get_entity_id(registered.domain, DOMAIN, subentry.subentry_id) is not None:
+            holder = registry.async_get_entity_id(registered.domain, DOMAIN, subentry.subentry_id)
+            if holder not in (None, registered.entity_id):
                 # Two old entries measured the same thing, and the subentry already has
                 # this entity from the first. The second copy has nothing to add.
                 registry.async_remove(registered.entity_id)
@@ -74,7 +75,9 @@ async def async_migrate_to_subentries(hass: HomeAssistant) -> None:
                 config_entry_id=parent.entry_id,
                 config_subentry_id=subentry.subentry_id,
                 disabled_by=disabled_by,
-                new_unique_id=subentry.subentry_id,
+                # An entity an interrupted run already moved keeps its unique id: the
+                # registry refuses even an entity's own unique id as a new one.
+                **({"new_unique_id": subentry.subentry_id} if holder is None else {}),
             )
 
         ir.async_delete_issue(hass, DOMAIN, f"no_data_{entry.entry_id}")

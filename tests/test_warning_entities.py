@@ -177,6 +177,25 @@ async def test_a_message_unreadable_for_an_hour_no_longer_holds_up_the_rest(hass
     assert caplog.text.count("unreadable for an hour") == 1
 
 
+async def test_a_warning_whose_reissue_cannot_be_read_does_not_look_cancelled_after_an_hour(hass: HomeAssistant, monkeypatch, freezer):
+    freezer.move_to("2026-09-16T12:00:00+03:00")
+    reissue = "https://alerts.fmi.fi/cap/test/reissue.xml"
+    api = FakeApi([SEVERAL_AREAS])
+    entry = await _setup(hass, monkeypatch, api)
+    event_before = hass.states.get(EVENT).state
+
+    # FMI replaced the message with one that can't be read.
+    api.urls = [reissue]
+    api.failing.add(reissue)
+    await _refresh(hass, entry, freezer)
+    freezer.tick(timedelta(hours=1))
+    await _refresh(hass, entry, freezer)
+    await _refresh(hass, entry, freezer)
+
+    assert hass.states.get(SENSOR).state == "yellow"
+    assert hass.states.get(EVENT).state == event_before
+
+
 async def test_places_share_one_download_of_the_feed(hass: HomeAssistant, monkeypatch, freezer):
     freezer.move_to("2026-09-16T12:00:00+03:00")
     api = FakeApi([SEVERAL_AREAS, BOTHNIA])

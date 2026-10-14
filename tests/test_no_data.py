@@ -226,3 +226,15 @@ async def test_switching_the_issues_off_clears_one_already_raised(hass: HomeAssi
     await hass.async_block_till_done()
 
     assert _issue(hass, entry) is None
+
+
+async def test_with_the_issues_off_an_outage_costs_one_query_per_poll(hass: HomeAssistant, monkeypatch):
+    api = FakeApi(age=None, parameters=[])
+    entry = await _setup(hass, monkeypatch, api, **{CONF_NO_DATA_ISSUE: False, CONF_NO_DATA_ISSUE_HOURS: 24})
+    calls = len(api.windows)
+
+    await _coordinator(entry).async_refresh()
+    await _coordinator(entry).async_refresh()
+    await hass.async_block_till_done()
+
+    assert len(api.windows) == calls + 2, api.windows

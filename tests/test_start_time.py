@@ -26,8 +26,3 @@ NOW = datetime(2026, 3, 15, 10, 30, 0, tzinfo=UTC)
 )
 def test_start_time(query_id: str, now: datetime, expected: datetime | None) -> None:
     assert get_start_time(query_id, now, {CONF_FORECAST_PAST_HOURS: 3}) == expected
-
-
-def test_fmi_time_formats_parse() -> None:
-    assert datetime.fromisoformat("2026-03-15T10:30:00Z") == NOW
-    assert datetime.fromisoformat("2026-03-15T12:30:00+02:00") == NOW

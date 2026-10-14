@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .cap import CapAlert, FMIWarning, WarningsFilter, parse_alert, parse_warning_feed, warning_changes, warnings_for
+from .cap import EVENT_CANCELLED, CapAlert, FMIWarning, WarningsFilter, parse_alert, parse_warning_feed, warning_changes, warnings_for
 from .const import API_WARNINGS_FEED_URL, CONF_LOCATION, CONF_WARNING_TYPES, DOMAIN, WARNINGS_SCAN_INTERVAL
 from .session import FMIException, FMISession
 
@@ -134,6 +134,11 @@ class FMIWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
         # The first refresh only learns what is already in force: announcing
         # it as new would repeat on every restart of Home Assistant.
         changes = [] if self._previous is None else warning_changes(self._previous, current, now)
+        if unreadable:
+            # A warning that dropped out may have been reissued in a message that can't be
+            # read. Keep it, and announce a cancellation only once every message is readable.
+            current = {**{warning.identifier: warning for kind, warning in changes if kind == EVENT_CANCELLED}, **current}
+            changes = [(kind, warning) for kind, warning in changes if kind != EVENT_CANCELLED]
         self._previous = current
 
         return WarningsData(current, changes, now)

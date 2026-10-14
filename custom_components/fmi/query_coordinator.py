@@ -159,12 +159,15 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         issue_enabled = self.config_entry.options.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE)
         if not stale:
             self._reported = False
+        elif not self._reported:
+            # Set whether or not the issue is wanted: it also spares the next
+            # polls of this outage the wider stale check.
+            self._reported = True
+            if issue_enabled:
+                await self._async_report_no_data(self._params(now, False))
         if not stale or not issue_enabled:
             # Also clears an issue raised before the user switched them off.
             ir.async_delete_issue(self.hass, DOMAIN, self.issue_id)
-        elif not self._reported:
-            self._reported = True
-            await self._async_report_no_data(self._params(now, False))
 
         result["stale"] = stale
         return result
