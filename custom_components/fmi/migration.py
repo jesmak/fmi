@@ -16,19 +16,15 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 
 from .const import (
-    CONF_ENTRY_TYPE,
     CONF_LANG,
     CONF_NO_DATA_ISSUE,
     CONF_NO_DATA_ISSUE_HOURS,
     DEFAULT_NO_DATA_ISSUE,
     DEFAULT_NO_DATA_ISSUE_HOURS,
     DOMAIN,
-    ENTRY_TYPE_WARNINGS,
     SUBENTRY_SENSOR,
-    SUBENTRY_WARNINGS,
 )
 from .query_coordinator import build_unique_id
-from .warning_coordinator import build_warnings_unique_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,6 +59,11 @@ async def async_migrate_to_subentries(hass: HomeAssistant) -> None:
             hass.config_entries.async_add_subentry(parent, subentry)
 
         for registered in er.async_entries_for_config_entry(registry, entry.entry_id):
+            if registry.async_get_entity_id(registered.domain, DOMAIN, subentry.subentry_id) is not None:
+                # Two old entries measured the same thing, and the subentry already has
+                # this entity from the first. The second copy has nothing to add.
+                registry.async_remove(registered.entity_id)
+                continue
             disabled_by = registered.disabled_by
             if disabled_by is er.RegistryEntryDisabler.CONFIG_ENTRY and not all_disabled:
                 # Moving to an enabled entry would clear this flag; the user had
@@ -95,16 +96,15 @@ async def async_migrate_to_subentries(hass: HomeAssistant) -> None:
 
 def _subentry_for(entry: ConfigEntry) -> ConfigSubentry:
     data = dict(entry.data)
-    is_warnings = data.pop(CONF_ENTRY_TYPE, None) == ENTRY_TYPE_WARNINGS
     # Stale data settings are shared by every sensor from now on.
     data.pop(CONF_NO_DATA_ISSUE, None)
     data.pop(CONF_NO_DATA_ISSUE_HOURS, None)
 
     return ConfigSubentry(
         data=MappingProxyType(data),
-        subentry_type=SUBENTRY_WARNINGS if is_warnings else SUBENTRY_SENSOR,
+        subentry_type=SUBENTRY_SENSOR,
         title=entry.title,
-        unique_id=build_warnings_unique_id(data) if is_warnings else build_unique_id(data),
+        unique_id=build_unique_id(data),
     )
 
 

@@ -15,26 +15,17 @@ from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from test_no_data import ENTRY_DATA
 from test_no_data import FakeApi as QueryApi
-from test_warning_entities import SEVERAL_AREAS
-from test_warning_entities import FakeApi as WarningsApi
 
 from custom_components.fmi.const import (
-    CONF_ENTRY_TYPE,
     CONF_LABEL,
     CONF_LANG,
-    CONF_LOCATION,
     CONF_NO_DATA_ISSUE,
     CONF_NO_DATA_ISSUE_HOURS,
     CONF_TARGET,
-    CONF_WARNING_TYPES,
     DOMAIN,
-    ENTRY_TYPE_WARNINGS,
     SUBENTRY_SENSOR,
-    SUBENTRY_WARNINGS,
-    WARNING_TYPES,
 )
 from custom_components.fmi.query_coordinator import build_unique_id
-from custom_components.fmi.warning_coordinator import build_warnings_unique_id
 
 pytestmark = pytest.mark.asyncio
 
@@ -42,19 +33,11 @@ KAISANIEMI = {**ENTRY_DATA, CONF_LANG: "fin", CONF_NO_DATA_ISSUE: True, CONF_NO_
 MANNERHEIMINTIE = {**KAISANIEMI, CONF_LABEL: "Mannerheimintie Air temperature", CONF_TARGET: "100742"}
 # Set up before the stale data settings existed.
 KATAJANOKKA = {**ENTRY_DATA, CONF_LABEL: "Katajanokka Air temperature", CONF_TARGET: "104053"}
-WARNINGS = {
-    CONF_ENTRY_TYPE: ENTRY_TYPE_WARNINGS,
-    CONF_LANG: "fin",
-    CONF_LABEL: "Varoitukset Suomenlinna",
-    CONF_LOCATION: {"latitude": 60.146, "longitude": 24.988, "radius": 0},
-    CONF_WARNING_TYPES: WARNING_TYPES,
-}
 
 
 @pytest.fixture(autouse=True)
 def fake_apis(monkeypatch):
     monkeypatch.setattr("custom_components.fmi.query_coordinator.FMISession", lambda *a, **kw: QueryApi(age=timedelta(hours=1)))
-    monkeypatch.setattr("custom_components.fmi.warning_coordinator.FMISession", lambda *a, **kw: WarningsApi([SEVERAL_AREAS]))
 
 
 def _old_entry(hass: HomeAssistant, data: dict, unique_id: str, entities: list[str], disabled: bool = False) -> MockConfigEntry:
@@ -117,15 +100,6 @@ async def test_every_entry_becomes_a_subentry_and_keeps_its_entities(hass: HomeA
             "binary_sensor.fmi_katajanokka_air_temperature_stale_data",
         ],
     )
-    _old_entry(
-        hass,
-        WARNINGS,
-        build_warnings_unique_id(WARNINGS),
-        [
-            "sensor.fmi_varoitukset_suomenlinna",
-            "event.fmi_varoitukset_suomenlinna",
-        ],
-    )
     ir.async_create_issue(
         hass, DOMAIN, f"no_data_{kaisaniemi.entry_id}", is_fixable=False, severity=ir.IssueSeverity.WARNING, translation_key="no_data"
     )
@@ -144,10 +118,7 @@ async def test_every_entry_becomes_a_subentry_and_keeps_its_entities(hass: HomeA
         "Kaisaniemi Air temperature",
         "Mannerheimintie Air temperature",
         "Katajanokka Air temperature",
-        "Varoitukset Suomenlinna",
     }
-    assert subentries["Varoitukset Suomenlinna"].subentry_type == SUBENTRY_WARNINGS
-    assert CONF_ENTRY_TYPE not in subentries["Varoitukset Suomenlinna"].data
     assert subentries["Kaisaniemi Air temperature"].subentry_type == SUBENTRY_SENSOR
     assert subentries["Kaisaniemi Air temperature"].unique_id == build_unique_id(KAISANIEMI)
     assert CONF_NO_DATA_ISSUE_HOURS not in subentries["Kaisaniemi Air temperature"].data
@@ -162,8 +133,6 @@ async def test_every_entry_becomes_a_subentry_and_keeps_its_entities(hass: HomeA
         "binary_sensor.fmi_mannerheimintie_air_temperature_stale_data": "Mannerheimintie Air temperature",
         "sensor.fmi_katajanokka_air_temperature": "Katajanokka Air temperature",
         "binary_sensor.fmi_katajanokka_air_temperature_stale_data": "Katajanokka Air temperature",
-        "sensor.fmi_varoitukset_suomenlinna": "Varoitukset Suomenlinna",
-        "event.fmi_varoitukset_suomenlinna": "Varoitukset Suomenlinna",
     }
     for entity_id, title in moved.items():
         registered = registry.async_get(entity_id)
@@ -175,7 +144,6 @@ async def test_every_entry_becomes_a_subentry_and_keeps_its_entities(hass: HomeA
     # Nothing was registered a second time under a new entity ID.
     assert len(er.async_entries_for_config_entry(registry, entry.entry_id)) == len(moved)
     assert hass.states.get("sensor.temperature_outside").state == "1.5"
-    assert hass.states.get("sensor.fmi_varoitukset_suomenlinna") is not None
     # The user had turned this sensor off, and it stays off.
     assert registry.async_get("sensor.fmi_mannerheimintie_air_temperature").disabled_by is er.RegistryEntryDisabler.USER
     assert ir.async_get(hass).async_get_issue(DOMAIN, f"no_data_{kaisaniemi.entry_id}") is None
@@ -203,6 +171,23 @@ async def test_an_entry_left_behind_by_an_interrupted_migration_is_merged(hass: 
     assert entry.entry_id == parent.entry_id
     [subentry] = entry.subentries.values()
     assert er.async_get(hass).async_get("sensor.temperature_outside").config_subentry_id == subentry.subentry_id
+
+
+async def test_two_entries_measuring_the_same_thing_become_one_subentry(hass: HomeAssistant):
+    # 1.x told sensors apart by their label, so the same measurement could be added twice under two names.
+    twin = {**KAISANIEMI, CONF_LABEL: "Helsinki temperature"}
+    _old_entry(hass, KAISANIEMI, "fmi_kaisaniemi_air_temperature", ["sensor.fmi_kaisaniemi_air_temperature"])
+    _old_entry(hass, twin, "fmi_helsinki_temperature", ["sensor.fmi_helsinki_temperature"])
+
+    await _start(hass)
+
+    [entry] = hass.config_entries.async_entries(DOMAIN)
+    assert entry.version == 3
+    [subentry] = entry.subentries.values()
+    registry = er.async_get(hass)
+    assert registry.async_get("sensor.fmi_kaisaniemi_air_temperature").config_subentry_id == subentry.subentry_id
+    assert registry.async_get("sensor.fmi_helsinki_temperature") is None
+    assert hass.states.get("sensor.fmi_kaisaniemi_air_temperature").state == "1.5"
 
 
 async def test_a_current_entry_is_left_alone(hass: HomeAssistant):

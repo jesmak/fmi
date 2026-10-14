@@ -55,11 +55,6 @@ CONF_WARNING_TYPES = "warning_types"
 SUBENTRY_SENSOR = "sensor"
 SUBENTRY_WARNINGS = "warnings"
 
-# Before 3.0 every sensor was a config entry of its own, and warnings entries were
-# told apart by this key. Only the migration still reads it.
-CONF_ENTRY_TYPE = "entry_type"
-ENTRY_TYPE_WARNINGS = "warnings"
-
 # The warning types of FMI's CAP profile, https://alerts.fmi.fi/cap/profile/v1.1.0
 WARNING_TYPES = [
     "wind",
