@@ -1,6 +1,7 @@
 """Fetching one observation or forecast sensor, and noticing when its data goes stale."""
 
 import logging
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -45,7 +46,7 @@ def build_unique_id(data: dict[str, Any]) -> str:
     return "_".join([str(data[CONF_QUERY_ID]), str(data[CONF_TARGET_TYPE]), str(data[CONF_TARGET]), str(data[CONF_PARAMETER])]).lower()
 
 
-def get_start_time(query_id: str, now: datetime, data: dict[str, Any]) -> datetime | None:
+def get_start_time(query_id: str, now: datetime, data: Mapping[str, Any]) -> datetime | None:
     # Aggregate queries have to reach back past the current period: the running
     # day/month/year is reported as NaN until it completes, and NaN values are
     # discarded, which otherwise leaves the sensor permanently empty.
@@ -63,6 +64,29 @@ def get_start_time(query_id: str, now: datetime, data: dict[str, Any]) -> dateti
     if query_id.startswith("stuk::"):
         return None
     return now - timedelta(hours=12)
+
+
+def query_params(
+    data: Mapping[str, Any], now: datetime, filter_parameter: bool = True, start_time: datetime | None = None
+) -> dict[str, Any]:
+    """The query a sensor makes, also used to try it out in the config flow."""
+    query_id = str(data[CONF_QUERY_ID])
+    is_forecast = "::forecast" in query_id
+    if start_time is None:
+        start_time = get_start_time(query_id, now, data)
+    end_time = now + timedelta(hours=data[CONF_FORECAST_HOURS]) if is_forecast else None
+    params = {
+        "starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
+        "endtime": end_time.strftime(API_TIME_FORMAT) if end_time is not None else None,
+        "timestep": data.get(CONF_FORECAST_STEP) if is_forecast else None,
+        "storedquery_id": query_id,
+        data[CONF_TARGET_TYPE]: data[CONF_TARGET],
+    }
+    if filter_parameter:
+        # Ignored by queries that do not declare it (the STUK nuclide query
+        # uses "nuclides"), which is harmless: get_feature filters anyway.
+        params["parameters"] = data[CONF_PARAMETER]
+    return params
 
 
 def stale_after_hours(query_id: str, configured_hours: int) -> int:
@@ -102,26 +126,7 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return stale_after_hours(str(self.subentry.data[CONF_QUERY_ID]), configured)
 
     def _params(self, now: datetime, filter_parameter: bool, start_time: datetime | None = None) -> dict[str, Any]:
-        data = self.subentry.data
-        query_id = str(data[CONF_QUERY_ID])
-        is_forecast = "::forecast" in query_id
-        if start_time is None:
-            start_time = get_start_time(query_id, now, data)
-        end_time = now + timedelta(hours=data[CONF_FORECAST_HOURS]) if is_forecast else None
-        params = {
-            "starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
-            "endtime": end_time.strftime(API_TIME_FORMAT) if end_time is not None else None,
-            "timestep": data.get(CONF_FORECAST_STEP),
-            "storedquery_id": query_id,
-            data[CONF_TARGET_TYPE]: data[CONF_TARGET],
-        }
-
-        if filter_parameter:
-            # Ignored by queries that do not declare it (the STUK nuclide query
-            # uses "nuclides"), which is harmless: get_feature filters anyway.
-            params["parameters"] = data[CONF_PARAMETER]
-
-        return params
+        return query_params(self.subentry.data, now, filter_parameter, start_time)
 
     async def _async_update_data(self) -> dict[str, Any]:
         data = self.subentry.data

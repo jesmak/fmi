@@ -41,12 +41,14 @@
         "reconfigure": "Muokkaa anturia"
       },
       "error": {
-        "connection_problem": "FMI ei palauttanut dataa tälle kyselylle, asemalle ja parametrille. Tarkista sijainti ja yritä uudelleen.",
+        "connection_problem": "FMI:hin ei saatu yhteyttä. Yritä hetken päästä uudelleen.",
+        "no_data": "FMI ei palauttanut dataa tälle kyselylle, asemalle ja parametrille. Tarkista sijainti ja yritä uudelleen.",
         "unknown": "Tuntematon virhe"
       },
       "abort": {
         "already_configured": "Anturi tälle kyselylle, asemalle ja parametrille on jo olemassa",
-        "reconfigure_successful": "Anturin asetukset päivitetty"
+        "reconfigure_successful": "Anturin asetukset päivitetty",
+        "cannot_connect": "FMI:hin ei saatu yhteyttä kyselyjen hakemiseksi. Yritä hetken päästä uudelleen."
       },
       "step": {
         "user": {

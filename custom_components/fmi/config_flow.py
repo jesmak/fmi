@@ -14,7 +14,6 @@ import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, ConfigSubentryFlow, OptionsFlow, SubentryFlowResult
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import (
     LocationSelector,
     LocationSelectorConfig,
@@ -54,7 +53,7 @@ from .const import (
     WARNING_TYPE_KEYS,
 )
 from .migration import TITLE, VERSION
-from .query_coordinator import build_unique_id, get_start_time
+from .query_coordinator import build_unique_id, get_start_time, query_params
 from .session import FMIException, FMISession
 from .warning_coordinator import build_warnings_unique_id
 
@@ -84,29 +83,21 @@ def language_schema(default: str) -> vol.Schema:
     return vol.Schema({vol.Required(CONF_LANG, default=default): vol.All(cv.string, vol.In(LANGUAGES))})
 
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> str:
+async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> str | None:
+    """Read the sensor once as it would be read, and return the error to show, if any."""
+    query_id = str(data[CONF_QUERY_ID])
     try:
-        now = dt_util.utcnow()
-        is_forecast = "::forecast" in str(data[CONF_QUERY_ID])
-        start_time = now - timedelta(hours=data[CONF_FORECAST_PAST_HOURS]) if is_forecast is True else now - timedelta(hours=1)
-        end_time = now + timedelta(hours=data[CONF_FORECAST_HOURS]) if is_forecast is True else now
-        api = FMISession()
-        params = {
-            "starttime": start_time.strftime(API_TIME_FORMAT),
-            "endtime": end_time.strftime(API_TIME_FORMAT),
-            "timestep": data.get(CONF_FORECAST_STEP),
-            "storedquery_id": data[CONF_QUERY_ID],
-            data[CONF_TARGET_TYPE]: data[CONF_TARGET],
-            "parameters": data[CONF_PARAMETER],
-        }
-        await hass.async_add_executor_job(
-            api.get_feature, data[CONF_LANG], params, data[CONF_PARAMETER], is_forecast is False, data.get(CONF_NEGATIVE_AS_ZERO, False)
+        result = await hass.async_add_executor_job(
+            FMISession().get_feature,
+            data[CONF_LANG],
+            query_params(data, dt_util.utcnow()),
+            data[CONF_PARAMETER],
+            "::forecast" not in query_id,
+            data.get(CONF_NEGATIVE_AS_ZERO, False),
         )
-
-    except FMIException as err:
-        raise ConnectionProblem from err
-
-    return data[CONF_LABEL]
+    except FMIException:
+        return "connection_problem"
+    return None if result["data"] else "no_data"
 
 
 def warning_types_from_form(data: dict[str, Any]) -> dict[str, Any]:
@@ -130,7 +121,7 @@ def unique_id_taken(entry: ConfigEntry, unique_id: str, except_subentry_id: str 
     return any(subentry.unique_id == unique_id and subentry.subentry_id != except_subentry_id for subentry in entry.subentries.values())
 
 
-class ConfigFlow(ConfigFlow, domain=DOMAIN):
+class FMIConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = VERSION
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
@@ -321,7 +312,11 @@ class SensorSubentryFlow(ConfigSubentryFlow):
         }
 
     async def _async_query_form(self, step_id: str, current: str | None = None) -> SubentryFlowResult:
-        self.queries = await self.hass.async_add_executor_job(FMISession().list_stored_queries, self.data[CONF_LANG], "::simple")
+        try:
+            self.queries = await self.hass.async_add_executor_job(FMISession().list_stored_queries, self.data[CONF_LANG], "::simple")
+        except FMIException as exception:
+            _LOGGER.warning(f"Could not list FMI's queries: {exception}")
+            return self.async_abort(reason="cannot_connect")
         choices = [f"{query[1]} ({query[0]})" for query in self.queries]
         default = next((choice for choice, query in zip(choices, self.queries, strict=True) if query[0] == current), None)
         schema = vol.Schema(
@@ -331,8 +326,13 @@ class SensorSubentryFlow(ConfigSubentryFlow):
         )
         return self.async_show_form(step_id=step_id, data_schema=schema)
 
-    def _chosen_query_id(self, user_input: dict[str, Any]) -> str | None:
-        return next((query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
+    def _choose_query(self, user_input: dict[str, Any]) -> None:
+        query_id = next((query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
+        self.data.update(user_input, **{CONF_QUERY_ID: query_id})
+        if "::forecast" not in str(query_id):
+            # Left over when an existing forecast sensor is changed to read observations.
+            for key in (CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP):
+                self.data.pop(key, None)
 
     def _params_schema(self, parameter_selector, values: dict[str, Any]) -> vol.Schema:
         schema_params = {
@@ -350,13 +350,11 @@ class SensorSubentryFlow(ConfigSubentryFlow):
     async def _async_validated(self, user_input: dict[str, Any]) -> dict[str, str]:
         """Errors from test-reading the sensor with the chosen settings; empty when it works."""
         try:
-            await validate_input(self.hass, {CONF_LABEL: "", **self.data, **user_input})
-        except ConnectionProblem:
-            return {"base": "connection_problem"}
+            error = await validate_input(self.hass, {**self.data, **user_input})
         except Exception:
             _LOGGER.exception("Unexpected exception")
-            return {"base": "unknown"}
-        return {}
+            error = "unknown"
+        return {"base": error} if error else {}
 
     # ---------------- adding a sensor ----------------
 
@@ -368,8 +366,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
         if user_input is None:
             return await self._async_query_form("user")
 
-        user_input[CONF_QUERY_ID] = self._chosen_query_id(user_input)
-        self.data.update(user_input)
+        self._choose_query(user_input)
 
         return await self.async_step_location()
 
@@ -445,8 +442,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
             self.data = dict(subentry.data)
             return await self._async_query_form("reconfigure", self.data.get(CONF_QUERY_ID))
 
-        user_input[CONF_QUERY_ID] = self._chosen_query_id(user_input)
-        self.data.update(user_input)
+        self._choose_query(user_input)
 
         return await self.async_step_reconfigure_location()
 
@@ -549,7 +545,3 @@ class WarningsSubentryFlow(ConfigSubentryFlow):
         return self.async_show_form(
             step_id="reconfigure", data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values), errors=errors
         )
-
-
-class ConnectionProblem(HomeAssistantError):
-    """Error to indicate there is an issue with the connection"""

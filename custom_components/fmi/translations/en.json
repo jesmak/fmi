@@ -41,12 +41,14 @@
         "reconfigure": "Change sensor"
       },
       "error": {
-        "connection_problem": "FMI returned no data for this query, station and parameter. Check the location and try again.",
+        "connection_problem": "Could not reach FMI. Try again in a moment.",
+        "no_data": "FMI returned no data for this query, station and parameter. Check the location and try again.",
         "unknown": "Unknown error"
       },
       "abort": {
         "already_configured": "A sensor for this query, station and parameter already exists",
-        "reconfigure_successful": "Sensor updated"
+        "reconfigure_successful": "Sensor updated",
+        "cannot_connect": "Could not reach FMI to list its queries. Try again in a moment."
       },
       "step": {
         "user": {

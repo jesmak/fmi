@@ -59,7 +59,7 @@ def _coords(element: ElementTree.Element | None) -> tuple[float | None, float | 
     return (float(parts[0]), float(parts[1])) if len(parts) > 1 else (None, None)
 
 
-def _feature_url(lang: str, params: dict[str, Any]) -> str:
+def feature_url(lang: str, params: dict[str, Any]) -> str:
     url = API_GET_FEATURE_URL.replace("${lang}", lang)
     for key, value in params.items():
         if value is not None and value != "":
@@ -89,7 +89,7 @@ class FMISession:
             raise FMIException(f"FMI's response is not valid XML: {exception}") from exception
 
     def get_feature(self, lang: str, params: dict[str, Any], target_param: str, get_latest: bool, negative_as_zero: bool = False) -> Any:
-        root = self._xml(_feature_url(lang, params))
+        root = self._xml(feature_url(lang, params))
         result = {
             "latitude": None,
             "longitude": None,
@@ -141,7 +141,7 @@ class FMISession:
         the response, so what the config flow offers is exactly what a sensor
         will be able to read.
         """
-        root = self._xml(_feature_url(lang, params))
+        root = self._xml(feature_url(lang, params))
         names = {item.text for item in root.findall("./wfs:member/BsWfs:BsWfsElement/BsWfs:ParameterName", NAMESPACES) if item.text}
         return sorted(names, key=str.lower)
 
@@ -156,7 +156,7 @@ class FMISession:
         if coverage_id == query_id:
             return []
 
-        root = self._xml(_feature_url(lang, {**params, "storedquery_id": coverage_id, "bbox": API_FINLAND_BBOX}))
+        root = self._xml(feature_url(lang, {**params, "storedquery_id": coverage_id, "bbox": API_FINLAND_BBOX}))
 
         regions = {}
         for location in root.findall(".//target:Location", NAMESPACES):
@@ -189,7 +189,7 @@ class FMISession:
         Decommissioned stations are simply absent from this response rather
         than carrying an end date, so it doubles as a liveness check.
         """
-        root = self._xml(_feature_url(lang, {"storedquery_id": API_STATIONS_QUERY_ID}))
+        root = self._xml(feature_url(lang, {"storedquery_id": API_STATIONS_QUERY_ID}))
 
         stations = []
         for facility in root.findall("./wfs:member/ef:EnvironmentalMonitoringFacility", NAMESPACES):
