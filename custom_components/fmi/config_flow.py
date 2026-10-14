@@ -84,7 +84,7 @@ def language_schema(default: str) -> vol.Schema:
     return vol.Schema({vol.Required(CONF_LANG, default=default): vol.All(cv.string, vol.In(LANGUAGES))})
 
 
-async def validate_input(hass: HomeAssistant, data: dict[str, any]) -> str:
+async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> str:
     try:
         now = dt_util.utcnow()
         is_forecast = "::forecast" in str(data[CONF_QUERY_ID])
@@ -133,7 +133,7 @@ def unique_id_taken(entry: ConfigEntry, unique_id: str, except_subentry_id: str 
 class ConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = VERSION
 
-    async def async_step_user(self, user_input: dict[str, any] = None) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
 
         if user_input is not None:
             return self.async_create_entry(
@@ -145,7 +145,7 @@ class ConfigFlow(ConfigFlow, domain=DOMAIN):
         default = "fin" if self.hass.config.language.startswith("fi") else "eng"
         return self.async_show_form(step_id="user", data_schema=language_schema(default))
 
-    async def async_step_reconfigure(self, user_input: dict[str, any] = None) -> ConfigFlowResult:
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Change the default language for new sensors and warnings places."""
         entry = self._get_reconfigure_entry()
 
@@ -170,7 +170,7 @@ class ConfigFlow(ConfigFlow, domain=DOMAIN):
 class StaleDataOptionsFlow(OptionsFlow):
     """When data counts as stale, and whether a repair issue is raised. Shared by every sensor."""
 
-    async def async_step_init(self, user_input: dict[str, any] = None) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
 
         if user_input is not None:
             return self.async_create_entry(data=user_input)
@@ -193,7 +193,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
         self.stations: list[dict[str, Any]] | None = None
         self.descriptions: dict[str, tuple[str, str]] | None = None
 
-    async def _async_stations_for_query(self) -> list[dict[str, any]]:
+    async def _async_stations_for_query(self) -> list[dict[str, Any]]:
         """Stations that serve the chosen query, or all of them as a fallback.
 
         Forecast queries are interpolated to a point rather than tied to a
@@ -243,7 +243,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
         if not stations:
             return cv.string
 
-        def distance_to_home(station: dict[str, any]) -> float:
+        def distance_to_home(station: dict[str, Any]) -> float:
             if station["latitude"] is None or station["longitude"] is None:
                 return float("inf")
             metres = distance(self.hass.config.latitude, self.hass.config.longitude, station["latitude"], station["longitude"])
@@ -331,10 +331,10 @@ class SensorSubentryFlow(ConfigSubentryFlow):
         )
         return self.async_show_form(step_id=step_id, data_schema=schema)
 
-    def _chosen_query_id(self, user_input: dict[str, any]) -> str | None:
+    def _chosen_query_id(self, user_input: dict[str, Any]) -> str | None:
         return next((query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
 
-    def _params_schema(self, parameter_selector, values: dict[str, any]) -> vol.Schema:
+    def _params_schema(self, parameter_selector, values: dict[str, Any]) -> vol.Schema:
         schema_params = {
             vol.Required(CONF_PARAMETER, **({"default": values[CONF_PARAMETER]} if values.get(CONF_PARAMETER) else {})): parameter_selector,
             vol.Required(CONF_NEGATIVE_AS_ZERO, default=values.get(CONF_NEGATIVE_AS_ZERO, False)): cv.boolean,
@@ -347,7 +347,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
         return vol.Schema(schema_params)
 
-    async def _async_validated(self, user_input: dict[str, any]) -> dict[str, str]:
+    async def _async_validated(self, user_input: dict[str, Any]) -> dict[str, str]:
         """Errors from test-reading the sensor with the chosen settings; empty when it works."""
         try:
             await validate_input(self.hass, {CONF_LABEL: "", **self.data, **user_input})
@@ -360,7 +360,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
     # ---------------- adding a sensor ----------------
 
-    async def async_step_user(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Choose the query. The language comes from the integration's settings."""
         if not self.data:
             self.data = {CONF_LANG: self._get_entry().data[CONF_LANG]}
@@ -373,7 +373,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
         return await self.async_step_location()
 
-    async def async_step_location(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+    async def async_step_location(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
 
         if user_input is None:
             schema = vol.Schema({vol.Required(CONF_TARGET): await self._async_build_target_selector()})
@@ -384,7 +384,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
         return await self.async_step_params()
 
-    async def async_step_params(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+    async def async_step_params(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
 
         if user_input is None:
             self.param_schema = self._params_schema(await self._async_build_parameter_selector(), {})
@@ -421,7 +421,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
         return f"{source} {measurement}".strip()
 
-    async def async_step_name(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+    async def async_step_name(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
 
         if user_input is None:
             schema = vol.Schema({vol.Required(CONF_LABEL, default=self._default_label()): cv.string})
@@ -433,7 +433,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
     # ---------------- changing a sensor ----------------
 
-    async def async_step_reconfigure(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Repoint an existing sensor at a different station, query or parameter.
 
         The name is not editable here: renaming is a plain entity rename and
@@ -450,7 +450,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
         return await self.async_step_reconfigure_location()
 
-    async def async_step_reconfigure_location(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+    async def async_step_reconfigure_location(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
 
         if user_input is None:
             schema = vol.Schema(
@@ -465,7 +465,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
         return await self.async_step_reconfigure_params()
 
-    async def async_step_reconfigure_params(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+    async def async_step_reconfigure_params(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         subentry = self._get_reconfigure_subentry()
 
         if user_input is None:
@@ -500,7 +500,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 class WarningsSubentryFlow(ConfigSubentryFlow):
     """FMI's weather warnings for a place picked on a map."""
 
-    async def async_step_user(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         entry = self._get_entry()
         errors = {}
 
@@ -527,7 +527,7 @@ class WarningsSubentryFlow(ConfigSubentryFlow):
 
         return self.async_show_form(step_id="user", data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values), errors=errors)
 
-    async def async_step_reconfigure(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
         """Move the place, or change its radius, warning types or name."""
         entry = self._get_entry()
         subentry = self._get_reconfigure_subentry()
