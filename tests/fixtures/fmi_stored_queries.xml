@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DescribeStoredQueriesResponse xmlns="http://www.opengis.net/wfs/2.0"
+  xmlns:omso="http://inspire.ec.europa.eu/schemas/omso/3.0"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:ows_common="http://www.opengis.net/ows/1.1"
+  xmlns:inspire_common="http://inspire.ec.europa.eu/schemas/common/1.0"
+  xmlns:gml="http://www.opengis.net/gml/3.2"
+  xmlns:fe="http://www.opengis.net/fes/2.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.opengis.net/wfs/2.0 http://schemas.opengis.net/wfs/2.0/wfs.xsd
+  http://inspire.ec.europa.eu/schemas/omso/3.0 https://inspire.ec.europa.eu/schemas/omso/3.0/SpecialisedObservations.xsd
+  http://inspire.ec.europa.eu/schemas/common/1.0 https://inspire.ec.europa.eu/schemas/common/1.0/common.xsd
+  http://www.opengis.net/gml/3.2 http://schemas.opengis.net/gml/3.2.1/gml.xsd">
+
+<StoredQueryDescription id="fmi::forecast::harmonie::surface::point::simple">
+    <Title>Harmonie Surface Point Weather Forecast as simple features</Title>
+    <Abstract>
+    The stored query can be used to fetch Harmonie surface level weather forecast in simple feature format. The model data covers the geographical area of Scandinavia. New forecast dataset will come available every 6 hours. Location need to be specified as place or geoid or latlon query parameters. By default data will be returned 50 hours from the request time.
+    </Abstract>
+    
+    <Parameter name="starttime" type="dateTime">
+      <Title>Begin of time interval</Title>
+      <Abstract>
+      Parameter specifies the begin of time interval in ISO 8601 format (for example 2012-02-27T00:00:00Z).
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="endtime" type="dateTime">
+      <Title>End of time interval</Title>
+      <Abstract>
+      Parameter specifies the end of time interval in ISO 8601 format (for example 2012-02-27T00:00:00Z).
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="timestep" type="int">
+      <Title>The time step of data in minutes</Title>
+      <Abstract>
+      The time step of data in minutes. Notice that timestep is calculated from start of the ongoing hour or day. 
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="parameters" type="NameList">
+      <Title>Parameters to return</Title>
+      <Abstract>
+      Comma separated list of meteorological parameters to return.
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="place" type="xsi:string">
+      <Title>The location for which to provide data</Title>
+      <Abstract>
+      The location for which to provide forecast. Region can be given after location name separated by comma (for example Kumpula,Kolari).
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="latlon" type="gml:pos">
+      <Title>Location coordinates to return data.</Title>
+      <Abstract>
+      Location coordinates to return data  (lat,lon). For example 61.2,21
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="geoid" type="int">
+      <Title>Geoid of the location for which to return data.</Title>
+      <Abstract>
+      Geoid of the location for which to return data. (ID from geonames.org)
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="fmisid" type="int">
+      <Title>FMI observation station identifier.</Title>
+      <Abstract>
+      Identifier of the observation station.
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="wmo" type="int">
+      <Title>WMO code of the location for which to return data.</Title>
+      <Abstract>
+      WMO code of the location for which to return data.
+      </Abstract>
+    </Parameter>
+    
+    <QueryExpressionText xmlns:wfs_001="http://xml.fmi.fi/schema/wfs/2.0"
+                         xsi:schemaLocation="http://xml.fmi.fi/schema/wfs/2.0 http://xml.fmi.fi/schema/wfs/2.0/fmi_wfs_simplefeature.xsd"
+                         returnFeatureTypes="wfs_001:BsWfsElement"
+                         language="urn:ogc:def:queryLanguage:OGC-WFS::WFS_QueryExpression"
+                         isPrivate="true"/>
+  </StoredQueryDescription>
+
+  <StoredQueryDescription id="fmi::observations::lightning::simple">
+    <Title>Lightning Strikes</Title>
+    <Abstract>
+    The response contains all detected lightning strikes in Northern Europe. Observations are mainly ground flashes but some of cloud flashes are also detected.
+    </Abstract>
+    
+    <Parameter name="parameters" type="NameList">
+      <Title>Parameters to return</Title>
+      <Abstract>
+      Comma separated list of meteorological parameters to return.
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="crs" type="xsi:string">
+      <Title>Coordinate projection to use in results</Title>
+      <Abstract>
+      Coordinate projection to use in results. For example EPSG::3067
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="bbox" type="xsi:string">
+      <Title>Bounding box of area for which to return data.</Title>
+      <Abstract>
+      Bounding box of area for which to return data (lon,lat,lon,lat). For example 21,61,22,62
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="starttime" type="dateTime">
+      <Title>Begin of the time interval</Title>
+      <Abstract>
+      Parameter begin specifies the begin of time interval in ISO-format (for example 2012-02-27T00:00:00Z).
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="endtime" type="dateTime">
+      <Title>End of time interval</Title>
+      <Abstract>
+      End of time interval in ISO-format (for example 2012-02-27T00:00:00Z).
+      </Abstract>
+    </Parameter>
+    
+    <QueryExpressionText xmlns:wfs_001="http://xml.fmi.fi/schema/wfs/2.0"
+                         xsi:schemaLocation="http://xml.fmi.fi/schema/wfs/2.0 http://xml.fmi.fi/schema/wfs/2.0/fmi_wfs_simplefeature.xsd"
+                         returnFeatureTypes="wfs_001:BsWfsElement"
+                         language="urn:ogc:def:queryLanguage:OGC-WFS::WFS_QueryExpression"
+                         isPrivate="true"/>
+  </StoredQueryDescription>
+
+  <StoredQueryDescription id="fmi::observations::weather::multipointcoverage">
+    <Title>Instantaneous Weather Observations</Title>
+    <Abstract>
+    Real time weather observations from weather stations. Default set contains wind speed, direction, gust, temperature, relative humidity, dew point, pressure reduced to sea level, one hour precipitation amount, visibility and cloud cover. By default, the data is returned from last 12 hour. At least one location parameter (geoid/place/fmisid/wmo/bbox) has to be given. The data is returned as a multi point coverage format.
+    </Abstract>
+    
+    <Parameter name="starttime" type="dateTime">
+      <Title>Begin of the time interval</Title>
+      <Abstract>
+      Parameter begin specifies the begin of time interval in ISO-format (for example 2012-02-27T00:00:00Z).
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="endtime" type="dateTime">
+      <Title>End of time interval</Title>
+      <Abstract>
+      End of time interval in ISO-format (for example 2012-02-27T00:00:00Z).
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="timestep" type="int">
+      <Title>The time step of data in minutes</Title>
+      <Abstract>
+      The time step of data in minutes. Notice that timestep is calculated from start of the ongoing hour or day. 
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="parameters" type="NameList">
+      <Title>Parameters to return</Title>
+      <Abstract>
+      Comma separated list of meteorological parameters to return.
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="crs" type="xsi:string">
+      <Title>Coordinate projection to use in results</Title>
+      <Abstract>
+      Coordinate projection to use in results. For example EPSG::3067
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="bbox" type="xsi:string">
+      <Title>Bounding box of area for which to return data.</Title>
+      <Abstract>
+      Bounding box of area for which to return data (lon,lat,lon,lat). For example 21,61,22,62
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="place" type="xsi:string">
+      <Title>The location for which to provide data</Title>
+      <Abstract>
+      The location for which to provide data. Region can be given after location name separated by comma (for example Kumpula,Kolari).
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="fmisid" type="int">
+      <Title>FMI observation station identifier.</Title>
+      <Abstract>
+      Identifier of the observation station.
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="maxlocations" type="int">
+      <Title>Amount of locations</Title>
+      <Abstract>
+      How many observation stations are fetched around queried locations. Note that stations are only searched with 50 kilometers radius around the location.
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="geoid" type="int">
+      <Title>Geoid of the location for which to return data.</Title>
+      <Abstract>
+      Geoid of the location for which to return data. (ID from geonames.org)
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="wmo" type="int">
+      <Title>WMO code of the location for which to return data.</Title>
+      <Abstract>
+      WMO code of the location for which to return data.
+      </Abstract>
+    </Parameter>
+    
+    <QueryExpressionText xmlns:wfs_001="http://inspire.ec.europa.eu/schemas/omso/3.0"
+                         xsi:schemaLocation="http://inspire.ec.europa.eu/schemas/omso/3.0 https://inspire.ec.europa.eu/schemas/omso/3.0/SpecialisedObservations.xsd"
+                         returnFeatureTypes="wfs_001:GridSeriesObservation"
+                         language="urn:ogc:def:queryLanguage:OGC-WFS::WFS_QueryExpression"
+                         isPrivate="true"/>
+  </StoredQueryDescription>
+
+  <StoredQueryDescription id="fmi::observations::weather::simple">
+    <Title>Instantaneous Weather Observations</Title>
+    <Abstract>
+    Real time weather observations from weather stations. Default set contains wind speed, direction, gust, temperature, relative humidity, dew point, pressure reduced to sea level, one hour precipitation amount, visibility and cloud cover. By default, the data is returned from last 12 hour. At least one location parameter (geoid/place/fmisid/wmo/bbox) has to be given. The data is returned as a simple feature format.
+    </Abstract>
+    
+    <Parameter name="starttime" type="dateTime">
+      <Title>Begin of the time interval</Title>
+      <Abstract>
+      Parameter begin specifies the begin of time interval in ISO-format (for example 2012-02-27T00:00:00Z).
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="endtime" type="dateTime">
+      <Title>End of time interval</Title>
+      <Abstract>
+      End of time interval in ISO-format (for example 2012-02-27T00:00:00Z).
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="timestep" type="int">
+      <Title>The time step of data in minutes</Title>
+      <Abstract>
+      The time step of data in minutes. Notice that timestep is calculated from start of the ongoing hour or day. 
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="parameters" type="NameList">
+      <Title>Parameters to return</Title>
+      <Abstract>
+      Comma separated list of meteorological parameters to return.
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="crs" type="xsi:string">
+      <Title>Coordinate projection to use in results</Title>
+      <Abstract>
+      Coordinate projection to use in results. For example EPSG::3067
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="bbox" type="xsi:string">
+      <Title>Bounding box of area for which to return data.</Title>
+      <Abstract>
+      Bounding box of area for which to return data (lon,lat,lon,lat). For example 21,61,22,62
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="place" type="xsi:string">
+      <Title>The location for which to provide data</Title>
+      <Abstract>
+      The location for which to provide data. Region can be given after location name separated by comma (for example Kumpula,Kolari).
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="fmisid" type="int">
+      <Title>FMI observation station identifier.</Title>
+      <Abstract>
+      Identifier of the observation station.
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="maxlocations" type="int">
+      <Title>Amount of locations</Title>
+      <Abstract>
+      How many observation stations are fetched around queried locations. Note that stations are only searched with 50 kilometers radius around the location.
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="geoid" type="int">
+      <Title>Geoid of the location for which to return data.</Title>
+      <Abstract>
+      Geoid of the location for which to return data. (ID from geonames.org)
+      </Abstract>
+    </Parameter>
+    
+    <Parameter name="wmo" type="int">
+      <Title>WMO code of the location for which to return data.</Title>
+      <Abstract>
+      WMO code of the location for which to return data.
+      </Abstract>
+    </Parameter>
+    
+    <QueryExpressionText xmlns:wfs_001="http://xml.fmi.fi/schema/wfs/2.0"
+                         xsi:schemaLocation="http://xml.fmi.fi/schema/wfs/2.0 http://xml.fmi.fi/schema/wfs/2.0/fmi_wfs_simplefeature.xsd"
+                         returnFeatureTypes="wfs_001:BsWfsElement"
+                         language="urn:ogc:def:queryLanguage:OGC-WFS::WFS_QueryExpression"
+                         isPrivate="true"/>
+  </StoredQueryDescription>
+
+  </DescribeStoredQueriesResponse>

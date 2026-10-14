@@ -55,6 +55,7 @@ class FakeApi:
         self.age = age
         self.parameters = ["t2m", "ws_10min"] if parameters is None else parameters
         self.windows: list[str | None] = []
+        self.unit_lookups = 0
 
     def get_feature(self, lang, params, target_param, get_latest, negative_as_zero=False):
         self.windows.append(params.get("starttime"))
@@ -63,7 +64,6 @@ class FakeApi:
             "longitude": "24.9",
             "query_id": params["storedquery_id"],
             "parameter": target_param,
-            "unit": "degC",
             "data": [],
         }
 
@@ -83,8 +83,9 @@ class FakeApi:
     def list_parameters(self, lang, params):
         return self.parameters
 
-    def get_unit_type(self, *args):
-        return "degC"
+    def get_unit(self, *args):
+        self.unit_lookups += 1
+        return "°C"
 
 
 def _parse(stamp: str):
@@ -201,3 +202,14 @@ async def test_probe_runs_once_per_outage(hass: HomeAssistant, monkeypatch):
 
     # One more plain poll only: no widened query, no second probe.
     assert len(api.windows) == calls + 1, api.windows
+
+
+async def test_the_unit_is_looked_up_once(hass: HomeAssistant, monkeypatch):
+    api = FakeApi(age=timedelta(hours=1))
+    entry = await _setup(hass, monkeypatch, api)
+
+    await _coordinator(entry).async_refresh()
+    await hass.async_block_till_done()
+
+    assert api.unit_lookups == 1
+    assert _coordinator(entry).data["unit"] == "°C"

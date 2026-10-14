@@ -91,6 +91,10 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Whether this outage has been looked into already, so the probe in
         # _async_report_no_data runs once per outage rather than once per update.
         self._reported = False
+        # The unit comes from FMI's parameter metadata, which doesn't change, so it is
+        # looked up once rather than with every poll.
+        self._unit: str | None = None
+        self._unit_known = False
 
     @property
     def stale_after_hours(self) -> int:
@@ -133,8 +137,15 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 is_forecast is False,
                 data.get(CONF_NEGATIVE_AS_ZERO, False),
             )
+            if not self._unit_known:
+                self._unit = await self.hass.async_add_executor_job(
+                    FMISession().get_unit, data[CONF_LANG], str(data[CONF_QUERY_ID]), data[CONF_PARAMETER]
+                )
+                self._unit_known = True
         except FMIException as exception:
             raise UpdateFailed(f"Could not read {data[CONF_LABEL]} from FMI: {exception}") from exception
+
+        result["unit"] = self._unit
 
         # Staleness is always worked out, because the stale data binary sensor
         # reports it; the repair issue is the part that can be switched off.

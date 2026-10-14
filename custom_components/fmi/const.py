@@ -13,7 +13,7 @@ API_GET_PARAMS_URL = "https://opendata.fmi.fi/meta?observableProperty=${property
 # space between date and time; an ISO "+00:00" offset would decode as a space
 # server-side and be rejected, so timestamps are always formatted, never str()d.
 API_TIME_FORMAT = "%Y-%m-%d%%20%H:%M:%S"
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.5249.62 Safari/537.36"
+USER_AGENT = "Home Assistant FMI integration (https://github.com/jesmak/fmi)"
 DEFAULT_SCAN_INTERVAL = 5
 
 # A station can stop reporting for a while without being broken, so data only
