@@ -60,8 +60,9 @@ class FakeApi:
     def get_feature(self, lang, params, target_param, get_latest, negative_as_zero=False):
         self.windows.append(params.get("starttime"))
         result = {
-            "latitude": "60.1",
-            "longitude": "24.9",
+            # FMI sends the station's coordinates only along with values.
+            "latitude": None,
+            "longitude": None,
             "query_id": params["storedquery_id"],
             "parameter": target_param,
             "data": [],
@@ -77,6 +78,7 @@ class FakeApi:
         if start is not None and time < _parse(start):
             return result
 
+        result.update(latitude=60.1, longitude=24.9)
         result["data"].append({"time": time, "value": "1.5"})
         return result
 
@@ -155,7 +157,9 @@ async def test_data_just_outside_the_poll_window_is_not_reported(hass: HomeAssis
     # The plain 12 h poll came back empty, so a second, wider window was asked for.
     assert len(api.windows) > 1
     # And the value it found is shown rather than nothing.
-    assert hass.states.get("sensor.fmi_kaisaniemi_air_temperature").state == "1.5"
+    state = hass.states.get("sensor.fmi_kaisaniemi_air_temperature")
+    assert state.state == "1.5"
+    assert state.attributes["latitude"] is not None
 
 
 async def test_silence_beyond_the_grace_period_is_reported(hass: HomeAssistant, monkeypatch):

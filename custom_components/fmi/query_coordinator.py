@@ -221,7 +221,7 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         newest = max((item["time"] for item in widened["data"]), default=None)
         if newest is not None:
             # The poll window missed the latest value, which the wider query found. Show it.
-            result["data"] = widened["data"]
+            result.update(data=widened["data"], latitude=widened["latitude"], longitude=widened["longitude"])
 
         return newest is None or now - newest >= grace
 
