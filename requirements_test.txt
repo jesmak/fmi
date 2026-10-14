@@ -1,2 +1,2 @@
-homeassistant
 pytest-homeassistant-custom-component
+ruff
