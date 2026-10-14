@@ -188,6 +188,11 @@
           }
         }
       }
+    },
+    "binary_sensor": {
+      "stale_data": {
+        "name": "FMI {label} vanhentunut data"
+      }
     }
   },
   "issues": {

@@ -66,3 +66,9 @@ def test_the_limit_is_never_below_a_reporting_period():
     assert stale_after_hours("fmi::observations::weather::daily::simple", 120) == 120
     assert stale_after_hours("fmi::observations::weather::monthly::simple", 120) == 62 * 24
     assert stale_after_hours("fmi::observations::weather::yearly::simple", 120) == 2 * 366 * 24
+
+
+async def test_the_name_follows_home_assistants_language(hass: HomeAssistant, monkeypatch):
+    await _setup(hass, monkeypatch, FakeApi(age=timedelta(hours=1)))
+
+    assert hass.states.get(STALE_SENSOR).attributes["friendly_name"] == "FMI Kaisaniemi Air temperature stale data"

@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTRIBUTION, CONF_LABEL, CONF_LANG, STALE_DATA_SUFFIX
+from .const import ATTRIBUTION, CONF_LABEL
 from .query_coordinator import FMIQueryCoordinator
 
 ATTR_NO_DATA_ISSUE_HOURS = "no_data_issue_hours"
@@ -29,13 +29,13 @@ class FMIStaleDataBinarySensor(CoordinatorEntity[FMIQueryCoordinator], BinarySen
     _attr_attribution = ATTRIBUTION
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_has_entity_name = True
+    _attr_translation_key = "stale_data"
 
     def __init__(self, coordinator: FMIQueryCoordinator):
         super().__init__(coordinator)
-        data = coordinator.subentry.data
-        suffix = STALE_DATA_SUFFIX.get(data.get(CONF_LANG), STALE_DATA_SUFFIX["eng"])
         self._attr_unique_id = coordinator.subentry.subentry_id
-        self._attr_name = f"FMI {data.get(CONF_LABEL, coordinator.subentry.title)} {suffix}"
+        self._attr_translation_placeholders = {"label": coordinator.subentry.data.get(CONF_LABEL, coordinator.subentry.title)}
         self._attr_extra_state_attributes = {ATTR_NO_DATA_ISSUE_HOURS: coordinator.stale_after_hours}
 
     @property

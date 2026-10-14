@@ -79,6 +79,3 @@ WARNING_TYPE_KEYS = {warning_type: re.sub(r"(?<!^)(?=[A-Z])", "_", warning_type)
 WARNING_LEVELS = ["none", "yellow", "orange", "red"]
 DEFAULT_WARNINGS_RADIUS = 1000
 DEFAULT_WARNINGS_LABEL = {"eng": "Warnings", "fin": "Varoitukset"}
-
-# Name suffix of the diagnostic stale data sensor, in the sensor's language.
-STALE_DATA_SUFFIX = {"eng": "stale data", "fin": "vanhentunut data"}
