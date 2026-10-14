@@ -1,4 +1,5 @@
 """The diagnostic "stale data" binary sensor of observation and forecast sensors."""
+
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass, BinarySensorEntity
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant

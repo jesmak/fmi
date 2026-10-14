@@ -4,6 +4,7 @@ The integration decides a sensor is broken from the age of the newest value FMI
 holds for it, not from how many empty updates it has seen, so these tests drive
 get_feature directly and move the timestamps around.
 """
+
 from datetime import timedelta
 
 import pytest
@@ -57,8 +58,14 @@ class FakeApi:
 
     def get_feature(self, lang, params, target_param, get_latest, negative_as_zero=False):
         self.windows.append(params.get("starttime"))
-        result = {"latitude": "60.1", "longitude": "24.9", "query_id": params["storedquery_id"],
-                  "parameter": target_param, "unit": "degC", "data": []}
+        result = {
+            "latitude": "60.1",
+            "longitude": "24.9",
+            "query_id": params["storedquery_id"],
+            "parameter": target_param,
+            "unit": "degC",
+            "data": [],
+        }
 
         if self.age is None:
             return result
@@ -82,6 +89,7 @@ class FakeApi:
 
 def _parse(stamp: str):
     from datetime import UTC, datetime
+
     return datetime.strptime(stamp.replace("%20", " "), "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
 
 
@@ -93,9 +101,15 @@ async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, **overrides) ->
     monkeypatch.setattr("custom_components.fmi.query_coordinator.FMISession", lambda *a, **kw: api)
     options = {key: value for key, value in overrides.items() if key in STALE_DATA_SETTINGS}
     data = {**ENTRY_DATA, **{key: value for key, value in overrides.items() if key not in STALE_DATA_SETTINGS}}
-    entry = MockConfigEntry(domain=DOMAIN, data={CONF_LANG: "eng"}, options=options, version=3, subentries_data=[
-        ConfigSubentryData(data=data, subentry_type=SUBENTRY_SENSOR, title=data[CONF_LABEL], unique_id="test"),
-    ])
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_LANG: "eng"},
+        options=options,
+        version=3,
+        subentries_data=[
+            ConfigSubentryData(data=data, subentry_type=SUBENTRY_SENSOR, title=data[CONF_LABEL], unique_id="test"),
+        ],
+    )
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()

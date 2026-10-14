@@ -4,6 +4,7 @@ The fixtures are real messages from FMI's CAP feed on 15 Sep 2026: a yellow sea
 wind warning for five sea areas, valid 16 Sep 9.00-21.00, and one for the Sea of
 Bothnia and the Quark.
 """
+
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -117,8 +118,7 @@ def test_level_is_the_highest_in_force_now():
 
     assert highest_level(warnings, BEFORE) == "none", "announced for tomorrow, not in force yet"
     assert highest_level(warnings, DURING) == "yellow"
-    assert highest_level({**warnings, "orange": replace(warning, identifier="orange", level="orange")},
-                         DURING) == "orange"
+    assert highest_level({**warnings, "orange": replace(warning, identifier="orange", level="orange")}, DURING) == "orange"
 
 
 def test_expired_cancelled_and_replaced_messages_are_left_out():

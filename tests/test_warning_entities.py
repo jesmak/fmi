@@ -1,4 +1,5 @@
 """A warnings place end to end: the level sensor, its attributes and the event entity."""
+
 from pathlib import Path
 
 import pytest
@@ -52,19 +53,30 @@ class FakeApi:
 
 def warnings_place(label: str, latitude: float, longitude: float, radius: float = 0) -> ConfigSubentryData:
     location = {"latitude": latitude, "longitude": longitude, "radius": radius}
-    return ConfigSubentryData(subentry_type=SUBENTRY_WARNINGS, title=label, unique_id=f"warnings_{label}", data={
-        CONF_LANG: "fin",
-        CONF_LABEL: label,
-        CONF_LOCATION: location,
-        CONF_WARNING_TYPES: WARNING_TYPES,
-    })
+    return ConfigSubentryData(
+        subentry_type=SUBENTRY_WARNINGS,
+        title=label,
+        unique_id=f"warnings_{label}",
+        data={
+            CONF_LANG: "fin",
+            CONF_LABEL: label,
+            CONF_LOCATION: location,
+            CONF_WARNING_TYPES: WARNING_TYPES,
+        },
+    )
 
 
 async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, *places: ConfigSubentryData) -> MockConfigEntry:
     monkeypatch.setattr("custom_components.fmi.warning_coordinator.FMISession", lambda *a, **kw: api)
-    entry = MockConfigEntry(domain=DOMAIN, version=3, data={CONF_LANG: "fin"}, subentries_data=list(places) or [
-        warnings_place("Varoitukset Suomenlinna", 60.146, 24.988),
-    ])
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=3,
+        data={CONF_LANG: "fin"},
+        subentries_data=list(places)
+        or [
+            warnings_place("Varoitukset Suomenlinna", 60.146, 24.988),
+        ],
+    )
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -147,8 +159,13 @@ async def test_a_warning_that_cannot_be_read_does_not_look_cancelled(hass: HomeA
 async def test_places_share_one_download_of_the_feed(hass: HomeAssistant, monkeypatch, freezer):
     freezer.move_to("2026-09-16T12:00:00+03:00")
     api = FakeApi([SEVERAL_AREAS, BOTHNIA])
-    await _setup(hass, monkeypatch, api, warnings_place("Varoitukset Suomenlinna", 60.146, 24.988),
-                 warnings_place("Varoitukset Hanko", 59.823, 22.968, 2000))
+    await _setup(
+        hass,
+        monkeypatch,
+        api,
+        warnings_place("Varoitukset Suomenlinna", 60.146, 24.988),
+        warnings_place("Varoitukset Hanko", 59.823, 22.968, 2000),
+    )
 
     assert api.feed_requests == 1
     assert hass.states.get("sensor.fmi_varoitukset_suomenlinna").state == "yellow"

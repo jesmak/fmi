@@ -13,5 +13,5 @@
     "python-dateutil>=2.8.2"
   ],
   "single_config_entry": true,
-  "version": "3.0.1"
+  "version": "4.0.0"
 }

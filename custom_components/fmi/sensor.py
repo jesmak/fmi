@@ -1,15 +1,30 @@
 import logging
 
-from homeassistant.components.sensor import SensorStateClass, SensorEntity, SensorDeviceClass
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .cap import highest_level
-from .const import (CONF_LABEL, CONF_QUERY_ID, CONF_LANG, CONF_QUERY_LABEL, CONF_PARAMETER, CONF_TARGET_TYPE,
-                    CONF_TARGET, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, CONF_NO_DATA_ISSUE,
-                    DEFAULT_NO_DATA_ISSUE, ATTRIBUTION, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_LEVELS)
+from .const import (
+    ATTRIBUTION,
+    CONF_FORECAST_HOURS,
+    CONF_FORECAST_PAST_HOURS,
+    CONF_FORECAST_STEP,
+    CONF_LABEL,
+    CONF_LANG,
+    CONF_LOCATION,
+    CONF_NO_DATA_ISSUE,
+    CONF_PARAMETER,
+    CONF_QUERY_ID,
+    CONF_QUERY_LABEL,
+    CONF_TARGET,
+    CONF_TARGET_TYPE,
+    CONF_WARNING_TYPES,
+    DEFAULT_NO_DATA_ISSUE,
+    WARNING_LEVELS,
+)
 from .query_coordinator import FMIQueryCoordinator
 from .warning_coordinator import FMIWarningsCoordinator
 
@@ -185,8 +200,9 @@ class FMIWarningLevelSensor(CoordinatorEntity[FMIWarningsCoordinator], SensorEnt
     @property
     def extra_state_attributes(self) -> dict:
         now = dt_util.utcnow()
-        warnings = sorted(self.coordinator.data.warnings.values(),
-                          key=lambda warning: warning.onset or now) if self.coordinator.data else []
+        warnings = (
+            sorted(self.coordinator.data.warnings.values(), key=lambda warning: warning.onset or now) if self.coordinator.data else []
+        )
         return {
             **self._config_attributes,
             ATTR_ACTIVE_WARNINGS: sum(1 for warning in warnings if warning.is_active(now)),

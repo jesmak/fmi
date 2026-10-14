@@ -2,11 +2,19 @@ import logging
 from datetime import UTC
 from typing import Any
 from xml.etree import ElementTree
+
 import requests
 from dateutil.parser import isoparse
 from requests import ConnectTimeout, RequestException
-from .const import USER_AGENT, API_DESCRIBE_STORED_QUERIES_URL, API_GET_FEATURE_URL, API_GET_PARAMS_URL, \
-    API_STATIONS_QUERY_ID, API_FINLAND_BBOX
+
+from .const import (
+    API_DESCRIBE_STORED_QUERIES_URL,
+    API_FINLAND_BBOX,
+    API_GET_FEATURE_URL,
+    API_GET_PARAMS_URL,
+    API_STATIONS_QUERY_ID,
+    USER_AGENT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,9 +48,7 @@ class FMISession:
 
             response = requests.get(
                 url=url,
-                headers={
-                    "User-Agent": USER_AGENT
-                },
+                headers={"User-Agent": USER_AGENT},
                 timeout=self._timeout,
             )
 
@@ -57,8 +63,7 @@ class FMISession:
         except RequestException as exception:
             raise FMIException(f"Communication error {exception}") from exception
 
-    def get_feature(self, lang: str, params: dict[str, str], target_param: str, get_latest: bool,
-                    negative_as_zero: bool = False) -> Any:
+    def get_feature(self, lang: str, params: dict[str, str], target_param: str, get_latest: bool, negative_as_zero: bool = False) -> Any:
 
         try:
             url = API_GET_FEATURE_URL.replace("${lang}", lang)
@@ -70,9 +75,7 @@ class FMISession:
 
             response = requests.get(
                 url=url,
-                headers={
-                    "User-Agent": USER_AGENT
-                },
+                headers={"User-Agent": USER_AGENT},
                 timeout=self._timeout,
             )
 
@@ -80,20 +83,25 @@ class FMISession:
                 raise FMIException(f"{response.status_code} is not valid")
 
             else:
-                result = {"latitude": None, "longitude": None, "query_id": params["storedquery_id"],
-                          "parameter": target_param, "unit": None, "data": []}
+                result = {
+                    "latitude": None,
+                    "longitude": None,
+                    "query_id": params["storedquery_id"],
+                    "parameter": target_param,
+                    "unit": None,
+                    "data": [],
+                }
 
                 namespaces = {
                     "wfs": "http://www.opengis.net/wfs/2.0",
                     "gml": "http://www.opengis.net/gml/3.2",
                     "BsWfs": "http://xml.fmi.fi/schema/wfs/2.0",
-                    "xsi": "http://www.w3.org/2001/XMLSchema-instance"
+                    "xsi": "http://www.w3.org/2001/XMLSchema-instance",
                 }
 
                 tree = ElementTree.fromstring(response.text)
 
                 for item in tree.findall("./wfs:member/BsWfs:BsWfsElement", namespaces):
-
                     if result["latitude"] is None or result["longitude"] is None:
                         coords = item.find("./BsWfs:Location/gml:Point/gml:pos", namespaces).text.rstrip().split(" ")
                         result["latitude"] = coords[0]
@@ -133,9 +141,7 @@ class FMISession:
             url = API_DESCRIBE_STORED_QUERIES_URL.replace("${lang}", lang)
             response = requests.get(
                 url=url,
-                headers={
-                    "User-Agent": USER_AGENT
-                },
+                headers={"User-Agent": USER_AGENT},
                 timeout=self._timeout,
             )
 
@@ -149,7 +155,7 @@ class FMISession:
                     "wfs": "http://www.opengis.net/wfs/2.0",
                     "gml": "http://www.opengis.net/gml/3.2",
                     "BsWfs": "http://xml.fmi.fi/schema/wfs/2.0",
-                    "xsi": "http://www.w3.org/2001/XMLSchema-instance"
+                    "xsi": "http://www.w3.org/2001/XMLSchema-instance",
                 }
 
                 root = ElementTree.fromstring(response.text)
@@ -191,9 +197,7 @@ class FMISession:
 
             response = requests.get(
                 url=url,
-                headers={
-                    "User-Agent": USER_AGENT
-                },
+                headers={"User-Agent": USER_AGENT},
                 timeout=self._timeout,
             )
 
@@ -204,13 +208,15 @@ class FMISession:
                 "wfs": "http://www.opengis.net/wfs/2.0",
                 "gml": "http://www.opengis.net/gml/3.2",
                 "BsWfs": "http://xml.fmi.fi/schema/wfs/2.0",
-                "xsi": "http://www.w3.org/2001/XMLSchema-instance"
+                "xsi": "http://www.w3.org/2001/XMLSchema-instance",
             }
 
             tree = ElementTree.fromstring(response.text)
-            names = {item.text for item in
-                     tree.findall("./wfs:member/BsWfs:BsWfsElement/BsWfs:ParameterName", namespaces)
-                     if item.text is not None}
+            names = {
+                item.text
+                for item in tree.findall("./wfs:member/BsWfs:BsWfsElement/BsWfs:ParameterName", namespaces)
+                if item.text is not None
+            }
 
             return sorted(names, key=str.lower)
 
@@ -244,19 +250,14 @@ class FMISession:
 
             response = requests.get(
                 url=url,
-                headers={
-                    "User-Agent": USER_AGENT
-                },
+                headers={"User-Agent": USER_AGENT},
                 timeout=self._timeout,
             )
 
             if response.status_code != 200:
                 raise FMIException(f"{response.status_code} is not valid")
 
-            namespaces = {
-                "gml": "http://www.opengis.net/gml/3.2",
-                "target": "http://xml.fmi.fi/namespace/om/atmosphericfeatures/1.1"
-            }
+            namespaces = {"gml": "http://www.opengis.net/gml/3.2", "target": "http://xml.fmi.fi/namespace/om/atmosphericfeatures/1.1"}
 
             root = ElementTree.fromstring(response.text)
 
@@ -278,13 +279,15 @@ class FMISession:
                 if not fmisid.isdigit():
                     continue
 
-                stations.append({
-                    "id": fmisid,
-                    "name": name.text if name is not None and name.text else fmisid,
-                    "region": regions.get(fmisid),
-                    "latitude": float(coords[0]) if len(coords) > 1 else None,
-                    "longitude": float(coords[1]) if len(coords) > 1 else None,
-                })
+                stations.append(
+                    {
+                        "id": fmisid,
+                        "name": name.text if name is not None and name.text else fmisid,
+                        "region": regions.get(fmisid),
+                        "latitude": float(coords[0]) if len(coords) > 1 else None,
+                        "longitude": float(coords[1]) if len(coords) > 1 else None,
+                    }
+                )
 
             return stations
 
@@ -308,9 +311,7 @@ class FMISession:
 
             response = requests.get(
                 url=url,
-                headers={
-                    "User-Agent": USER_AGENT
-                },
+                headers={"User-Agent": USER_AGENT},
                 timeout=self._timeout,
             )
 
@@ -321,7 +322,7 @@ class FMISession:
                 "wfs": "http://www.opengis.net/wfs/2.0",
                 "gml": "http://www.opengis.net/gml/3.2",
                 "ef": "http://inspire.ec.europa.eu/schemas/ef/4.0",
-                "base": "http://inspire.ec.europa.eu/schemas/base/3.3"
+                "base": "http://inspire.ec.europa.eu/schemas/base/3.3",
             }
 
             stations = []
@@ -339,13 +340,15 @@ class FMISession:
                 names = [name.text for name in facility.findall("./gml:name", namespaces) if name.text]
                 coords = position.text.rstrip().split(" ") if position is not None and position.text else []
 
-                stations.append({
-                    "id": identifier.text,
-                    "name": names[0] if names else identifier.text,
-                    "region": names[-2] if len(names) > 2 else None,
-                    "latitude": float(coords[0]) if len(coords) > 1 else None,
-                    "longitude": float(coords[1]) if len(coords) > 1 else None,
-                })
+                stations.append(
+                    {
+                        "id": identifier.text,
+                        "name": names[0] if names else identifier.text,
+                        "region": names[-2] if len(names) > 2 else None,
+                        "latitude": float(coords[0]) if len(coords) > 1 else None,
+                        "longitude": float(coords[1]) if len(coords) > 1 else None,
+                    }
+                )
 
             return stations
 
@@ -360,23 +363,19 @@ class FMISession:
 
         try:
             url = API_GET_PARAMS_URL.replace("${lang}", lang).replace(
-                "${property}", "forecast" if "forecast::" in query_id else "observation")
+                "${property}", "forecast" if "forecast::" in query_id else "observation"
+            )
 
             response = requests.get(
                 url=url,
-                headers={
-                    "User-Agent": USER_AGENT
-                },
+                headers={"User-Agent": USER_AGENT},
                 timeout=self._timeout,
             )
 
             if response.status_code != 200:
                 raise FMIException(f"{response.status_code} is not valid")
 
-            namespaces = {
-                "gml": "http://www.opengis.net/gml/3.2",
-                "omop": "http://inspire.ec.europa.eu/schemas/omop/2.9"
-            }
+            namespaces = {"gml": "http://www.opengis.net/gml/3.2", "omop": "http://inspire.ec.europa.eu/schemas/omop/2.9"}
 
             result = {}
             root = ElementTree.fromstring(response.text)
@@ -392,8 +391,7 @@ class FMISession:
                 uom = prop.find("./omop:uom", namespaces)
                 unit = uom.attrib.get("uom") if uom is not None else None
 
-                result[name] = (label.text if label is not None else None,
-                                unit.replace("degC", "°C") if unit is not None else None)
+                result[name] = (label.text if label is not None else None, unit.replace("degC", "°C") if unit is not None else None)
 
             return result
 
@@ -406,13 +404,12 @@ class FMISession:
     def get_unit_type(self, param_name: str, lang: str, query_id: str) -> str:
 
         try:
-            url = API_GET_PARAMS_URL.replace("${lang}", lang).replace("${property}",
-                                                                      "forecast" if "forecast::" in query_id else "observation")
+            url = API_GET_PARAMS_URL.replace("${lang}", lang).replace(
+                "${property}", "forecast" if "forecast::" in query_id else "observation"
+            )
             response = requests.get(
                 url=url,
-                headers={
-                    "User-Agent": USER_AGENT
-                },
+                headers={"User-Agent": USER_AGENT},
                 timeout=self._timeout,
             )
 
@@ -425,7 +422,7 @@ class FMISession:
                     "gml": "http://www.opengis.net/gml/3.2",
                     "BsWfs": "http://xml.fmi.fi/schema/wfs/2.0",
                     "xsi": "http://www.w3.org/2001/XMLSchema-instance",
-                    "omop": "http://inspire.ec.europa.eu/schemas/omop/2.9"
+                    "omop": "http://inspire.ec.europa.eu/schemas/omop/2.9",
                 }
 
                 unit = None
@@ -440,7 +437,7 @@ class FMISession:
                     root = ElementTree.fromstring(response.text)
                     for component in root.findall("./omop:component", namespaces):
                         prop = component.find("./omop:ObservableProperty", namespaces)
-                        if prop.attrib['{http://www.opengis.net/gml/3.2}id'] == param_name.lower():
+                        if prop.attrib["{http://www.opengis.net/gml/3.2}id"] == param_name.lower():
                             unit = prop.find("./omop:uom", namespaces).attrib["uom"]
                             break
 

@@ -10,6 +10,7 @@ warning concerns the place when one of its areas covers the configured point,
 or comes within the configured radius of it. Sea area polygons include the
 islands in them, so a point on an island is inside its sea area.
 """
+
 import math
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -46,13 +47,16 @@ LatLon = tuple[float, float]
 
 # ---------------- the feed and the documents ----------------
 
+
 def parse_warning_feed(content: bytes) -> list[str]:
     """The CAP document addresses listed in FMI's Atom feed."""
     root = ElementTree.fromstring(content)
-    return [link.get("href")
-            for entry in root.findall("atom:entry", ATOM_NAMESPACES)
-            for link in entry.findall("atom:link", ATOM_NAMESPACES)
-            if link.get("type") == "application/cap+xml" and link.get("href")]
+    return [
+        link.get("href")
+        for entry in root.findall("atom:entry", ATOM_NAMESPACES)
+        for link in entry.findall("atom:link", ATOM_NAMESPACES)
+        if link.get("type") == "application/cap+xml" and link.get("href")
+    ]
 
 
 @dataclass(frozen=True)
@@ -130,8 +134,9 @@ def _parse_info(info: ElementTree.Element) -> CapInfo:
         expires=_time(_text(info, "expires")),
         headline=_text(info, "headline"),
         description=_text(info, "description"),
-        parameters={_text(parameter, "valueName"): _text(parameter, "value")
-                    for parameter in info.findall("cap:parameter", CAP_NAMESPACES)},
+        parameters={
+            _text(parameter, "valueName"): _text(parameter, "value") for parameter in info.findall("cap:parameter", CAP_NAMESPACES)
+        },
         areas=[_parse_area(area) for area in info.findall("cap:area", CAP_NAMESPACES)],
     )
 
@@ -140,8 +145,7 @@ def _parse_area(area: ElementTree.Element) -> CapArea:
     polygons = [parse_polygon(polygon.text or "") for polygon in area.findall("cap:polygon", CAP_NAMESPACES)]
     return CapArea(
         name=_text(area, "areaDesc"),
-        geocodes={_text(code, "valueName"): _text(code, "value")
-                  for code in area.findall("cap:geocode", CAP_NAMESPACES)},
+        geocodes={_text(code, "valueName"): _text(code, "value") for code in area.findall("cap:geocode", CAP_NAMESPACES)},
         polygons=[polygon for polygon in polygons if len(polygon) >= 3],
     )
 
@@ -159,11 +163,13 @@ def _time(text: str) -> datetime | None:
 
 # ---------------- geometry ----------------
 
+
 def area_concerns(area: CapArea, latitude: float, longitude: float, radius_m: float) -> bool:
     """Whether the area covers the point, or comes within radius_m of it."""
-    return any(point_in_polygon(latitude, longitude, polygon)
-               or (radius_m > 0 and distance_to_outline_m(latitude, longitude, polygon) <= radius_m)
-               for polygon in area.polygons)
+    return any(
+        point_in_polygon(latitude, longitude, polygon) or (radius_m > 0 and distance_to_outline_m(latitude, longitude, polygon) <= radius_m)
+        for polygon in area.polygons
+    )
 
 
 def point_in_polygon(latitude: float, longitude: float, polygon: list[LatLon]) -> bool:
@@ -184,8 +190,7 @@ def distance_to_outline_m(latitude: float, longitude: float, polygon: list[LatLo
     percent over the few kilometres a radius is meant for.
     """
     metres_per_degree_longitude = METRES_PER_DEGREE_LATITUDE * math.cos(math.radians(latitude))
-    points = [((lon - longitude) * metres_per_degree_longitude, (lat - latitude) * METRES_PER_DEGREE_LATITUDE)
-              for lat, lon in polygon]
+    points = [((lon - longitude) * metres_per_degree_longitude, (lat - latitude) * METRES_PER_DEGREE_LATITUDE) for lat, lon in polygon]
     edges = zip(points, points[1:] + points[:1], strict=True)
     return min(_distance_from_origin_to_segment(start, end) for start, end in edges)
 
@@ -199,6 +204,7 @@ def _distance_from_origin_to_segment(start: tuple[float, float], end: tuple[floa
 
 
 # ---------------- the warnings of a place ----------------
+
 
 @dataclass(frozen=True)
 class WarningsFilter:
@@ -247,8 +253,18 @@ class FMIWarning:
 
     def content(self) -> tuple:
         """Everything a person would notice changing. FMI's identifiers change on every reissue."""
-        return (self.type, self.level, self.onset, self.expires, self.headline, self.description, self.impacts,
-                self.probability, self.areas, tuple(sorted(self.parameters.items())))
+        return (
+            self.type,
+            self.level,
+            self.onset,
+            self.expires,
+            self.headline,
+            self.description,
+            self.impacts,
+            self.probability,
+            self.areas,
+            tuple(sorted(self.parameters.items())),
+        )
 
     def as_dict(self) -> dict[str, Any]:
         """For state attributes and event data."""
@@ -284,8 +300,11 @@ def warnings_for(alerts: Iterable[CapAlert], warnings_filter: WarningsFilter, no
             continue
         if info.expires is not None and info.expires <= now:
             continue
-        areas = [area.name for area in info.areas
-                 if area_concerns(area, warnings_filter.latitude, warnings_filter.longitude, warnings_filter.radius_m)]
+        areas = [
+            area.name
+            for area in info.areas
+            if area_concerns(area, warnings_filter.latitude, warnings_filter.longitude, warnings_filter.radius_m)
+        ]
         if not areas:
             continue
         result[alert.identifier] = _warning(alert, info, areas)
@@ -325,13 +344,11 @@ def _number(value: str) -> Any:
 
 def highest_level(warnings: dict[str, FMIWarning], now: datetime) -> str:
     """The highest level among the warnings in force now; "none" when there are none."""
-    levels = [warning.level for warning in warnings.values()
-              if warning.is_active(now) and warning.level in WARNING_LEVELS[1:]]
+    levels = [warning.level for warning in warnings.values() if warning.is_active(now) and warning.level in WARNING_LEVELS[1:]]
     return max(levels, key=WARNING_LEVELS.index, default=WARNING_LEVELS[0])
 
 
-def warning_changes(previous: dict[str, FMIWarning], current: dict[str, FMIWarning],
-                    now: datetime) -> list[tuple[str, FMIWarning]]:
+def warning_changes(previous: dict[str, FMIWarning], current: dict[str, FMIWarning], now: datetime) -> list[tuple[str, FMIWarning]]:
     """What happened between two refreshes, as (event type, warning).
 
     FMI reissues its warnings as new messages that reference the ones they
@@ -367,6 +384,11 @@ def _predecessor(warning: FMIWarning, previous: dict[str, FMIWarning], matched: 
             return previous[reference]
     # A failed refresh can skip a version, breaking the chain of references;
     # the same type with the same validity is then the same warning.
-    return next((old for old in previous.values()
-                 if old.identifier not in matched and old.type == warning.type
-                 and old.onset == warning.onset and old.expires == warning.expires), None)
+    return next(
+        (
+            old
+            for old in previous.values()
+            if old.identifier not in matched and old.type == warning.type and old.onset == warning.onset and old.expires == warning.expires
+        ),
+        None,
+    )

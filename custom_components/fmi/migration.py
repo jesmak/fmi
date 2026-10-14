@@ -5,16 +5,28 @@ with it. Entity IDs do not change, so history, statistics, dashboards and
 automations keep working. Modelled on the migration in Home Assistant's own
 OpenAI Conversation integration.
 """
+
 import logging
 from collections import Counter
 from types import MappingProxyType
 
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er, issue_registry as ir
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 
-from .const import (CONF_ENTRY_TYPE, CONF_LANG, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE,
-                    DEFAULT_NO_DATA_ISSUE_HOURS, DOMAIN, ENTRY_TYPE_WARNINGS, SUBENTRY_SENSOR, SUBENTRY_WARNINGS)
+from .const import (
+    CONF_ENTRY_TYPE,
+    CONF_LANG,
+    CONF_NO_DATA_ISSUE,
+    CONF_NO_DATA_ISSUE_HOURS,
+    DEFAULT_NO_DATA_ISSUE,
+    DEFAULT_NO_DATA_ISSUE_HOURS,
+    DOMAIN,
+    ENTRY_TYPE_WARNINGS,
+    SUBENTRY_SENSOR,
+    SUBENTRY_WARNINGS,
+)
 from .query_coordinator import build_unique_id
 from .warning_coordinator import build_warnings_unique_id
 
@@ -103,12 +115,10 @@ def _most_common_language(entries: list[ConfigEntry]) -> str:
 
 def _most_common_stale_data_settings(entries: list[ConfigEntry]) -> dict:
     settings = Counter(
-        (entry.data.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE),
-         entry.data.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS))
+        (entry.data.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE), entry.data.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS))
         for entry in entries
         # Sensors set up before the settings existed say nothing about the user's choice.
         if CONF_NO_DATA_ISSUE_HOURS in entry.data
     )
-    enabled, hours = settings.most_common(1)[0][0] if settings else (DEFAULT_NO_DATA_ISSUE,
-                                                                     DEFAULT_NO_DATA_ISSUE_HOURS)
+    enabled, hours = settings.most_common(1)[0][0] if settings else (DEFAULT_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE_HOURS)
     return {CONF_NO_DATA_ISSUE: enabled, CONF_NO_DATA_ISSUE_HOURS: hours}

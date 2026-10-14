@@ -1,4 +1,5 @@
 """The event entity of a warnings subentry: fires when FMI issues, updates or cancels a warning for the place."""
+
 from homeassistant.components.event import EventEntity
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback

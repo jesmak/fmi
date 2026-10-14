@@ -1,4 +1,5 @@
 """Fetching one observation or forecast sensor, and noticing when its data goes stale."""
+
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -10,11 +11,27 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .const import (API_TIME_FORMAT, CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, CONF_LABEL,
-                    CONF_LANG, CONF_NEGATIVE_AS_ZERO, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, CONF_PARAMETER,
-                    CONF_QUERY_ID, CONF_TARGET, CONF_TARGET_TYPE, DEFAULT_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE_HOURS,
-                    DEFAULT_SCAN_INTERVAL, DOMAIN, MINIMUM_STALE_HOURS)
-from .session import FMISession, FMIException
+from .const import (
+    API_TIME_FORMAT,
+    CONF_FORECAST_HOURS,
+    CONF_FORECAST_PAST_HOURS,
+    CONF_FORECAST_STEP,
+    CONF_LABEL,
+    CONF_LANG,
+    CONF_NEGATIVE_AS_ZERO,
+    CONF_NO_DATA_ISSUE,
+    CONF_NO_DATA_ISSUE_HOURS,
+    CONF_PARAMETER,
+    CONF_QUERY_ID,
+    CONF_TARGET,
+    CONF_TARGET_TYPE,
+    DEFAULT_NO_DATA_ISSUE,
+    DEFAULT_NO_DATA_ISSUE_HOURS,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    MINIMUM_STALE_HOURS,
+)
+from .session import FMIException, FMISession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,20 +43,28 @@ def build_unique_id(data: dict[str, Any]) -> str:
     any identity. This is the subentry's unique id, which is what stops the
     same measurement being added twice.
     """
-    return "_".join([str(data[CONF_QUERY_ID]), str(data[CONF_TARGET_TYPE]),
-                     str(data[CONF_TARGET]), str(data[CONF_PARAMETER])]).lower()
+    return "_".join([str(data[CONF_QUERY_ID]), str(data[CONF_TARGET_TYPE]), str(data[CONF_TARGET]), str(data[CONF_PARAMETER])]).lower()
 
 
 def get_start_time(query_id: str, now: datetime, data: dict[str, Any]):
     # Aggregate queries have to reach back past the current period: the running
     # day/month/year is reported as NaN until it completes, and NaN values are
     # discarded, which otherwise leaves the sensor permanently empty.
-    return now - timedelta(hours=data[CONF_FORECAST_PAST_HOURS]) if "::forecast" in query_id else \
-        now.replace(minute=0, second=0) - relativedelta(hours=1) if "::hourly" in query_id else \
-            now.replace(hour=0, minute=0, second=0) - relativedelta(days=2) if "::daily" in query_id else \
-                now.replace(day=1, hour=0, minute=0, second=0) - relativedelta(months=2) if "::monthly" in query_id else \
-                    now.replace(month=1, day=1, hour=0, minute=0, second=0) - relativedelta(years=2) if "::yearly" in query_id else \
-                        now - timedelta(hours=12) if not query_id.startswith("stuk::") else None
+    return (
+        now - timedelta(hours=data[CONF_FORECAST_PAST_HOURS])
+        if "::forecast" in query_id
+        else now.replace(minute=0, second=0) - relativedelta(hours=1)
+        if "::hourly" in query_id
+        else now.replace(hour=0, minute=0, second=0) - relativedelta(days=2)
+        if "::daily" in query_id
+        else now.replace(day=1, hour=0, minute=0, second=0) - relativedelta(months=2)
+        if "::monthly" in query_id
+        else now.replace(month=1, day=1, hour=0, minute=0, second=0) - relativedelta(years=2)
+        if "::yearly" in query_id
+        else now - timedelta(hours=12)
+        if not query_id.startswith("stuk::")
+        else None
+    )
 
 
 def stale_after_hours(query_id: str, configured_hours: int) -> int:
@@ -81,10 +106,13 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if start_time is None:
             start_time = get_start_time(query_id, now, data)
         end_time = now + timedelta(hours=data[CONF_FORECAST_HOURS]) if is_forecast else None
-        params = {"starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
-                  "endtime": end_time.strftime(API_TIME_FORMAT) if end_time is not None else None,
-                  "timestep": data.get(CONF_FORECAST_STEP), "storedquery_id": query_id,
-                  data[CONF_TARGET_TYPE]: data[CONF_TARGET]}
+        params = {
+            "starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
+            "endtime": end_time.strftime(API_TIME_FORMAT) if end_time is not None else None,
+            "timestep": data.get(CONF_FORECAST_STEP),
+            "storedquery_id": query_id,
+            data[CONF_TARGET_TYPE]: data[CONF_TARGET],
+        }
 
         if filter_parameter:
             # Ignored by queries that do not declare it (the STUK nuclide query
@@ -99,10 +127,14 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         is_forecast = "::forecast" in str(data[CONF_QUERY_ID])
 
         try:
-            result = await self.hass.async_add_executor_job(FMISession().get_feature, data[CONF_LANG],
-                                                            self._params(now, True), data[CONF_PARAMETER],
-                                                            is_forecast is False,
-                                                            data.get(CONF_NEGATIVE_AS_ZERO, False))
+            result = await self.hass.async_add_executor_job(
+                FMISession().get_feature,
+                data[CONF_LANG],
+                self._params(now, True),
+                data[CONF_PARAMETER],
+                is_forecast is False,
+                data.get(CONF_NEGATIVE_AS_ZERO, False),
+            )
         except FMIException as exception:
             raise UpdateFailed(f"Could not read {data[CONF_LABEL]} from FMI: {exception}") from exception
 
@@ -151,10 +183,14 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return True
 
         try:
-            widened = await self.hass.async_add_executor_job(FMISession().get_feature, data[CONF_LANG],
-                                                             self._params(now, True, now - grace),
-                                                             data[CONF_PARAMETER], is_forecast is False,
-                                                             data.get(CONF_NEGATIVE_AS_ZERO, False))
+            widened = await self.hass.async_add_executor_job(
+                FMISession().get_feature,
+                data[CONF_LANG],
+                self._params(now, True, now - grace),
+                data[CONF_PARAMETER],
+                is_forecast is False,
+                data.get(CONF_NEGATIVE_AS_ZERO, False),
+            )
         except FMIException as exception:
             # Better to say nothing than to report an outage the network invented.
             _LOGGER.debug(f"Could not date the last data for {data[CONF_LABEL]}: {exception}")
@@ -174,15 +210,18 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         parameter = data[CONF_PARAMETER]
 
         try:
-            available = await self.hass.async_add_executor_job(FMISession().list_parameters,
-                                                               data[CONF_LANG], probe_params)
+            available = await self.hass.async_add_executor_job(FMISession().list_parameters, data[CONF_LANG], probe_params)
         except FMIException as exception:
             _LOGGER.warning(f"Could not determine why {data[CONF_LABEL]} has no data: {exception}")
             return
 
-        placeholders = {"label": data[CONF_LABEL], "parameter": parameter,
-                        "query_id": str(data[CONF_QUERY_ID]),
-                        "target_type": data[CONF_TARGET_TYPE], "target": data[CONF_TARGET]}
+        placeholders = {
+            "label": data[CONF_LABEL],
+            "parameter": parameter,
+            "query_id": str(data[CONF_QUERY_ID]),
+            "target_type": data[CONF_TARGET_TYPE],
+            "target": data[CONF_TARGET],
+        }
 
         if not available:
             translation_key = "no_data"
@@ -195,6 +234,12 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         _LOGGER.warning(f"{data[CONF_LABEL]}: no data ({translation_key}), available={available}")
 
-        ir.async_create_issue(self.hass, DOMAIN, self.issue_id, is_fixable=False,
-                              severity=ir.IssueSeverity.WARNING, translation_key=translation_key,
-                              translation_placeholders=placeholders)
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            self.issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=translation_key,
+            translation_placeholders=placeholders,
+        )

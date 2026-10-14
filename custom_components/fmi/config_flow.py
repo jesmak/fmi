@@ -4,6 +4,7 @@ The config entry holds the language, and its options the stale data settings
 shared by every sensor. Sensors and warnings places are subentries, added and
 changed from the integration page.
 """
+
 import logging
 import re
 from datetime import timedelta
@@ -11,24 +12,50 @@ from typing import Any
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-
-from homeassistant.config_entries import (ConfigEntry, ConfigFlow, ConfigFlowResult, ConfigSubentryFlow, OptionsFlow,
-                                          SubentryFlowResult)
-from homeassistant.core import callback, HomeAssistant
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, ConfigSubentryFlow, OptionsFlow, SubentryFlowResult
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.selector import (LocationSelector, LocationSelectorConfig, SelectOptionDict, SelectSelector,
-                                            SelectSelectorConfig, SelectSelectorMode)
+from homeassistant.helpers.selector import (
+    LocationSelector,
+    LocationSelectorConfig,
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 from homeassistant.util import dt as dt_util
 from homeassistant.util.location import distance
 
-from .const import (DOMAIN, CONF_LABEL, CONF_LANG, CONF_QUERY_ID, CONF_QUERY_LABEL, CONF_FORECAST_HOURS, CONF_TARGET,
-                    CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP, LANGUAGES, CONF_PARAMETER, CONF_TARGET_TYPE,
-                    CONF_NEGATIVE_AS_ZERO, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE,
-                    DEFAULT_NO_DATA_ISSUE_HOURS, API_TIME_FORMAT, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_TYPE_KEYS,
-                    DEFAULT_WARNINGS_RADIUS, DEFAULT_WARNINGS_LABEL, SUBENTRY_SENSOR, SUBENTRY_WARNINGS)
+from .const import (
+    API_TIME_FORMAT,
+    CONF_FORECAST_HOURS,
+    CONF_FORECAST_PAST_HOURS,
+    CONF_FORECAST_STEP,
+    CONF_LABEL,
+    CONF_LANG,
+    CONF_LOCATION,
+    CONF_NEGATIVE_AS_ZERO,
+    CONF_NO_DATA_ISSUE,
+    CONF_NO_DATA_ISSUE_HOURS,
+    CONF_PARAMETER,
+    CONF_QUERY_ID,
+    CONF_QUERY_LABEL,
+    CONF_TARGET,
+    CONF_TARGET_TYPE,
+    CONF_WARNING_TYPES,
+    DEFAULT_NO_DATA_ISSUE,
+    DEFAULT_NO_DATA_ISSUE_HOURS,
+    DEFAULT_WARNINGS_LABEL,
+    DEFAULT_WARNINGS_RADIUS,
+    DOMAIN,
+    LANGUAGES,
+    SUBENTRY_SENSOR,
+    SUBENTRY_WARNINGS,
+    WARNING_TYPE_KEYS,
+)
 from .migration import TITLE, VERSION
 from .query_coordinator import build_unique_id, get_start_time
-from .session import FMISession, FMIException
+from .session import FMIException, FMISession
 from .warning_coordinator import build_warnings_unique_id
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,8 +71,10 @@ WARNINGS_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_LOCATION): LocationSelector(LocationSelectorConfig(radius=True, icon="mdi:alert")),
         vol.Required(CONF_WARNING_TYPES): SelectSelector(
-            SelectSelectorConfig(options=list(WARNING_TYPE_KEYS.values()), multiple=True,
-                                 translation_key=CONF_WARNING_TYPES, mode=SelectSelectorMode.LIST)),
+            SelectSelectorConfig(
+                options=list(WARNING_TYPE_KEYS.values()), multiple=True, translation_key=CONF_WARNING_TYPES, mode=SelectSelectorMode.LIST
+            )
+        ),
         vol.Required(CONF_LABEL): cv.string,
     }
 )
@@ -59,19 +88,23 @@ async def validate_input(hass: HomeAssistant, data: dict[str, any]) -> str:
     try:
         now = dt_util.utcnow()
         is_forecast = "::forecast" in str(data[CONF_QUERY_ID])
-        start_time = now - timedelta(
-            hours=data[CONF_FORECAST_PAST_HOURS]) if is_forecast is True else now - timedelta(hours=1)
+        start_time = now - timedelta(hours=data[CONF_FORECAST_PAST_HOURS]) if is_forecast is True else now - timedelta(hours=1)
         end_time = now + timedelta(hours=data[CONF_FORECAST_HOURS]) if is_forecast is True else now
         api = FMISession()
-        params = {"starttime": start_time.strftime(API_TIME_FORMAT), "endtime": end_time.strftime(API_TIME_FORMAT),
-                  "timestep": data.get(CONF_FORECAST_STEP),
-                  "storedquery_id": data[CONF_QUERY_ID], data[CONF_TARGET_TYPE]: data[CONF_TARGET],
-                  "parameters": data[CONF_PARAMETER]}
-        await hass.async_add_executor_job(api.get_feature, data[CONF_LANG], params, data[CONF_PARAMETER],
-                                          is_forecast is False, data.get(CONF_NEGATIVE_AS_ZERO, False))
+        params = {
+            "starttime": start_time.strftime(API_TIME_FORMAT),
+            "endtime": end_time.strftime(API_TIME_FORMAT),
+            "timestep": data.get(CONF_FORECAST_STEP),
+            "storedquery_id": data[CONF_QUERY_ID],
+            data[CONF_TARGET_TYPE]: data[CONF_TARGET],
+            "parameters": data[CONF_PARAMETER],
+        }
+        await hass.async_add_executor_job(
+            api.get_feature, data[CONF_LANG], params, data[CONF_PARAMETER], is_forecast is False, data.get(CONF_NEGATIVE_AS_ZERO, False)
+        )
 
-    except FMIException:
-        raise ConnectionProblem
+    except FMIException as err:
+        raise ConnectionProblem from err
 
     return data[CONF_LABEL]
 
@@ -94,8 +127,7 @@ def validate_warnings_input(data: dict[str, Any]) -> dict[str, str]:
 
 
 def unique_id_taken(entry: ConfigEntry, unique_id: str, except_subentry_id: str | None = None) -> bool:
-    return any(subentry.unique_id == unique_id and subentry.subentry_id != except_subentry_id
-               for subentry in entry.subentries.values())
+    return any(subentry.unique_id == unique_id and subentry.subentry_id != except_subentry_id for subentry in entry.subentries.values())
 
 
 class ConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -143,10 +175,12 @@ class StaleDataOptionsFlow(OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(data=user_input)
 
-        values = {CONF_NO_DATA_ISSUE: DEFAULT_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS: DEFAULT_NO_DATA_ISSUE_HOURS,
-                  **self.config_entry.options}
-        return self.async_show_form(step_id="init",
-                                    data_schema=self.add_suggested_values_to_schema(STALE_DATA_SCHEMA, values))
+        values = {
+            CONF_NO_DATA_ISSUE: DEFAULT_NO_DATA_ISSUE,
+            CONF_NO_DATA_ISSUE_HOURS: DEFAULT_NO_DATA_ISSUE_HOURS,
+            **self.config_entry.options,
+        }
+        return self.async_show_form(step_id="init", data_schema=self.add_suggested_values_to_schema(STALE_DATA_SCHEMA, values))
 
 
 class SensorSubentryFlow(ConfigSubentryFlow):
@@ -170,8 +204,10 @@ class SensorSubentryFlow(ConfigSubentryFlow):
         api = FMISession()
         now = dt_util.utcnow()
         start_time = get_start_time(query_id, now, {CONF_FORECAST_PAST_HOURS: 1})
-        params = {"starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
-                  "endtime": now.strftime(API_TIME_FORMAT)}
+        params = {
+            "starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
+            "endtime": now.strftime(API_TIME_FORMAT),
+        }
 
         stations = await self.hass.async_add_executor_job(api.list_stations_for_query, lang, query_id, params)
 
@@ -210,8 +246,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
         def distance_to_home(station: dict[str, any]) -> float:
             if station["latitude"] is None or station["longitude"] is None:
                 return float("inf")
-            metres = distance(self.hass.config.latitude, self.hass.config.longitude,
-                              station["latitude"], station["longitude"])
+            metres = distance(self.hass.config.latitude, self.hass.config.longitude, station["latitude"], station["longitude"])
             return float("inf") if metres is None else metres
 
         options = []
@@ -223,8 +258,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
             suffix = "" if away == float("inf") else f" - {round(away / 1000)} km"
             options.append(SelectOptionDict(value=station["id"], label=f"{label} ({station['id']}){suffix}"))
 
-        return SelectSelector(SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN,
-                                                   custom_value=True, sort=False))
+        return SelectSelector(SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN, custom_value=True, sort=False))
 
     async def _async_build_parameter_selector(self):
         """Offer the parameters the chosen query and station actually report.
@@ -240,9 +274,12 @@ class SensorSubentryFlow(ConfigSubentryFlow):
         start_time = get_start_time(query_id, now, {CONF_FORECAST_PAST_HOURS: 1})
         end_time = now + timedelta(hours=12) if is_forecast else None
 
-        params = {"starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
-                  "endtime": end_time.strftime(API_TIME_FORMAT) if end_time is not None else None,
-                  "storedquery_id": query_id, self.data[CONF_TARGET_TYPE]: self.data[CONF_TARGET]}
+        params = {
+            "starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
+            "endtime": end_time.strftime(API_TIME_FORMAT) if end_time is not None else None,
+            "storedquery_id": query_id,
+            self.data[CONF_TARGET_TYPE]: self.data[CONF_TARGET],
+        }
 
         api = FMISession()
 
@@ -257,7 +294,8 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
         try:
             self.descriptions = descriptions = await self.hass.async_add_executor_job(
-                api.get_parameter_descriptions, self.data[CONF_LANG], query_id)
+                api.get_parameter_descriptions, self.data[CONF_LANG], query_id
+            )
         except Exception:  # noqa: BLE001 - labels are cosmetic, fall back to bare names
             self.descriptions = descriptions = {}
 
@@ -268,8 +306,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
             options.append(SelectOptionDict(value=name, label=text if unit is None else f"{text} ({unit})"))
 
         # custom_value keeps a parameter that the probe window happened to miss reachable.
-        return SelectSelector(SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN,
-                                                   custom_value=True, sort=False))
+        return SelectSelector(SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN, custom_value=True, sort=False))
 
     @callback
     def _params_placeholders(self) -> dict[str, str]:
@@ -277,42 +314,36 @@ class SensorSubentryFlow(ConfigSubentryFlow):
         query_id = self.data[CONF_QUERY_ID]
         return {
             "url": f"https://opendata.fmi.fi/wfs/{self.data[CONF_LANG]}?request=getFeature"
-                   f"&storedquery_id={query_id}"
-                   f"&starttime={(now - timedelta(hours=1)).strftime(API_TIME_FORMAT)}"
-                   f"&endtime={now.strftime(API_TIME_FORMAT)}"
-                   f"&{self.data[CONF_TARGET_TYPE]}={self.data[CONF_TARGET]}",
+            f"&storedquery_id={query_id}"
+            f"&starttime={(now - timedelta(hours=1)).strftime(API_TIME_FORMAT)}"
+            f"&endtime={now.strftime(API_TIME_FORMAT)}"
+            f"&{self.data[CONF_TARGET_TYPE]}={self.data[CONF_TARGET]}",
         }
 
     async def _async_query_form(self, step_id: str, current: str | None = None) -> SubentryFlowResult:
-        self.queries = await self.hass.async_add_executor_job(FMISession().list_stored_queries,
-                                                              self.data[CONF_LANG], "::simple")
+        self.queries = await self.hass.async_add_executor_job(FMISession().list_stored_queries, self.data[CONF_LANG], "::simple")
         choices = [f"{query[1]} ({query[0]})" for query in self.queries]
-        default = next((choice for choice, query in zip(choices, self.queries, strict=True) if query[0] == current),
-                       None)
-        schema = vol.Schema({
-            vol.Required(CONF_QUERY_LABEL, **({"default": default} if default else {})): vol.All(cv.string,
-                                                                                               vol.In(choices)),
-        })
+        default = next((choice for choice, query in zip(choices, self.queries, strict=True) if query[0] == current), None)
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_QUERY_LABEL, **({"default": default} if default else {})): vol.All(cv.string, vol.In(choices)),
+            }
+        )
         return self.async_show_form(step_id=step_id, data_schema=schema)
 
     def _chosen_query_id(self, user_input: dict[str, any]) -> str | None:
-        return next((query[0] for query in self.queries
-                     if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
+        return next((query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
 
     def _params_schema(self, parameter_selector, values: dict[str, any]) -> vol.Schema:
         schema_params = {
-            vol.Required(CONF_PARAMETER, **({"default": values[CONF_PARAMETER]} if values.get(CONF_PARAMETER) else {})):
-                parameter_selector,
+            vol.Required(CONF_PARAMETER, **({"default": values[CONF_PARAMETER]} if values.get(CONF_PARAMETER) else {})): parameter_selector,
             vol.Required(CONF_NEGATIVE_AS_ZERO, default=values.get(CONF_NEGATIVE_AS_ZERO, False)): cv.boolean,
         }
 
         if "::forecast" in str(self.data[CONF_QUERY_ID]):
-            schema_params[vol.Required(CONF_FORECAST_HOURS, default=values.get(CONF_FORECAST_HOURS, 36))] = \
-                cv.positive_int
-            schema_params[vol.Required(CONF_FORECAST_PAST_HOURS, default=values.get(CONF_FORECAST_PAST_HOURS, 5))] = \
-                cv.positive_int
-            schema_params[vol.Required(CONF_FORECAST_STEP, default=values.get(CONF_FORECAST_STEP, 30))] = \
-                cv.positive_int
+            schema_params[vol.Required(CONF_FORECAST_HOURS, default=values.get(CONF_FORECAST_HOURS, 36))] = cv.positive_int
+            schema_params[vol.Required(CONF_FORECAST_PAST_HOURS, default=values.get(CONF_FORECAST_PAST_HOURS, 5))] = cv.positive_int
+            schema_params[vol.Required(CONF_FORECAST_STEP, default=values.get(CONF_FORECAST_STEP, 30))] = cv.positive_int
 
         return vol.Schema(schema_params)
 
@@ -357,8 +388,9 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
         if user_input is None:
             self.param_schema = self._params_schema(await self._async_build_parameter_selector(), {})
-            return self.async_show_form(step_id="params", data_schema=self.param_schema,
-                                        description_placeholders=self._params_placeholders())
+            return self.async_show_form(
+                step_id="params", data_schema=self.param_schema, description_placeholders=self._params_placeholders()
+            )
 
         errors = await self._async_validated(user_input)
 
@@ -368,8 +400,9 @@ class SensorSubentryFlow(ConfigSubentryFlow):
                 return self.async_abort(reason="already_configured")
             return await self.async_step_name()
 
-        return self.async_show_form(step_id="params", data_schema=self.param_schema, errors=errors,
-                                    description_placeholders=self._params_placeholders())
+        return self.async_show_form(
+            step_id="params", data_schema=self.param_schema, errors=errors, description_placeholders=self._params_placeholders()
+        )
 
     @callback
     def _default_label(self) -> str:
@@ -396,8 +429,7 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
         self.data.update(user_input)
 
-        return self.async_create_entry(title=self.data[CONF_LABEL], data=self.data,
-                                       unique_id=build_unique_id(self.data))
+        return self.async_create_entry(title=self.data[CONF_LABEL], data=self.data, unique_id=build_unique_id(self.data))
 
     # ---------------- changing a sensor ----------------
 
@@ -421,9 +453,11 @@ class SensorSubentryFlow(ConfigSubentryFlow):
     async def async_step_reconfigure_location(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
 
         if user_input is None:
-            schema = vol.Schema({
-                vol.Required(CONF_TARGET, default=self.data.get(CONF_TARGET)): await self._async_build_target_selector(),
-            })
+            schema = vol.Schema(
+                {
+                    vol.Required(CONF_TARGET, default=self.data.get(CONF_TARGET)): await self._async_build_target_selector(),
+                }
+            )
             return self.async_show_form(step_id="reconfigure_location", data_schema=schema)
 
         user_input[CONF_TARGET_TYPE] = self._target_type_for(user_input[CONF_TARGET])
@@ -436,8 +470,12 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
         if user_input is None:
             self.param_schema = self._params_schema(await self._async_build_parameter_selector(), self.data)
-            return self.async_show_form(step_id="reconfigure_params", data_schema=self.param_schema,
-                                        last_step=True, description_placeholders=self._params_placeholders())
+            return self.async_show_form(
+                step_id="reconfigure_params",
+                data_schema=self.param_schema,
+                last_step=True,
+                description_placeholders=self._params_placeholders(),
+            )
 
         errors = await self._async_validated(user_input)
 
@@ -450,8 +488,13 @@ class SensorSubentryFlow(ConfigSubentryFlow):
 
             return self.async_update_and_abort(self._get_entry(), subentry, data=updated, unique_id=unique_id)
 
-        return self.async_show_form(step_id="reconfigure_params", data_schema=self.param_schema, last_step=True,
-                                    errors=errors, description_placeholders=self._params_placeholders())
+        return self.async_show_form(
+            step_id="reconfigure_params",
+            data_schema=self.param_schema,
+            last_step=True,
+            errors=errors,
+            description_placeholders=self._params_placeholders(),
+        )
 
 
 class WarningsSubentryFlow(ConfigSubentryFlow):
@@ -473,15 +516,16 @@ class WarningsSubentryFlow(ConfigSubentryFlow):
 
         language = entry.data[CONF_LANG]
         values = user_input or {
-            CONF_LOCATION: {"latitude": self.hass.config.latitude, "longitude": self.hass.config.longitude,
-                            "radius": DEFAULT_WARNINGS_RADIUS},
+            CONF_LOCATION: {
+                "latitude": self.hass.config.latitude,
+                "longitude": self.hass.config.longitude,
+                "radius": DEFAULT_WARNINGS_RADIUS,
+            },
             CONF_WARNING_TYPES: list(WARNING_TYPE_KEYS.values()),
             CONF_LABEL: DEFAULT_WARNINGS_LABEL.get(language, DEFAULT_WARNINGS_LABEL["eng"]),
         }
 
-        return self.async_show_form(step_id="user",
-                                    data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values),
-                                    errors=errors)
+        return self.async_show_form(step_id="user", data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values), errors=errors)
 
     async def async_step_reconfigure(self, user_input: dict[str, any] = None) -> SubentryFlowResult:
         """Move the place, or change its radius, warning types or name."""
@@ -499,13 +543,12 @@ class WarningsSubentryFlow(ConfigSubentryFlow):
                 if unique_id_taken(entry, unique_id, except_subentry_id=subentry.subentry_id):
                     return self.async_abort(reason="already_configured")
 
-                return self.async_update_and_abort(entry, subentry, title=updated[CONF_LABEL], data=updated,
-                                                   unique_id=unique_id)
+                return self.async_update_and_abort(entry, subentry, title=updated[CONF_LABEL], data=updated, unique_id=unique_id)
 
         values = user_input or warning_types_for_form(dict(subentry.data))
-        return self.async_show_form(step_id="reconfigure",
-                                    data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values),
-                                    errors=errors)
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values), errors=errors
+        )
 
 
 class ConnectionProblem(HomeAssistantError):

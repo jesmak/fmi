@@ -4,13 +4,15 @@ One config entry holds the language and the stale data settings. Every sensor,
 and every place whose warnings are followed, is a config subentry with its own
 coordinator.
 """
+
 import asyncio
 import logging
 from dataclasses import dataclass
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv, issue_registry as ir
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN, SUBENTRY_SENSOR, SUBENTRY_WARNINGS
@@ -85,6 +87,5 @@ def _remove_orphaned_issues(hass: HomeAssistant, entry: FMIConfigEntry) -> None:
     """Drop no-data repair issues of sensors that no longer exist."""
     registry = ir.async_get(hass)
     for domain, issue_id in list(registry.issues):
-        if domain == DOMAIN and issue_id.startswith("no_data_") \
-                and issue_id.removeprefix("no_data_") not in entry.subentries:
+        if domain == DOMAIN and issue_id.startswith("no_data_") and issue_id.removeprefix("no_data_") not in entry.subentries:
             ir.async_delete_issue(hass, DOMAIN, issue_id)

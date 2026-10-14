@@ -1,9 +1,11 @@
 """Adding and changing a warnings place through its subentry flow."""
+
 import pytest
 from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from test_warning_entities import SEVERAL_AREAS, FakeApi
 
 from custom_components.fmi.const import (
     CONF_LABEL,
@@ -13,7 +15,6 @@ from custom_components.fmi.const import (
     DOMAIN,
     SUBENTRY_WARNINGS,
 )
-from test_warning_entities import SEVERAL_AREAS, FakeApi
 
 pytestmark = pytest.mark.asyncio
 
@@ -37,8 +38,7 @@ async def entry(hass: HomeAssistant) -> MockConfigEntry:
 
 
 async def _warnings_form(hass: HomeAssistant, entry: MockConfigEntry) -> dict:
-    result = await hass.config_entries.subentries.async_init((entry.entry_id, SUBENTRY_WARNINGS),
-                                                             context={"source": SOURCE_USER})
+    result = await hass.config_entries.subentries.async_init((entry.entry_id, SUBENTRY_WARNINGS), context={"source": SOURCE_USER})
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
     return result
@@ -87,15 +87,14 @@ async def test_reconfiguring_a_warnings_place(hass: HomeAssistant, entry: MockCo
     [subentry] = entry.subentries.values()
 
     result = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, SUBENTRY_WARNINGS),
-        context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry.subentry_id})
+        (entry.entry_id, SUBENTRY_WARNINGS), context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry.subentry_id}
+    )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "reconfigure"
     warning_types = next(key for key in result["data_schema"].schema if key == CONF_WARNING_TYPES)
     assert warning_types.description["suggested_value"] == ["sea_wind", "sea_wave_height"]
 
-    result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {**FORM, CONF_LOCATION: {**HANKO, "radius": 5000}})
+    result = await hass.config_entries.subentries.async_configure(result["flow_id"], {**FORM, CONF_LOCATION: {**HANKO, "radius": 5000}})
     await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.ABORT

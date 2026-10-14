@@ -1,13 +1,14 @@
 """Setting up the integration, and the stale data settings shared by every sensor."""
+
 from datetime import timedelta
 
 import pytest
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from test_no_data import FakeApi, _setup
 
 from custom_components.fmi.const import CONF_LANG, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DOMAIN
-from test_no_data import FakeApi, _setup
 
 pytestmark = pytest.mark.asyncio
 
@@ -44,7 +45,8 @@ async def test_changing_the_stale_data_settings_applies_to_the_sensors(hass: Hom
     result = await hass.config_entries.options.async_init(entry.entry_id)
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_NO_DATA_ISSUE: False, CONF_NO_DATA_ISSUE_HOURS: 120})
+        result["flow_id"], {CONF_NO_DATA_ISSUE: False, CONF_NO_DATA_ISSUE_HOURS: 120}
+    )
     await hass.async_block_till_done()
 
     assert entry.options == {CONF_NO_DATA_ISSUE: False, CONF_NO_DATA_ISSUE_HOURS: 120}

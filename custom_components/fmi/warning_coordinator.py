@@ -1,4 +1,5 @@
 """Weather warnings: the shared warning feed, and keeping each place's warnings up to date."""
+
 import asyncio
 import logging
 from dataclasses import dataclass
@@ -13,7 +14,7 @@ from homeassistant.util import dt as dt_util
 
 from .cap import CapAlert, FMIWarning, WarningsFilter, parse_alert, parse_warning_feed, warning_changes, warnings_for
 from .const import API_WARNINGS_FEED_URL, CONF_LOCATION, CONF_WARNING_TYPES, DOMAIN, WARNINGS_SCAN_INTERVAL
-from .session import FMISession, FMIException
+from .session import FMIException, FMISession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,9 +25,15 @@ FEED_REUSE_TIME = timedelta(seconds=30)
 def build_warnings_unique_id(data: dict[str, Any]) -> str:
     """Identify a warnings subentry by the place, radius and warning types it follows."""
     location = data[CONF_LOCATION]
-    return "_".join(["warnings", f"{float(location['latitude']):.4f}", f"{float(location['longitude']):.4f}",
-                     str(round(float(location.get("radius") or 0))),
-                     ",".join(sorted(data[CONF_WARNING_TYPES]))]).lower()
+    return "_".join(
+        [
+            "warnings",
+            f"{float(location['latitude']):.4f}",
+            f"{float(location['longitude']):.4f}",
+            str(round(float(location.get("radius") or 0))),
+            ",".join(sorted(data[CONF_WARNING_TYPES])),
+        ]
+    ).lower()
 
 
 class WarningFeed:

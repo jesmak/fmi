@@ -12,7 +12,7 @@ API_GET_PARAMS_URL = "https://opendata.fmi.fi/meta?observableProperty=${property
 # %%20 renders as a literal "%20" once strftime is done with it. FMI accepts a
 # space between date and time; an ISO "+00:00" offset would decode as a space
 # server-side and be rejected, so timestamps are always formatted, never str()d.
-API_TIME_FORMAT = '%Y-%m-%d%%20%H:%M:%S'
+API_TIME_FORMAT = "%Y-%m-%d%%20%H:%M:%S"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.5249.62 Safari/537.36"
 DEFAULT_SCAN_INTERVAL = 5
 
@@ -79,9 +79,7 @@ WARNING_TYPES = [
 ]
 # The same types as translation keys, which must be lower case: "seaWind" is "sea_wind" in the warnings form.
 # Subentries store FMI's own names.
-WARNING_TYPE_KEYS = {
-    warning_type: re.sub(r"(?<!^)(?=[A-Z])", "_", warning_type).lower() for warning_type in WARNING_TYPES
-}
+WARNING_TYPE_KEYS = {warning_type: re.sub(r"(?<!^)(?=[A-Z])", "_", warning_type).lower() for warning_type in WARNING_TYPES}
 # In rising order. "none" is the state when no warning is in force.
 WARNING_LEVELS = ["none", "yellow", "orange", "red"]
 DEFAULT_WARNINGS_RADIUS = 1000

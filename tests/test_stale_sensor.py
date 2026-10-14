@@ -3,13 +3,14 @@
 It follows the same age check as the no-data repair issue, but works whether or
 not the issue is enabled.
 """
+
 from datetime import timedelta
 
 from homeassistant.core import HomeAssistant
+from test_no_data import FakeApi, _coordinator, _issue, _setup
 
 from custom_components.fmi.const import CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, CONF_QUERY_ID
 from custom_components.fmi.query_coordinator import stale_after_hours
-from test_no_data import FakeApi, _coordinator, _issue, _setup
 
 STALE_SENSOR = "binary_sensor.fmi_kaisaniemi_air_temperature_stale_data"
 
@@ -51,8 +52,7 @@ async def test_stale_turns_off_when_data_comes_back(hass: HomeAssistant, monkeyp
 async def test_daily_statistics_get_at_least_three_days(hass: HomeAssistant, monkeypatch):
     """Yesterday's value is published only once the day is over, so a day-old value is not stale."""
     api = FakeApi(age=timedelta(hours=30))
-    await _setup(hass, monkeypatch, api, **{CONF_QUERY_ID: "fmi::observations::weather::daily::simple",
-                                            CONF_NO_DATA_ISSUE_HOURS: 24})
+    await _setup(hass, monkeypatch, api, **{CONF_QUERY_ID: "fmi::observations::weather::daily::simple", CONF_NO_DATA_ISSUE_HOURS: 24})
 
     state = hass.states.get(STALE_SENSOR)
     assert state.state == "off"

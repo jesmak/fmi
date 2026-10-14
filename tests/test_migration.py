@@ -3,14 +3,20 @@
 What matters to the user is that nothing they have built on the entities
 breaks: entity IDs, and so history, dashboards and automations, stay the same.
 """
+
 from datetime import timedelta
 
 import pytest
 from homeassistant.config_entries import ConfigEntryDisabler, ConfigSubentryData
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er, issue_registry as ir
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from test_no_data import ENTRY_DATA
+from test_no_data import FakeApi as QueryApi
+from test_warning_entities import SEVERAL_AREAS
+from test_warning_entities import FakeApi as WarningsApi
 
 from custom_components.fmi.const import (
     CONF_ENTRY_TYPE,
@@ -29,10 +35,6 @@ from custom_components.fmi.const import (
 )
 from custom_components.fmi.query_coordinator import build_unique_id
 from custom_components.fmi.warning_coordinator import build_warnings_unique_id
-from test_no_data import ENTRY_DATA
-from test_no_data import FakeApi as QueryApi
-from test_warning_entities import SEVERAL_AREAS
-from test_warning_entities import FakeApi as WarningsApi
 
 pytestmark = pytest.mark.asyncio
 
@@ -51,24 +53,32 @@ WARNINGS = {
 
 @pytest.fixture(autouse=True)
 def fake_apis(monkeypatch):
-    monkeypatch.setattr("custom_components.fmi.query_coordinator.FMISession",
-                        lambda *a, **kw: QueryApi(age=timedelta(hours=1)))
-    monkeypatch.setattr("custom_components.fmi.warning_coordinator.FMISession",
-                        lambda *a, **kw: WarningsApi([SEVERAL_AREAS]))
+    monkeypatch.setattr("custom_components.fmi.query_coordinator.FMISession", lambda *a, **kw: QueryApi(age=timedelta(hours=1)))
+    monkeypatch.setattr("custom_components.fmi.warning_coordinator.FMISession", lambda *a, **kw: WarningsApi([SEVERAL_AREAS]))
 
 
-def _old_entry(hass: HomeAssistant, data: dict, unique_id: str, entities: list[str],
-               disabled: bool = False) -> MockConfigEntry:
+def _old_entry(hass: HomeAssistant, data: dict, unique_id: str, entities: list[str], disabled: bool = False) -> MockConfigEntry:
     """A 2.x entry, with its entities registered as 2.x left them: unique id = entry id."""
-    entry = MockConfigEntry(domain=DOMAIN, version=2, title=data[CONF_LABEL], data=data, unique_id=unique_id,
-                            disabled_by=ConfigEntryDisabler.USER if disabled else None)
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=2,
+        title=data[CONF_LABEL],
+        data=data,
+        unique_id=unique_id,
+        disabled_by=ConfigEntryDisabler.USER if disabled else None,
+    )
     entry.add_to_hass(hass)
     registry = er.async_get(hass)
     for entity_id in entities:
         domain, object_id = entity_id.split(".")
         registry.async_get_or_create(
-            domain, DOMAIN, entry.entry_id, config_entry=entry, suggested_object_id=object_id,
-            disabled_by=er.RegistryEntryDisabler.CONFIG_ENTRY if disabled else None)
+            domain,
+            DOMAIN,
+            entry.entry_id,
+            config_entry=entry,
+            suggested_object_id=object_id,
+            disabled_by=er.RegistryEntryDisabler.CONFIG_ENTRY if disabled else None,
+        )
     return entry
 
 
@@ -78,25 +88,47 @@ async def _start(hass: HomeAssistant) -> None:
 
 
 async def test_every_entry_becomes_a_subentry_and_keeps_its_entities(hass: HomeAssistant):
-    kaisaniemi = _old_entry(hass, KAISANIEMI, build_unique_id(KAISANIEMI), [
-        # Renamed by the user at some point: the entity ID must not follow the name.
-        "sensor.temperature_outside",
-        "binary_sensor.fmi_kaisaniemi_air_temperature_stale_data",
-    ])
-    _old_entry(hass, MANNERHEIMINTIE, build_unique_id(MANNERHEIMINTIE), [
-        "sensor.fmi_mannerheimintie_air_temperature",
-        "binary_sensor.fmi_mannerheimintie_air_temperature_stale_data",
-    ], disabled=True)
-    _old_entry(hass, KATAJANOKKA, build_unique_id(KATAJANOKKA), [
-        "sensor.fmi_katajanokka_air_temperature",
-        "binary_sensor.fmi_katajanokka_air_temperature_stale_data",
-    ])
-    _old_entry(hass, WARNINGS, build_warnings_unique_id(WARNINGS), [
-        "sensor.fmi_varoitukset_suomenlinna",
-        "event.fmi_varoitukset_suomenlinna",
-    ])
-    ir.async_create_issue(hass, DOMAIN, f"no_data_{kaisaniemi.entry_id}", is_fixable=False,
-                          severity=ir.IssueSeverity.WARNING, translation_key="no_data")
+    kaisaniemi = _old_entry(
+        hass,
+        KAISANIEMI,
+        build_unique_id(KAISANIEMI),
+        [
+            # Renamed by the user at some point: the entity ID must not follow the name.
+            "sensor.temperature_outside",
+            "binary_sensor.fmi_kaisaniemi_air_temperature_stale_data",
+        ],
+    )
+    _old_entry(
+        hass,
+        MANNERHEIMINTIE,
+        build_unique_id(MANNERHEIMINTIE),
+        [
+            "sensor.fmi_mannerheimintie_air_temperature",
+            "binary_sensor.fmi_mannerheimintie_air_temperature_stale_data",
+        ],
+        disabled=True,
+    )
+    _old_entry(
+        hass,
+        KATAJANOKKA,
+        build_unique_id(KATAJANOKKA),
+        [
+            "sensor.fmi_katajanokka_air_temperature",
+            "binary_sensor.fmi_katajanokka_air_temperature_stale_data",
+        ],
+    )
+    _old_entry(
+        hass,
+        WARNINGS,
+        build_warnings_unique_id(WARNINGS),
+        [
+            "sensor.fmi_varoitukset_suomenlinna",
+            "event.fmi_varoitukset_suomenlinna",
+        ],
+    )
+    ir.async_create_issue(
+        hass, DOMAIN, f"no_data_{kaisaniemi.entry_id}", is_fixable=False, severity=ir.IssueSeverity.WARNING, translation_key="no_data"
+    )
 
     await _start(hass)
 
@@ -108,8 +140,12 @@ async def test_every_entry_becomes_a_subentry_and_keeps_its_entities(hass: HomeA
     assert entry.options == {CONF_NO_DATA_ISSUE: True, CONF_NO_DATA_ISSUE_HOURS: 120}
 
     subentries = {subentry.title: subentry for subentry in entry.subentries.values()}
-    assert set(subentries) == {"Kaisaniemi Air temperature", "Mannerheimintie Air temperature",
-                               "Katajanokka Air temperature", "Varoitukset Suomenlinna"}
+    assert set(subentries) == {
+        "Kaisaniemi Air temperature",
+        "Mannerheimintie Air temperature",
+        "Katajanokka Air temperature",
+        "Varoitukset Suomenlinna",
+    }
     assert subentries["Varoitukset Suomenlinna"].subentry_type == SUBENTRY_WARNINGS
     assert CONF_ENTRY_TYPE not in subentries["Varoitukset Suomenlinna"].data
     assert subentries["Kaisaniemi Air temperature"].subentry_type == SUBENTRY_SENSOR
@@ -141,18 +177,23 @@ async def test_every_entry_becomes_a_subentry_and_keeps_its_entities(hass: HomeA
     assert hass.states.get("sensor.temperature_outside").state == "1.5"
     assert hass.states.get("sensor.fmi_varoitukset_suomenlinna") is not None
     # The user had turned this sensor off, and it stays off.
-    assert registry.async_get("sensor.fmi_mannerheimintie_air_temperature").disabled_by \
-        is er.RegistryEntryDisabler.USER
+    assert registry.async_get("sensor.fmi_mannerheimintie_air_temperature").disabled_by is er.RegistryEntryDisabler.USER
     assert ir.async_get(hass).async_get_issue(DOMAIN, f"no_data_{kaisaniemi.entry_id}") is None
 
 
 async def test_an_entry_left_behind_by_an_interrupted_migration_is_merged(hass: HomeAssistant):
-    subentry_data = {key: value for key, value in KAISANIEMI.items()
-                     if key not in (CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS)}
-    parent = MockConfigEntry(domain=DOMAIN, version=3, title="FMI", data={CONF_LANG: "fin"}, subentries_data=[
-        ConfigSubentryData(data=subentry_data, subentry_type=SUBENTRY_SENSOR, title="Kaisaniemi Air temperature",
-                           unique_id=build_unique_id(KAISANIEMI)),
-    ])
+    subentry_data = {key: value for key, value in KAISANIEMI.items() if key not in (CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS)}
+    parent = MockConfigEntry(
+        domain=DOMAIN,
+        version=3,
+        title="FMI",
+        data={CONF_LANG: "fin"},
+        subentries_data=[
+            ConfigSubentryData(
+                data=subentry_data, subentry_type=SUBENTRY_SENSOR, title="Kaisaniemi Air temperature", unique_id=build_unique_id(KAISANIEMI)
+            ),
+        ],
+    )
     parent.add_to_hass(hass)
     _old_entry(hass, KAISANIEMI, build_unique_id(KAISANIEMI), ["sensor.temperature_outside"])
 
@@ -165,8 +206,9 @@ async def test_an_entry_left_behind_by_an_interrupted_migration_is_merged(hass: 
 
 
 async def test_a_current_entry_is_left_alone(hass: HomeAssistant):
-    parent = MockConfigEntry(domain=DOMAIN, version=3, title="FMI", data={CONF_LANG: "eng"},
-                             options={CONF_NO_DATA_ISSUE: False, CONF_NO_DATA_ISSUE_HOURS: 48})
+    parent = MockConfigEntry(
+        domain=DOMAIN, version=3, title="FMI", data={CONF_LANG: "eng"}, options={CONF_NO_DATA_ISSUE: False, CONF_NO_DATA_ISSUE_HOURS: 48}
+    )
     parent.add_to_hass(hass)
 
     await _start(hass)
