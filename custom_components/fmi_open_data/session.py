@@ -26,6 +26,8 @@ NAMESPACES = {
     "ef": "http://inspire.ec.europa.eu/schemas/ef/4.0",
     "base": "http://inspire.ec.europa.eu/schemas/base/3.3",
     "omop": "http://inspire.ec.europa.eu/schemas/omop/2.9",
+    "gmlcov": "http://www.opengis.net/gmlcov/1.0",
+    "swe": "http://www.opengis.net/swe/2.0",
 }
 
 # STUK's radiation queries are not in FMI's parameter metadata.
@@ -34,6 +36,10 @@ STUK_UNITS = {"::air": "µBq/m³", "::external-radiation": "µSv/h"}
 
 class FMIException(Exception):
     pass
+
+
+class FMINoData(FMIException):
+    """FMI has nothing for the request, such as a forecast for a place outside its area."""
 
 
 def normalize_value(value: str, negative_as_zero: bool) -> str:
@@ -78,6 +84,8 @@ class FMISession:
             response = requests.get(url=url, headers={"User-Agent": USER_AGENT}, timeout=self._timeout)
         except RequestException as exception:
             raise FMIException(f"Communication error {exception}") from exception
+        if response.status_code == 400 and b"No data available" in response.content:
+            raise FMINoData("FMI has no data for the request")
         if response.status_code != 200:
             raise FMIException(f"{response.status_code} is not valid")
         return response.content
@@ -122,6 +130,31 @@ class FMISession:
             result["data"].append({"time": time, "value": normalize_value(value, negative_as_zero)})
 
         return result
+
+    def get_coverage(self, lang: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        """Return a multipointcoverage query's values for one place as one row per time.
+
+        Each row has "time" and the parameters by name, with FMI's NaN as None.
+        """
+        root = self._xml(feature_url(lang, params))
+        fields = [field.attrib["name"] for field in root.iter("{http://www.opengis.net/swe/2.0}field")]
+        positions = _text(root, ".//gmlcov:positions").split() if fields else []
+        values = _text(root, ".//gml:doubleOrNilReasonTupleList").split() if fields else []
+        # A position is latitude, longitude and a Unix time; a tuple has one value per field.
+        if len(positions) % 3 or len(values) != len(positions) // 3 * len(fields):
+            raise FMIException("FMI's response has a different number of times and values")
+
+        rows = []
+        for index in range(len(positions) // 3):
+            row: dict[str, Any] = {"time": datetime.fromtimestamp(int(positions[index * 3 + 2]), UTC)}
+            for offset, name in enumerate(fields):
+                value = values[index * len(fields) + offset]
+                try:
+                    row[name] = None if value == "NaN" else float(value)
+                except ValueError as exception:
+                    raise FMIException(f"FMI's response has {value} as {name}") from exception
+            rows.append(row)
+        return rows
 
     def list_stored_queries(self, lang: str, suffix: str | None = None) -> list[list[str]]:
         """Return [id, title] of the queries that take a station (fmisid), sorted by title."""

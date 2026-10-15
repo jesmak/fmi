@@ -51,9 +51,10 @@ CONF_NO_DATA_ISSUE_HOURS = "no_data_issue_hours"
 CONF_LOCATION = "location"
 CONF_WARNING_TYPES = "warning_types"
 
-# Config subentry types: one subentry per sensor, and one per place whose warnings are followed.
+# Config subentry types: one subentry per sensor, one per place whose warnings are followed, and one per weather place.
 SUBENTRY_SENSOR = "sensor"
 SUBENTRY_WARNINGS = "warnings"
+SUBENTRY_WEATHER = "weather"
 
 # The warning types of FMI's CAP profile, https://alerts.fmi.fi/cap/profile/v1.1.0
 WARNING_TYPES = [
@@ -79,3 +80,10 @@ WARNING_TYPE_KEYS = {warning_type: re.sub(r"(?<!^)(?=[A-Z])", "_", warning_type)
 WARNING_LEVELS = ["none", "yellow", "orange", "red"]
 DEFAULT_WARNINGS_RADIUS = 1000
 DEFAULT_WARNINGS_LABEL = {"eng": "Warnings", "fin": "Varoitukset"}
+
+# The meteorologists' edited forecast, the one ilmatieteenlaitos.fi shows. It has values for
+# about 9.5 days and NaN after that. The coverage format is some 50 times smaller than ::simple.
+API_FORECAST_QUERY_ID = "fmi::forecast::edited::weather::scandinavia::point::multipointcoverage"
+FORECAST_DAYS = 10
+WEATHER_SCAN_INTERVAL = 30
+DEFAULT_WEATHER_LABEL = {"eng": "Weather", "fin": "Sää"}

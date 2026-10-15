@@ -1,8 +1,8 @@
 """FMI data and weather warnings for Home Assistant.
 
 One config entry holds the language and the stale data settings. Every sensor,
-and every place whose warnings are followed, is a config subentry with its own
-coordinator.
+every place whose warnings are followed and every weather place is a config
+subentry with its own coordinator.
 """
 
 import asyncio
@@ -13,20 +13,21 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
-from .const import DOMAIN, SUBENTRY_SENSOR, SUBENTRY_WARNINGS
+from .const import DOMAIN, SUBENTRY_SENSOR, SUBENTRY_WARNINGS, SUBENTRY_WEATHER
 from .migration import CONF_MOVE_FROM, async_check_old_folder, async_move_old_entries
 from .query_coordinator import FMIQueryCoordinator
 from .warning_coordinator import FMIWarningsCoordinator, WarningFeed
+from .weather_coordinator import FMIWeatherCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor", "binary_sensor", "event"]
+PLATFORMS = ["sensor", "binary_sensor", "event", "weather"]
 
 
 @dataclass
 class FMIRuntimeData:
     # By subentry id.
-    coordinators: dict[str, FMIQueryCoordinator | FMIWarningsCoordinator]
+    coordinators: dict[str, FMIQueryCoordinator | FMIWarningsCoordinator | FMIWeatherCoordinator]
     warning_feed: WarningFeed
 
 
@@ -46,6 +47,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> bool:
             coordinators[subentry.subentry_id] = FMIQueryCoordinator(hass, entry, subentry)
         elif subentry.subentry_type == SUBENTRY_WARNINGS:
             coordinators[subentry.subentry_id] = FMIWarningsCoordinator(hass, entry, subentry, feed)
+        elif subentry.subentry_type == SUBENTRY_WEATHER:
+            coordinators[subentry.subentry_id] = FMIWeatherCoordinator(hass, entry, subentry)
 
     entry.runtime_data = FMIRuntimeData(coordinators, feed)
     _remove_orphaned_issues(hass, entry)

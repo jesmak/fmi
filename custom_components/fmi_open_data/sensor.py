@@ -99,6 +99,8 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddC
     for subentry_id, coordinator in entry.runtime_data.coordinators.items():
         if isinstance(coordinator, FMIWarningsCoordinator):
             sensor = FMIWarningLevelSensor(coordinator)
+        elif not isinstance(coordinator, FMIQueryCoordinator):
+            continue
         elif "::forecast" in str(coordinator.subentry.data[CONF_QUERY_ID]):
             sensor = FMIForecastSensor(coordinator)
         else:

@@ -151,6 +151,39 @@
           }
         }
       }
+    },
+    "weather": {
+      "entry_type": "Weather forecast",
+      "initiate_flow": {
+        "user": "Weather forecast",
+        "reconfigure": "Change weather forecast settings"
+      },
+      "error": {
+        "connection_problem": "Could not reach FMI. Try again in a moment.",
+        "no_forecast": "FMI has no forecast for this place. Pick a place in Finland or nearby."
+      },
+      "abort": {
+        "already_configured": "This place already has a weather entity",
+        "reconfigure_successful": "Weather forecast settings updated"
+      },
+      "step": {
+        "user": {
+          "title": "Weather forecast place",
+          "description": "Pick the place on the map. The weather entity shows FMI's forecast for it, hour by hour for about nine days, and by day and by half day.",
+          "data": {
+            "location": "Place",
+            "label": "Name"
+          }
+        },
+        "reconfigure": {
+          "title": "Weather forecast place",
+          "description": "Pick the place on the map. The weather entity shows FMI's forecast for it, hour by hour for about nine days, and by day and by half day.",
+          "data": {
+            "location": "Place",
+            "label": "Name"
+          }
+        }
+      }
     }
   },
   "selector": {

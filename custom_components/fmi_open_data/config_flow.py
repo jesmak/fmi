@@ -1,8 +1,8 @@
 """Config flow.
 
 The config entry holds the language, and its options the stale data settings
-shared by every sensor. Sensors and warnings places are subentries, added and
-changed from the integration page.
+shared by every sensor. Sensors, warnings places and weather places are
+subentries, added and changed from the integration page.
 """
 
 import logging
@@ -46,16 +46,19 @@ from .const import (
     DEFAULT_NO_DATA_ISSUE_HOURS,
     DEFAULT_WARNINGS_LABEL,
     DEFAULT_WARNINGS_RADIUS,
+    DEFAULT_WEATHER_LABEL,
     DOMAIN,
     LANGUAGES,
     SUBENTRY_SENSOR,
     SUBENTRY_WARNINGS,
+    SUBENTRY_WEATHER,
     WARNING_TYPE_KEYS,
 )
 from .migration import TITLE, VERSION, moved_entry, old_entries
 from .query_coordinator import build_unique_id, get_start_time, query_params
-from .session import FMIException, FMISession
+from .session import FMIException, FMINoData, FMISession
 from .warning_coordinator import build_warnings_unique_id
+from .weather_coordinator import async_get_forecast, build_weather_unique_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,6 +77,13 @@ WARNINGS_SCHEMA = vol.Schema(
                 options=list(WARNING_TYPE_KEYS.values()), multiple=True, translation_key=CONF_WARNING_TYPES, mode=SelectSelectorMode.LIST
             )
         ),
+        vol.Required(CONF_LABEL): cv.string,
+    }
+)
+
+WEATHER_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_LOCATION): LocationSelector(LocationSelectorConfig(radius=False, icon="mdi:weather-partly-cloudy")),
         vol.Required(CONF_LABEL): cv.string,
     }
 )
@@ -173,7 +183,7 @@ class FMIConfigFlow(ConfigFlow, domain=DOMAIN):
     @classmethod
     @callback
     def async_get_supported_subentry_types(cls, config_entry: ConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
-        return {SUBENTRY_SENSOR: SensorSubentryFlow, SUBENTRY_WARNINGS: WarningsSubentryFlow}
+        return {SUBENTRY_SENSOR: SensorSubentryFlow, SUBENTRY_WARNINGS: WarningsSubentryFlow, SUBENTRY_WEATHER: WeatherSubentryFlow}
 
 
 class StaleDataOptionsFlow(OptionsFlow):
@@ -562,4 +572,63 @@ class WarningsSubentryFlow(ConfigSubentryFlow):
         values = user_input or warning_types_for_form(dict(subentry.data))
         return self.async_show_form(
             step_id="reconfigure", data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values), errors=errors
+        )
+
+
+def weather_place_data(user_input: dict[str, Any]) -> dict[str, Any]:
+    location = user_input[CONF_LOCATION]
+    return {CONF_LOCATION: {"latitude": location["latitude"], "longitude": location["longitude"]}, CONF_LABEL: user_input[CONF_LABEL]}
+
+
+class WeatherSubentryFlow(ConfigSubentryFlow):
+    """FMI's forecast for a place picked on a map, as a weather entity."""
+
+    async def _async_forecast_error(self, data: dict[str, Any]) -> dict[str, str]:
+        """Try the place's forecast, so that a place FMI has nothing for is caught here."""
+        try:
+            await async_get_forecast(self.hass, self._get_entry().data[CONF_LANG], data[CONF_LOCATION])
+        except FMINoData:
+            return {"base": "no_forecast"}
+        except FMIException:
+            return {"base": "connection_problem"}
+        return {}
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        entry = self._get_entry()
+        errors = {}
+
+        if user_input is not None:
+            data = weather_place_data(user_input)
+            unique_id = build_weather_unique_id(data)
+            if unique_id_taken(entry, unique_id):
+                return self.async_abort(reason="already_configured")
+            errors = await self._async_forecast_error(data)
+            if not errors:
+                return self.async_create_entry(title=data[CONF_LABEL], data=data, unique_id=unique_id)
+
+        language = entry.data[CONF_LANG]
+        values = user_input or {
+            CONF_LOCATION: {"latitude": self.hass.config.latitude, "longitude": self.hass.config.longitude},
+            CONF_LABEL: DEFAULT_WEATHER_LABEL.get(language, DEFAULT_WEATHER_LABEL["eng"]),
+        }
+        return self.async_show_form(step_id="user", data_schema=self.add_suggested_values_to_schema(WEATHER_SCHEMA, values), errors=errors)
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """Move the place or rename it."""
+        entry = self._get_entry()
+        subentry = self._get_reconfigure_subentry()
+        errors = {}
+
+        if user_input is not None:
+            data = weather_place_data(user_input)
+            unique_id = build_weather_unique_id(data)
+            if unique_id_taken(entry, unique_id, except_subentry_id=subentry.subentry_id):
+                return self.async_abort(reason="already_configured")
+            errors = await self._async_forecast_error(data)
+            if not errors:
+                return self.async_update_and_abort(entry, subentry, title=data[CONF_LABEL], data=data, unique_id=unique_id)
+
+        values = user_input or dict(subentry.data)
+        return self.async_show_form(
+            step_id="reconfigure", data_schema=self.add_suggested_values_to_schema(WEATHER_SCHEMA, values), errors=errors
         )

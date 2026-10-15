@@ -151,6 +151,39 @@
           }
         }
       }
+    },
+    "weather": {
+      "entry_type": "Sääennuste",
+      "initiate_flow": {
+        "user": "Sääennuste",
+        "reconfigure": "Muuta sääennusteen määrityksiä"
+      },
+      "error": {
+        "connection_problem": "FMI:hin ei saatu yhteyttä. Yritä hetken päästä uudelleen.",
+        "no_forecast": "Ilmatieteen laitoksella ei ole ennustetta tälle paikalle. Valitse paikka Suomesta tai sen läheltä."
+      },
+      "abort": {
+        "already_configured": "Tälle paikalle on jo sääentiteetti",
+        "reconfigure_successful": "Sääennusteen määritykset päivitetty"
+      },
+      "step": {
+        "user": {
+          "title": "Sääennusteen paikka",
+          "description": "Valitse paikka kartalta. Sääentiteetti näyttää Ilmatieteen laitoksen ennusteen paikalle tunneittain noin yhdeksän päivän ajalta sekä päivittäin ja puolen vuorokauden jaksoissa.",
+          "data": {
+            "location": "Paikka",
+            "label": "Nimi"
+          }
+        },
+        "reconfigure": {
+          "title": "Sääennusteen paikka",
+          "description": "Valitse paikka kartalta. Sääentiteetti näyttää Ilmatieteen laitoksen ennusteen paikalle tunneittain noin yhdeksän päivän ajalta sekä päivittäin ja puolen vuorokauden jaksoissa.",
+          "data": {
+            "location": "Paikka",
+            "label": "Nimi"
+          }
+        }
+      }
     }
   },
   "selector": {
