@@ -106,3 +106,16 @@ def test_units(monkeypatch):
     assert session.get_unit("eng", "fmi::observations::weather::simple", "T2M") == "°C"
     assert session.get_unit("eng", "fmi::observations::weather::simple", "unknown") is None
     assert session.get_unit("eng", "stuk::observations::external-radiation::latest::multipointcoverage", "dr_pt10m_avg") == "µSv/h"
+
+
+def test_water_levels_have_their_units_without_fmis_metadata(monkeypatch):
+    def no_metadata(*args):
+        raise AssertionError("FMI's metadata has no unit for the water level")
+
+    monkeypatch.setattr(FMISession, "get_parameter_descriptions", no_metadata)
+    session = FMISession()
+
+    assert session.get_unit("eng", "fmi::observations::mareograph::instant::simple", "WLEVN2K_PT1S_INSTANT") == "mm"
+    assert session.get_unit("eng", "fmi::observations::mareograph::simple", "WLEV_PT1S_INSTANT") == "mm"
+    assert session.get_unit("eng", "fmi::forecast::sealevel::point::simple", "SeaLevelN2000") == "cm"
+    assert session.get_unit("eng", "fmi::forecast::sealevel::point::simple", "SeaLevel") == "cm"

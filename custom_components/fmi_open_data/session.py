@@ -34,6 +34,9 @@ NAMESPACES = {
 
 # STUK's radiation queries are not in FMI's parameter metadata.
 STUK_UNITS = {"::air": "µBq/m³", "::external-radiation": "µSv/h"}
+# Nor is the water level's unit. The mareograph's observations are in millimetres and the sea level forecast in
+# centimetres: ten days of daily means at Hamina put the observation at 9.6 to 10.8 times the forecast.
+WATER_LEVEL_UNITS = {"wlevn2k_pt1s_instant": "mm", "wlev_pt1s_instant": "mm", "sealeveln2000": "cm", "sealevel": "cm"}
 
 
 class FMIException(Exception):
@@ -291,4 +294,6 @@ class FMISession:
     def get_unit(self, lang: str, query_id: str, param_name: str) -> str | None:
         if query_id.startswith("stuk::"):
             return next((unit for key, unit in STUK_UNITS.items() if key in query_id), None)
+        if param_name.lower() in WATER_LEVEL_UNITS:
+            return WATER_LEVEL_UNITS[param_name.lower()]
         return self.get_parameter_descriptions(lang, query_id).get(param_name.lower(), (None, None))[1]

@@ -26,6 +26,7 @@ from .const import (
     WARNING_LEVELS,
 )
 from .query_coordinator import FMIQueryCoordinator
+from .session import WATER_LEVEL_UNITS
 from .warning_coordinator import FMIWarningsCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -128,6 +129,11 @@ class FMIQuerySensor(CoordinatorEntity[FMIQueryCoordinator], SensorEntity):
     @property
     def native_unit_of_measurement(self) -> str | None:
         return self.coordinator.data.get("unit") if self.coordinator.data else None
+
+    @property
+    def device_class(self) -> SensorDeviceClass | None:
+        # A water level is a distance, so the user can pick the unit it is shown in.
+        return SensorDeviceClass.DISTANCE if str(self.coordinator.subentry.data[CONF_PARAMETER]).lower() in WATER_LEVEL_UNITS else None
 
     def _location_attributes(self) -> dict:
         data = self.coordinator.data or {}
