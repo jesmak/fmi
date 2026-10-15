@@ -9,19 +9,24 @@ import asyncio
 import logging
 from dataclasses import dataclass
 
+import homeassistant.helpers.config_validation as cv
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN, SUBENTRY_SENSOR, SUBENTRY_WARNINGS, SUBENTRY_WEATHER
 from .migration import CONF_MOVE_FROM, async_check_old_folder, async_move_old_entries
 from .query_coordinator import FMIQueryCoordinator
+from .services import async_setup_services
 from .warning_coordinator import FMIWarningsCoordinator, WarningFeed
 from .weather_coordinator import FMIWeatherCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = ["sensor", "binary_sensor", "event", "weather"]
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 
 @dataclass
@@ -32,6 +37,11 @@ class FMIRuntimeData:
 
 
 type FMIConfigEntry = ConfigEntry[FMIRuntimeData]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    async_setup_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> bool:

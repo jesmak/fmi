@@ -1,0 +1,34 @@
+get_observations:
+  fields:
+    query:
+      required: true
+      example: "fmi::observations::weather::hourly"
+      selector:
+        text:
+    station:
+      required: true
+      example: 101237
+      selector:
+        number:
+          min: 1
+          max: 99999999
+          mode: box
+    parameters:
+      required: true
+      example: "TA_PT1H_AVG"
+      selector:
+        text:
+          multiple: true
+    start:
+      selector:
+        datetime:
+    end:
+      selector:
+        datetime:
+    timestep:
+      selector:
+        number:
+          min: 1
+          max: 1440
+          unit_of_measurement: min
+          mode: box

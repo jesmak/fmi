@@ -249,5 +249,57 @@
       "title": "Poista FMI:n vanha kansio",
       "description": "FMI on nyt FMI Open Data, eikä sen vanhaa kansiota {path} enää käytetä. Poista kansio ja käynnistä Home Assistant uudelleen."
     }
+  },
+  "services": {
+    "get_observations": {
+      "name": "Hae havainnot",
+      "description": "Hakee yhden aseman havainnot valitulta aikaväliltä suoraan Ilmatieteen laitokselta ilman omaa sensoria jokaiselle arvolle.",
+      "fields": {
+        "query": {
+          "name": "Kysely",
+          "description": "Ilmatieteen laitoksen havaintokyselyn tunnus, esimerkiksi fmi::observations::weather::hourly."
+        },
+        "station": {
+          "name": "Asema",
+          "description": "Aseman FMISID-tunnus."
+        },
+        "parameters": {
+          "name": "Parametrit",
+          "description": "Kyselyn haettavat parametrit, esimerkiksi TA_PT1H_AVG."
+        },
+        "start": {
+          "name": "Alku",
+          "description": "Aikavälin alku. Oletuksena 24 tuntia ennen loppua."
+        },
+        "end": {
+          "name": "Loppu",
+          "description": "Aikavälin loppu. Oletuksena nyt."
+        },
+        "timestep": {
+          "name": "Porrastus",
+          "description": "Arvojen välinen aika. Oletuksena kyselyn oma."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "FMI Open Dataa ei ole otettu käyttöön."
+    },
+    "not_an_observation_query": {
+      "message": "{query} ei ole Ilmatieteen laitoksen havaintokysely."
+    },
+    "start_after_end": {
+      "message": "Aikavälin alun tulee olla ennen aikavälin loppua."
+    },
+    "no_observations": {
+      "message": "Ilmatieteen laitoksella ei ole havaintoja tälle kyselylle, asemalle ja aikavälille."
+    },
+    "refused": {
+      "message": "Ilmatieteen laitos hylkäsi pyynnön viestillä \"{message}\"."
+    },
+    "connection_problem": {
+      "message": "FMI:hin ei saatu yhteyttä. Yritä hetken päästä uudelleen."
+    }
   }
 }

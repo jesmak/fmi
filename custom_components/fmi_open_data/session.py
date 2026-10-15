@@ -1,4 +1,6 @@
+import html
 import logging
+import re
 from datetime import UTC, datetime
 from typing import Any
 from xml.etree import ElementTree
@@ -38,7 +40,11 @@ class FMIException(Exception):
     pass
 
 
-class FMINoData(FMIException):
+class FMIRefused(FMIException):
+    """FMI answered HTTP 400. The message is FMI's own reason, such as "Too long time interval requested!"."""
+
+
+class FMINoData(FMIRefused):
     """FMI has nothing for the request, such as a forecast for a place outside its area."""
 
 
@@ -65,6 +71,27 @@ def _coords(element: ElementTree.Element | None) -> tuple[float | None, float | 
     return (float(parts[0]), float(parts[1])) if len(parts) > 1 else (None, None)
 
 
+def _coverage_rows(root: ElementTree.Element) -> list[dict[str, Any]]:
+    fields = [field.attrib["name"] for field in root.iter("{http://www.opengis.net/swe/2.0}field")]
+    positions = _text(root, ".//gmlcov:positions").split() if fields else []
+    values = _text(root, ".//gml:doubleOrNilReasonTupleList").split() if fields else []
+    # A position is latitude, longitude and a Unix time; a tuple has one value per field.
+    if len(positions) % 3 or len(values) != len(positions) // 3 * len(fields):
+        raise FMIException("FMI's response has a different number of times and values")
+
+    rows = []
+    for index in range(len(positions) // 3):
+        row: dict[str, Any] = {"time": datetime.fromtimestamp(int(positions[index * 3 + 2]), UTC)}
+        for offset, name in enumerate(fields):
+            value = values[index * len(fields) + offset]
+            try:
+                row[name] = None if value == "NaN" else float(value)
+            except ValueError as exception:
+                raise FMIException(f"FMI's response has {value} as {name}") from exception
+        rows.append(row)
+    return rows
+
+
 def feature_url(lang: str, params: dict[str, Any]) -> str:
     url = API_GET_FEATURE_URL.replace("${lang}", lang)
     for key, value in params.items():
@@ -84,8 +111,13 @@ class FMISession:
             response = requests.get(url=url, headers={"User-Agent": USER_AGENT}, timeout=self._timeout)
         except RequestException as exception:
             raise FMIException(f"Communication error {exception}") from exception
-        if response.status_code == 400 and b"No data available" in response.content:
-            raise FMINoData("FMI has no data for the request")
+        if response.status_code == 400:
+            # FMI explains itself in several ExceptionTexts, such as "Too long time interval requested!" and then the
+            # limit, and ends with an echo of the request's URI, which is left out.
+            texts = re.findall(r"<ExceptionText>([^<]*)", response.content.decode(errors="replace"))
+            reasons = [html.unescape(text).strip() for text in texts]
+            message = " ".join(reason for reason in reasons if reason and not reason.startswith("URI:")) or "400 is not valid"
+            raise (FMINoData if message.startswith("No data available") else FMIRefused)(message)
         if response.status_code != 200:
             raise FMIException(f"{response.status_code} is not valid")
         return response.content
@@ -136,25 +168,21 @@ class FMISession:
 
         Each row has "time" and the parameters by name, with FMI's NaN as None.
         """
-        root = self._xml(feature_url(lang, params))
-        fields = [field.attrib["name"] for field in root.iter("{http://www.opengis.net/swe/2.0}field")]
-        positions = _text(root, ".//gmlcov:positions").split() if fields else []
-        values = _text(root, ".//gml:doubleOrNilReasonTupleList").split() if fields else []
-        # A position is latitude, longitude and a Unix time; a tuple has one value per field.
-        if len(positions) % 3 or len(values) != len(positions) // 3 * len(fields):
-            raise FMIException("FMI's response has a different number of times and values")
+        return _coverage_rows(self._xml(feature_url(lang, params)))
 
-        rows = []
-        for index in range(len(positions) // 3):
-            row: dict[str, Any] = {"time": datetime.fromtimestamp(int(positions[index * 3 + 2]), UTC)}
-            for offset, name in enumerate(fields):
-                value = values[index * len(fields) + offset]
-                try:
-                    row[name] = None if value == "NaN" else float(value)
-                except ValueError as exception:
-                    raise FMIException(f"FMI's response has {value} as {name}") from exception
-            rows.append(row)
-        return rows
+    def get_observations(self, lang: str, params: dict[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+        """Return one station's observations as get_coverage does, with the station's name and coordinates.
+
+        The station is None when the response has no data at all.
+        """
+        root = self._xml(feature_url(lang, params))
+        point = root.find(".//gml:MultiPoint/gml:pointMember/gml:Point", NAMESPACES)
+        station = None
+        if point is not None:
+            name = point.find("./gml:name", NAMESPACES)
+            latitude, longitude = _coords(point.find("./gml:pos", NAMESPACES))
+            station = {"name": name.text if name is not None else None, "latitude": latitude, "longitude": longitude}
+        return station, _coverage_rows(root)
 
     def list_stored_queries(self, lang: str, suffix: str | None = None) -> list[list[str]]:
         """Return [id, title] of the queries that take a station (fmisid), sorted by title."""

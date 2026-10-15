@@ -249,5 +249,57 @@
       "title": "Delete the old FMI folder",
       "description": "FMI is now FMI Open Data, and its old folder {path} is no longer used. Delete the folder and restart Home Assistant."
     }
+  },
+  "services": {
+    "get_observations": {
+      "name": "Get observations",
+      "description": "Gets one station's observations over a chosen time range straight from FMI, without a sensor for each value.",
+      "fields": {
+        "query": {
+          "name": "Query",
+          "description": "The ID of an FMI observation query, such as fmi::observations::weather::hourly."
+        },
+        "station": {
+          "name": "Station",
+          "description": "The station's FMISID."
+        },
+        "parameters": {
+          "name": "Parameters",
+          "description": "The parameters of the query to get, such as TA_PT1H_AVG."
+        },
+        "start": {
+          "name": "Start",
+          "description": "The start of the time range. By default 24 hours before the end."
+        },
+        "end": {
+          "name": "End",
+          "description": "The end of the time range. By default now."
+        },
+        "timestep": {
+          "name": "Step",
+          "description": "The time between values. By default the query's own."
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "FMI Open Data is not set up."
+    },
+    "not_an_observation_query": {
+      "message": "{query} is not an FMI observation query."
+    },
+    "start_after_end": {
+      "message": "The start of the time range must be before the end of the time range."
+    },
+    "no_observations": {
+      "message": "FMI has no observations for this query, station and time range."
+    },
+    "refused": {
+      "message": "FMI refused the request with the message \"{message}\"."
+    },
+    "connection_problem": {
+      "message": "Could not reach FMI. Try again in a moment."
+    }
   }
 }

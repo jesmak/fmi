@@ -1,0 +1,7 @@
+{
+  "services": {
+    "get_observations": {
+      "service": "mdi:chart-timeline-variant"
+    }
+  }
+}
