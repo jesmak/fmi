@@ -15,14 +15,14 @@
       },
       "user": {
         "title": "FMI Open Data",
-        "description": "Valitse kieli jota FMI Open Data käyttää. Kielivalinta vaikuttaa antureita lisätessä näytettäviin kyselyiden ja parametrien nimiin, FMI:n palauttaman datan kieleen ja varoitustekstien kieleen.",
+        "description": "Valitse kieli, jota FMI Open Data käyttää. Kielivalinta vaikuttaa mittauksia lisätessä näytettäviin kyselyiden ja parametrien nimiin, FMI:n palauttaman datan kieleen ja varoitustekstien kieleen.",
         "data": {
           "language": "API-kutsuissa käytettävä kieli"
         }
       },
       "reconfigure": {
         "title": "FMI Open Data",
-        "description": "Valitse kieli tästä hetkestä alkaen lisättäville antureille ja varoituspaikoille. Olemassa olevat määritykset säilyttävät kielensä.",
+        "description": "Valitse kieli, jota FMI Open Data käyttää. Valinta koskee kaikkia asemia ja paikkoja.",
         "data": {
           "language": "API-kutsuissa käytettävä kieli"
         }

@@ -15,14 +15,14 @@
       },
       "user": {
         "title": "FMI Open Data",
-        "description": "Choose the language FMI Open Data uses. The choice affects the query and parameter names shown when adding sensors, the language of the data FMI returns, and the language of warning texts.",
+        "description": "Choose the language FMI Open Data uses. The choice affects the query and parameter names shown when adding measurements, the language of the data FMI returns, and the language of warning texts.",
         "data": {
           "language": "Language used in API calls"
         }
       },
       "reconfigure": {
         "title": "FMI Open Data",
-        "description": "Choose the language for sensors and warnings places added from now on. Existing setups keep their language.",
+        "description": "Choose the language FMI Open Data uses. The choice applies to every station and place.",
         "data": {
           "language": "Language used in API calls"
         }

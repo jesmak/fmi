@@ -1,292 +1,303 @@
-# FMI data for Home Assistant
+# FMI Open Data for Home Assistant
 
-Home Assistant integration for Finnish Meteorological Institute observations, forecasts and weather warnings.
+A Home Assistant integration for the Finnish Meteorological Institute's open data. Observations and forecasts from
+FMI's stations, a weather forecast for any place, and FMI's weather warnings.
 
-[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases]
+[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![HACS][hacs-shield]][hacs] [![License][license-shield]](LICENSE)
 
-[![HACS][hacs-shield]][hacs] [![Home Assistant][home-assistant-shield]][home-assistant] [![License][license-shield]](LICENSE)
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-light.png#gh-light-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and the rain in Tampere, the air quality with a month of particles and the dose rate, and the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and the rain in Tampere, the air quality with a month of particles and the dose rate, and the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights">
 
-![Project Maintenance][maintenance-shield] [![GitHub Activity][commits-shield]][commits] [![Open bugs][bugs-shield]][bugs] [![Open enhancements][enhancements-shield]][enhancements]
-
-## Support
-
-Hey dude! Help me out for a couple of :beers: or a :coffee:!
-
-[![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://www.buymeacoffee.com/jesmak)
+The data in the picture is made up.
 
 ## What is it?
 
-A custom component that integrates with Finnish Meteorological Institute to retrieve data not typically part of
-other weather integrations, such as seawater level, UV-index, snow thickness etc. Radiation data published by
-STUK through the same API is also available.
+FMI publishes almost everything it measures as open data. That is the weather at some 200 stations, rain, snow
+depth, sea level, waves, water temperature, air quality, solar radiation and STUK's radiation measurements, along
+with FMI's forecasts and weather warnings. The weather integrations usually give you the temperature and the forecast. This one
+gives you the rest as well.
 
-The integration is added once. Each sensor you then add to it is one parameter from one observation station or
-forecast point.
+You add **stations** and **places** to it. A station is one of FMI's stations, with the measurements you want from
+it, each a sensor. You start from what you want to measure, such as precipitation, and the integration offers the
+stations that measure it, nearest first. A place is a point on a map with FMI's weather forecast for it, the weather
+warnings in force there, or both. Each station and place is a device in Home Assistant, so it can be put in an area.
 
-It can also follow FMI's weather warnings for a place, with a sensor for the warning level in force and an event
-entity for automations. See [Weather warnings](#weather-warnings).
+For a one-off chart or a script, an action reads any station's observations over a time range without a sensor.
+
+No account or API key is needed. FMI's open data service is used anonymously.
 
 ## Installation
 
 ### With HACS
 
-1. Add this repository to HACS custom repositories
-2. Search for FMI in HACS and install with type integration
+1. Add this repository to HACS custom repositories with type **Integration**
+2. Search for FMI Open Data in HACS and download it
 3. Restart Home Assistant
-4. Add the integration from the settings/integrations page of Home Assistant
+4. Add FMI Open Data in Settings › Devices & services
 
 ### Manual
 
-1. Download source code from latest release tag
-2. Copy custom_components/fmi folder to your Home Assistant installation's config/custom_components folder.
+1. Download the source code from the latest release
+2. Copy the `custom_components/fmi_open_data` folder to your Home Assistant installation's `config/custom_components`
+   folder
 3. Restart Home Assistant
-4. Add the integration from the settings/integrations page of Home Assistant
+4. Add FMI Open Data in Settings › Devices & services
 
-No account or API key is needed. FMI's open data service is used anonymously.
+## Settings
 
-## Configuration
+Adding the integration asks for a language, English or Finnish. FMI's names of queries and parameters, the names
+of the measurements it suggests, and the warning texts are in that language. Change it later with **Reconfigure**.
 
-### Setting up the integration
+| Name     | Type | Description                       | Default                         |
+| -------- | ---- | --------------------------------- | ------------------------------- |
+| Language | enum | The language of FMI's names and texts | Home Assistant's, else English |
 
-| Name     | Type | Requirement  | Description                  | Default |
-|----------|------|--------------|------------------------------|---------|
-| language | enum | **Required** | Language used in API calls   | `eng`   |
+### Options
 
-The language affects the query titles and parameter descriptions returned by FMI, and the language of warning
-texts. It is the language of the sensors and warnings places added from then on; each keeps the language it was
-added with. Change it with **Reconfigure** on the integration.
+**Configure** on the integration sets when a measurement's data counts as stale. The settings apply to every
+measurement.
 
-Then add sensors with **Add sensor**, and places to follow weather warnings for with **Add warnings place**, on the
-integration's page.
+| Name                         | Type | Description                                          | Default |
+| ---------------------------- | ---- | ---------------------------------------------------- | ------- |
+| Raise a repair issue         | bool | Tell you with a repair issue when a measurement stops getting data | `true` |
+| Hours without new data       | int  | How old the newest data may be before it counts as stale | 24 |
 
-## Adding a sensor
+Daily, monthly and yearly statistics are published only once the day, month or year is over, so for those the
+limit is never shorter than three days, two months or two years.
 
-The wizard discovers what is available at each step, so you do not need to look anything up by hand.
+### Adding measurements
 
-### Step 1 - query
+Choose **Add measurements** on the integration page.
 
-| Name        | Type | Requirement  | Description                                  | Default |
-|-------------|------|--------------|----------------------------------------------|---------|
-| query_label | enum | **Required** | Query type, listed from FMI's stored queries |         |
+1. **What to measure.** Every parameter of FMI's station queries is in one list, about 380 of them, with the query
+   each comes from. Search by name, such as rain or snow, and pick as many as you like.
+2. **A station for each.** The stations that have reported the parameter recently, nearest to your home first, with
+   their distance. The station you chose for the previous parameter is suggested when it has this one too. Switch on
+   **Show all of the query's stations** for the ones that have not reported it lately. A parameter nobody has
+   reported lately, such as wave height while the buoys are ashore for the winter, starts from all of them.
+   - A model forecast, such as Harmonie or MEPS, is for any point. Pick it on a map and give the place a name.
+   - STUK's air radioactivity is measured by place, not by station. Type the place's name, such as Kotka.
+3. **Names.** Filled in from FMI's description of the parameter, with the period of a daily or hourly query, such
+   as "Sademäärä, tunti". Home Assistant shows the station's name in front of it, so the sensor reads
+   "Lappeenranta lentoasema Sademäärä, tunti".
 
-### Step 2 - location
+A measurement at a station that is already there is added to it. A new station becomes a new device. One run can add
+measurements to several stations.
 
-| Name   | Type | Requirement  | Description                  | Default |
-|--------|------|--------------|------------------------------|---------|
-| target | enum | **Required** | Observation station or place |         |
+### Changing a station
 
-For observation queries, only the stations that actually serve the query you chose are offered, so you cannot
-pick one that will never return data for it. Forecast queries are interpolated to a point rather than tied to a
-station, so all stations are offered for those. Either way they are ordered by distance from your Home
-Assistant location:
+**Reconfigure** on a station opens a menu:
 
-```
-Helsinki Mannerheimintie (100742) - 0 km
-Helsinki Kaisaniemi (100971) - 1 km
-Helsinki Katajanokka 2 (104053) - 2 km
-```
+- **Add measurements:** only what the station has reported is offered.
+- **Change a measurement's settings:**
 
-You can also type a place name, or coordinates as `latitude,longitude`. The identifier type is worked out from
-what you enter, so there is nothing to choose: digits are treated as an FMISID, a pair of numbers as
-coordinates, and anything else as a place name. This works for STUK queries too, which have their own stations.
+  | Name                | Type   | Description                                                                 | Default            |
+  | ------------------- | ------ | --------------------------------------------------------------------------- | ------------------ |
+  | Unit                | string | The unit to show. Empty uses FMI's own, which FMI does not give for every parameter | FMI's |
+  | Report -1 as 0      | bool   | For parameters that use -1 for no measurable value, such as daily precipitation | `false`        |
+  | Forecast hours      | int    | How many hours ahead a forecast shows                                       | 36                 |
+  | Forecast past hours | int    | How many hours of the forecast already past it keeps                        | 5                  |
+  | Forecast step       | int    | Minutes between two forecast values                                         | 30                 |
 
+  The forecast settings are only for forecasts.
+- **Remove measurements:** a station keeps at least one. To remove it altogether, delete it on the integration page.
 
-### Step 3 - parameter
+The station itself does not change, because a different station is a different device. To rename a measurement, rename its
+sensor in Home Assistant.
 
-| Name                | Type   | Requirement  | Description                                                               | Default |
-|---------------------|--------|--------------|---------------------------------------------------------------------------|---------|
-| parameter           | enum   | **Required** | Which parameter from the query data to use                                |         |
-| negative_as_zero    | bool   | **Required** | Report -1 as 0                                                            | `false` |
-| forecast_step       | int    | **Required** | Step between two values in minutes. Only shown for forecast type queries. | 30      |
-| forecast_hours      | int    | **Required** | How many hours of forecasts to retrieve (starting from current time)      | 36      |
-| forecast_past_hours | int    | **Required** | How many past hours of forecasts to retrieve (starting from current time) | 5       |
+### Adding a place
 
-Only the parameters the chosen station actually reports are offered, with their descriptions and units:
+Choose **Add place** on the integration page.
 
-```
-rrday - Precipitation amount (mm)
-tday - Air temperature (°C)
-TG_PT12H_min - Ground minimum temperature (°C)
-```
+| Name          | Type     | Description                                         | Default                      |
+| ------------- | -------- | --------------------------------------------------- | ---------------------------- |
+| Place         | location | The point, and a radius around it for the warnings  | Home, 1 km                   |
+| Name          | string   | The place's name, shown in front of its entities' names | Home Assistant's location name |
+| Weather forecast | bool  | A weather entity with FMI's forecast for the place  | `true`                       |
+| Warning types | list     | The warnings to follow. Empty follows none          | All                          |
 
-If a parameter you need is missing from the list you can still type its name.
+A place follows the forecast, the warnings or both. A warning is included when one of its areas covers the place or
+comes within the radius. The areas are municipalities for warnings on land and sea areas for warnings at sea, and a
+sea area includes its islands. On the shore, a radius of a kilometre or two brings in the nearby sea area.
 
-Some parameters use `-1` to mean "no measurable value" rather than `0`. Daily precipitation is the common
-case: a dry day reads `-1`, which distorts graphs and long term statistics. Enable **negative_as_zero** to
-report those as `0`. Only exactly `-1` is affected, so a genuine `-1` degree temperature is left alone.
+**Reconfigure** on a place changes any of these. Switching the forecast or the warnings off removes their entities.
 
-### Step 4 - name
+## Sensors
 
-| Name  | Type   | Requirement  | Description                                 | Default                     |
-|-------|--------|--------------|---------------------------------------------|-----------------------------|
-| label | string | **Required** | Name for the created sensor                 | station and parameter names |
+Every measurement is a sensor, named after the station and the measurement. An observation's state is the latest
+value, a forecast's the next one.
 
-A name is suggested from your choices, for example `Helsinki Kaisaniemi Air temperature`. The sensor can be
-renamed later without losing its history.
+| Attribute             | Description                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| `latitude`, `longitude` | Where the station is                                                              |
+| `label`               | The measurement's name                                                              |
+| `language`            | The language of FMI's texts                                                         |
+| `query_id`            | FMI's query, such as `fmi::observations::weather::hourly::simple`                  |
+| `parameter`           | FMI's parameter, such as `PRA_PT1H_ACC`                                             |
+| `location_type`, `location_id` | How the station is identified (`fmisid`, `geoid`, `place` or `latlon`), and the value |
+| `no_data_issue`, `no_data_issue_hours` | The stale data settings that apply, the hours after the minimum for the query |
+| `time`, `value`       | An observation's time and value                                                     |
+| `forecast`            | A forecast's values, each with `time` and `value`                                   |
+| `forecast_hours`, `forecast_past_hours`, `forecast_step` | A forecast's settings                          |
 
-## Changing a sensor later
+### Stale data
 
-Use **Change sensor** from the sensor's menu on the integration page to point an existing sensor at a different
-query, station or parameter, and to change the -1 handling and forecast settings. The entity keeps its identity
-and history, so this is the way to repair a sensor whose station has been decommissioned or whose parameter is no
-longer published.
+Every measurement also has a diagnostic binary sensor, such as
+`binary_sensor.lappeenranta_lentoasema_sademaara_tunti_stale_data`. It is on while the newest data FMI holds for the
+measurement is older than the limit in the options, and it turns off by itself when data comes back. The age comes
+from FMI's own timestamps, so restarting Home Assistant does not reset it.
 
-To rename a sensor, use Home Assistant's own entity settings. The name is not part of the sensor's identity, so
-renaming does not affect its history.
+FMI removes parameters from stations, and stations are now and then shut down or renumbered. Neither is an error:
+the query just returns nothing. A repair issue then tells you whether the station returns nothing at all, or still
+reports but no longer has your parameter, and lists what it does have. Remove the measurement and add a working one,
+and the issue clears.
 
-## Changes in 3.0
+## Weather
 
-- The integration is added once, and sensors and warnings places are added to it, instead of every sensor being
-  an integration entry of its own.
-- The stale data settings are shared by every sensor, under **Configure** on the integration.
-- Daily, monthly and yearly statistics are given a whole reporting period before their data counts as stale.
-- Warnings places share one download of FMI's warning feed.
+A place with the forecast on has a weather entity named after the place. It shows the hour under way, and Home
+Assistant's weather cards and voice assistants can use its forecasts:
 
-## Upgrading from 2.x
+- **Hourly** for about nine days, as far as FMI's forecast reaches
+- **Daily**, a day being the local calendar day
+- **Twice daily**, from 6 to 18 and from 18 to 6
 
-The existing entries are merged into one on the first start after the update: each becomes a sensor or warnings
-place of the one FMI entry. Entity IDs do not change, so history, statistics, dashboards and automations keep
-working, and entities you had disabled stay disabled. Nothing needs to be reconfigured.
+A day or a half takes its condition and wind from one hour, 14:00 for a day and a daytime half and 02:00 for a night.
+Its temperature is the highest and lowest, its precipitation the sum and its precipitation probability and gust the
+highest. The forecast is FMI's edited one, the same that FMI's own site shows, read every 30 minutes. When FMI cannot
+be reached, the last forecast is kept for three hours.
 
-The stale data settings most of your sensors had become the shared setting. Sensors that were set up before the
-setting existed used 24 hours, and use the shared setting from now on.
+## Warnings
 
-Downgrading to 2.x after the merge is not supported: restore a backup instead.
+### Warning level
 
-## Changes in 2.1
+A place with warnings has a sensor for the highest warning level in force now, `none`, `yellow`, `orange` or `red`.
 
-- Weather warnings for a place: a warning level sensor and an event entity for automations.
-- A diagnostic stale data binary sensor for every observation and forecast sensor.
-- The no-data repair issue can be made more or less patient with **no_data_issue_hours**, or switched off.
+| Attribute         | Description                                                                  |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `label`           | The place's name                                                             |
+| `language`        | The language of the warning texts                                            |
+| `latitude`, `longitude`, `radius` | The place and the radius in metres                           |
+| `warning_types`   | The warning types followed                                                   |
+| `active_warnings` | The number of warnings in force now                                          |
+| `warnings`        | Every warning that concerns the place, in force or coming up, earliest first |
 
-## Upgrading from 1.x
+Only the level is kept in history, not the `warnings` attribute.
 
-Version 2 stops identifying sensors by their name, so that they can be renamed and repointed. Entries from 1.x
-are migrated automatically on first start and keep their entities, history and statistics. Nothing needs to be
-reconfigured.
+Each warning, in `warnings` and in the events below, has these fields:
 
-## When a station or parameter stops working
+| Field         | Description                                                                           |
+| ------------- | ------------------------------------------------------------------------------------- |
+| `id`          | FMI's identifier for this version of the warning                                      |
+| `type`        | The warning type, such as `seaWind` or `seaWaveHeight`                                |
+| `level`       | `yellow`, `orange` or `red`                                                           |
+| `event`       | The warning's name, such as `Tuulivaroitus merelle`                                   |
+| `severity`    | `Moderate`, `Severe` or `Extreme`                                                     |
+| `onset`, `expires` | When the warning comes into force and when it ends                               |
+| `headline`, `description` | FMI's texts                                                               |
+| `impacts`     | The typical impacts, such as `Mahdollisesti vaarallinen huviveneille.`                |
+| `probability` | The probability in percent, when FMI gives one                                        |
+| `areas`       | The warning's areas that concern the place                                            |
+| `parameters`  | The warning type's values, such as `windIntensity: 14`, `windIntensityUom: m/s` and `windDirection: 180` |
 
-FMI removes parameters from stations, and stations are occasionally decommissioned or renumbered. Neither shows
-up as an error: the query simply returns nothing.
-
-When the newest value FMI holds for a sensor is more than **no_data_issue_hours** old (24 hours by default),
-the integration reports a repair issue in Home Assistant telling you whether the station returns nothing at
-all, or whether it is still reporting but no longer publishes your parameter, in which case the parameters it
-does publish are listed. Use **Change sensor** to move the sensor to a working station or parameter, and the
-issue clears itself.
-
-| Name                | Type | Description                                                  | Default |
-|---------------------|------|--------------------------------------------------------------|---------|
-| no_data_issue       | bool | Report a repair issue when a sensor stops getting data       | `true`  |
-| no_data_issue_hours | int  | How many hours without data before the data counts as stale  | 24      |
-
-Both are under **Configure** on the integration, and apply to every sensor. Stations do go quiet for a while
-without being broken, so the delay is deliberately generous. Shorten it if you want to hear about outages sooner,
-or turn **no_data_issue** off to rely on the stale data sensors alone.
-
-Daily, monthly and yearly statistics are published only once the day, month or year is over, so their newest
-value can legitimately be a whole period old. For those the limit is never shorter than three days, 62 days or
-two years, whatever the setting.
-
-The age is read from FMI's own timestamp on the data, not from how long Home Assistant has been seeing empty
-updates. That matters in two ways. Restarting Home Assistant does not put the clock back to zero, so a sensor
-on a box that reboots nightly is still noticed. And because each query type looks back over a different window
-- twelve hours for the plain observation queries, two days for the daily ones, two years for the yearly ones -
-a station that had gone quiet used to keep returning its last value for the length of that window before it
-even looked empty. The setting now means the age of the data, whatever the query.
-
-### Stale data sensor
-
-Every observation and forecast sensor also has a diagnostic binary sensor, for example
-`binary_sensor.fmi_helsinki_kaisaniemi_air_temperature_stale_data` (`..._vanhentunut_data` with Finnish as the
-language). It is on while the newest data is older than the limit above, and turns off by itself when data comes
-back. The repair issue is for you to notice; the binary sensor is for automations. It works whether or not the
-repair issue is enabled.
-
-## Weather warnings
-
-FMI issues weather warnings for land and sea areas up to five days ahead. A warnings place follows them for one
-place: choose **Add warnings place** on the integration page.
-
-| Name          | Type     | Requirement  | Description                               | Default                   |
-|---------------|----------|--------------|-------------------------------------------|---------------------------|
-| location      | map      | **Required** | The place, and a radius around it         | Home, 1 km                |
-| warning_types | list     | **Required** | Which warning types to follow             | All                       |
-| label         | string   | **Required** | Name for the sensor and the event entity  | `Warnings`/`Varoitukset`  |
-
-A warning is included when one of its areas covers the place, or comes within the radius of it. Warning areas are
-the municipalities for warnings on land and the sea areas for warnings at sea. A sea area includes the islands in
-it, so a place on an island gets the warnings for its sea area. On the shore, a radius of a kilometre or two brings
-in the nearby sea area.
-
-The warning types are wind on land and at sea, severe thunderstorms on land and at sea, heavy rain, traffic weather,
-pedestrian weather, wildfire, heat wave, cold, UV, wave height, sea level and ice accretion.
-
-Use **Change warnings place** to move the place or change the radius, the warning types or the name.
-
-The warnings come from FMI's open [CAP warning feed](https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml), read every
-ten minutes.
-
-### Warning level sensor
-
-The state is the highest warning level in force now: `none`, `yellow`, `orange` or `red`.
-
-| Name            | Type        | Description                                                                  |
-|-----------------|-------------|------------------------------------------------------------------------------|
-| label           | string      | Name given to the place                                                      |
-| language        | string      | Language of the warning texts                                                |
-| latitude        | float       | Latitude of the place                                                        |
-| longitude       | float       | Longitude of the place                                                       |
-| radius          | float       | Radius around the place in metres                                            |
-| warning_types   | list        | The warning types followed                                                   |
-| active_warnings | int         | Number of warnings in force now                                              |
-| warnings        | [warning]   | Every warning that concerns the place, in force or coming up, earliest first |
-
-Only the level is recorded in history; the `warnings` attribute is not.
-
-Each warning, in the `warnings` attribute and in the events below, has these fields:
-
-| Name        | Type     | Description                                                                         |
-|-------------|----------|-------------------------------------------------------------------------------------|
-| id          | string   | FMI's identifier for this version of the warning                                    |
-| type        | string   | Warning type, e.g. `seaWind` or `seaWaveHeight`                                     |
-| level       | string   | `yellow`, `orange` or `red`                                                         |
-| event       | string   | Name of the warning, e.g. `Tuulivaroitus merelle`                                   |
-| severity    | string   | `Moderate`, `Severe` or `Extreme`                                                   |
-| onset       | datetime | When the warning comes into force                                                   |
-| expires     | datetime | When it ends                                                                        |
-| headline    | string   | FMI's headline                                                                      |
-| description | string   | FMI's description                                                                   |
-| impacts     | string   | Typical impacts, e.g. `Mahdollisesti vaarallinen huviveneille.`                     |
-| probability | int      | Probability in percent, when FMI gives one                                          |
-| areas       | list     | The warning's areas that concern the place                                          |
-| parameters  | object   | Values for the warning type, e.g. `windIntensity: 14`, `windIntensityUom: m/s`, `windDirection: 180`, `waveHeight` |
+The warning types are wind on land and at sea, thunderstorms on land and at sea, heavy rain, traffic weather,
+pedestrian weather, forest fire weather, heat, cold, UV, wave height, sea level and ice accretion.
 
 ### Warning events
 
-The event entity fires when something happens to a warning that concerns the place:
+The place's event entity fires when something happens to a warning that concerns it:
 
-| Event type  | When                                                                  |
-|-------------|-----------------------------------------------------------------------|
-| `issued`    | A new warning concerns the place                                      |
-| `updated`   | A warning's level, validity, texts or values changed                  |
-| `cancelled` | A warning was withdrawn before it expired                             |
+| Event type  | When                                                 |
+| ----------- | ---------------------------------------------------- |
+| `issued`    | A new warning concerns the place                     |
+| `updated`   | A warning's level, validity, texts or values changed |
+| `cancelled` | A warning was withdrawn before it expired            |
 
-The event data is the warning, with the fields above. FMI republishes its warnings regularly; a warning republished
-without changes fires nothing. A warning coming into force or running out changes the level sensor instead, and
-warnings already in force when Home Assistant starts do not fire `issued`.
+The event data is the warning, with the fields above. FMI republishes its warnings regularly, and one republished
+without changes fires nothing. A warning coming into force or running out changes the level instead, and the
+warnings already in force when Home Assistant starts fire nothing.
 
-For example, a notification when a warning is issued for the cabin:
+## Actions
+
+### `fmi_open_data.get_observations`
+
+One station's observations over a time range, straight from FMI, without a sensor for each value. It returns
+the station's name and coordinates and one row per time.
+
+| Field      | Description                                                                   | Default                |
+| ---------- | ----------------------------------------------------------------------------- | ---------------------- |
+| Query      | An FMI observation query, such as `fmi::observations::weather::hourly`        |                        |
+| Station    | The station's FMISID                                                          |                        |
+| Parameters | The query's parameters, such as `TA_PT1H_AVG`                                 |                        |
+| Start      | The start of the time range                                                   | 24 hours before the end |
+| End        | The end of the time range                                                     | Now                    |
+| Step       | Minutes between values                                                        | The query's own        |
+
+FMI limits how long a range one request may cover, differently for each query. It is a week for the 10-minute
+observations, a month for the hourly ones and a year for the daily ones. A longer range is refused with FMI's own
+reason, which tells the limit. A range with nothing in it returns an empty list.
+
+## Examples
+
+### The sea level, measured and forecast
+
+The water level at a mareograph with FMI's forecast for the same place, in
+[apexcharts-card](https://github.com/RomRider/apexcharts-card). Add the mareograph's water level and the sea level
+forecast from the nearest forecast point as measurements, and give them their units (FMI gives none):
+millimetres for the observation and centimetres for the forecast.
+
+```yaml
+type: custom:apexcharts-card
+graph_span: 4d
+span:
+  offset: +2d
+now:
+  show: true
+header:
+  show: true
+  title: Sea level
+series:
+  - entity: sensor.hanko_pikku_kolalahti_wlevn2k_pt1s_instant
+    name: Measured
+    transform: return x / 10
+    unit: cm
+    extend_to: now
+  - entity: sensor.hanko_sealeveln2000
+    name: Forecast
+    data_generator: |
+      return entity.attributes.forecast.map((entry) => [new Date(entry.time).getTime(), entry.value]);
+```
+
+### The warnings on a dashboard
+
+Every warning that concerns a place, in Home Assistant's own markdown card. The warnings in force come first in the
+list, so the first `active_warnings` of them are the ones in force now.
+
+```yaml
+type: markdown
+title: Weather warnings
+content: |
+  {% set warnings = state_attr('sensor.cabin_warning_level', 'warnings') or [] %}
+  {% set active = state_attr('sensor.cabin_warning_level', 'active_warnings') or 0 %}
+  {% for w in warnings %}
+  <ha-alert alert-type="{{ 'error' if w.level == 'red' else 'warning' }}" title="{{ w.event }}">
+  <b>{{ 'In force now.' if loop.index <= active else 'Coming.' }}</b> {{ w.description }} {{ w.impacts }}<br>
+  <i>{{ as_timestamp(w.onset) | timestamp_custom('%a %H:%M') }} – {{ as_timestamp(w.expires) | timestamp_custom('%a %H:%M') }}</i>
+  </ha-alert>
+  {% else %}
+  <ha-alert alert-type="success">No warnings</ha-alert>
+  {% endfor %}
+```
+
+### A notification when a warning is issued
 
 ```yaml
 triggers:
   - trigger: state
-    entity_id: event.fmi_warnings_cabin
+    entity_id: event.cabin_warning
     not_from: unavailable
 conditions:
   - condition: state
-    entity_id: event.fmi_warnings_cabin
+    entity_id: event.cabin_warning
     attribute: event_type
     state: issued
 actions:
@@ -296,120 +307,108 @@ actions:
       message: "{{ trigger.to_state.attributes.description }}"
 ```
 
-## State attributes
+### The past week's daily precipitation
 
-All sensors return the following extra attributes.
+```yaml
+action: fmi_open_data.get_observations
+data:
+  query: fmi::observations::weather::daily
+  station: 101124
+  parameters:
+    - rrday
+  start: "{{ now() - timedelta(days=7) }}"
+response_variable: rain
+```
 
-| Name          | Type   | Description                                                 |
-|---------------|--------|-------------------------------------------------------------|
-| latitude      | float  | Latitude of the observation station                         |
-| longitude     | float  | Longitude of the observation station                        |
-| label         | string | Name given to the sensor                                    |
-| language      | string | Language used in API calls                                  |
-| query_id      | string | Query ID set when configuring the sensor                    |
-| query_name    | string | Human readable name of the query                            |
-| parameter     | string | Name of the returned parameter                              |
-| location_type | string | Type of identifier used (fmisid/place/latlon)                |
-| location_id   | string | Identifier value                                            |
-| no_data_issue | bool   | Whether the no-data repair issue is enabled                 |
-| no_data_issue_hours | int | Hours without data before the data counts as stale, after the minimum for the query type |
+## Upgrading from 3.x
 
-Additionally, observation type sensors return the following extra attributes.
-Observation type sensors return the latest known value as sensor state.
+Version 4.0.0 is a big change, and the names of all the entities change with it.
 
-| Name   | Type     | Description                     |
-|--------|----------|---------------------------------|
-| time   | datetime | Time of the latest observation  |
-| value  | string   | Value of the latest observation |
+**The domain is now `fmi_open_data`** instead of `fmi`, which another integration also uses. After updating, add
+**FMI Open Data** once in Settings › Devices & services and choose to move the existing setup. Its sensors and
+warnings places move to the new integration, and Home Assistant then asks you to delete the old
+`custom_components/fmi` folder, which HACS leaves behind.
 
-Additionally, forecast type sensors return the following extra attributes.
-Forecast type sensors return the next known forecast value as sensor state.
+**Sensors become stations and places.** On the first start, the sensors are merged into stations by the station
+they read, and the warnings places into places by their coordinates. Two warnings places at the same point are
+merged with all the warning types either followed and the larger radius.
 
-| Name                | Type             | Description                                                       |
-|---------------------|------------------|-------------------------------------------------------------------|
-| forecast            | [{date, string}] | List of forecast values as objects containing time and value keys |
-| forecast_hours      | int              | Configured number of forecast hours                               |
-| forecast_past_hours | int              | Configured number of past forecast hours                          |
-| forecast_step       | int              | Configured step between two values in minutes                     |
+**The names change.** Home Assistant puts a device's name in front of its entities' names, so each measurement is
+renamed after what it measures, from FMI's description of the parameter, and the station's name comes in front. A
+place keeps the name it had, and its level sensor and event are called the warning level and the warning. Rename
+anything you like in Home Assistant afterwards.
 
-### Usage with apexcharts-card
+**What stays:** entity IDs, and with them history, long-term statistics, dashboards and automations. Disabled
+entities stay disabled.
 
-One example use case for this integration could be to show waterlevel values with [apexcharts-card](https://github.com/RomRider/apexcharts-card).
+**Units:** FMI's metadata has no unit for some parameters, such as the water level and STUK's air radioactivity.
+Give them one in the measurement's settings. Home Assistant may then ask under Developer tools › Statistics what to
+do with the statistics recorded without a unit. Keep them under the new unit, as the numbers are the same.
 
-Below is an example configuration for showing waterlevels (2 days of observations and 2 days of forecasts, 2 hour overlap).
-Same kind of configuration could of course be used for other observation/forecast types aswell.
+The `query_name` attribute is gone.
 
-![fmi_waterlevel](fmi_waterlevel.png)
+## Data
+
+The data comes from FMI's [open data service](https://en.ilmatieteenlaitos.fi/open-data) under the
+[Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/) licence, which also covers the
+Radiation and Nuclear Safety Authority STUK's radiation data and the air quality data published there. Every
+entity credits FMI in its attribution.
+
+- **Measurements** are read from FMI's WFS service every five minutes each.
+- **The weather forecast** is FMI's edited point forecast, read every 30 minutes a place.
+- **The warnings** are FMI's [CAP warning feed](https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml), read every ten
+  minutes and shared by every place.
+- **Adding measurements** reads every station query once over Finland to see which stations report what, about 40
+  requests, kept for an hour.
+
+## Translating
+
+The texts are in `custom_components/fmi_open_data/translations/`, one JSON file per language, such as `en.json` and
+`fi.json`. To add a language, copy `en.json` to the new language's code and translate the values. FMI's own names of
+queries, parameters and warnings come from FMI in English or Finnish.
+
+## Development
+
+Requires Python 3.14.
 
 ```
-type: custom:apexcharts-card
-graph_span: 4d
-span:
-  offset: +2d
-now:
-  show: true
-header:
-  show: true
-  title: Waterlevel, Hamina
-  show_states: true
-  colorize_states: true
-all_series_config:
-  curve: straight
-apex_config:
-  chart:
-    height: 150px
-  legend:
-    show: false
-  xaxis:
-    labels:
-      format: dd.MM.
-series:
-  - entity: sensor.fmi_waterlevel_hamina
-    transform: return x/10
-    stroke_width: 1
-    float_precision: 3
-    yaxis_id: waterlevel
-    name: Mitattu
-    color: orange
-    unit: cm
-    extend_to: now
-  - entity: sensor.fmi_waterlevel_forecast_hamina
-    data_generator: |
-      return entity.attributes.forecast.map((entry) => {
-        return [entry["time"], entry["value"]];
-      });
-    stroke_width: 1
-    float_precision: 3
-    yaxis_id: waterlevel
-    show:
-      in_header: false
-yaxis:
-  - id: waterlevel
-    min: ~-20
-    max: ~100
-    apex_config:
-      tickAmount: 4
-      labels:
-        style:
-          fontSize: 8px
-        formatter: |
-          EVAL:function(value) {
-            return value.toFixed(1) + ' cm'; 
-          }
+python3.14 -m venv .venv
+.venv/bin/pip install -r requirements_test.txt
+.venv/bin/pytest
+.venv/bin/ruff check .
 ```
+
+The tests run on made-up data and trimmed real responses from FMI's public stations, without network access.
+
+| Path                           | What it contains                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------- |
+| `__init__.py`                  | Setup                                                                               |
+| `config_flow.py`               | The language, the options, adding and changing stations and places                  |
+| `catalogue.py`                 | What can be measured, and which stations report what                                |
+| `structure.py`                 | Stations and places, their devices, and the move from 3.x's subentries              |
+| `migration.py`                 | The move from the old `fmi` domain                                                  |
+| `session.py`                   | FMI's WFS service                                                                   |
+| `query_coordinator.py`         | Reading a measurement, and noticing stale data                                      |
+| `weather_coordinator.py`       | The point forecast, and its days and halves                                         |
+| `warning_coordinator.py`, `cap.py` | The warning feed and the warnings for a place                                   |
+| `sensor.py`, `binary_sensor.py`, `event.py`, `weather.py` | The entities                             |
+| `services.py`                  | The `get_observations` action                                                       |
+| `diagnostics.py`               | The diagnostics download, with places left out                                      |
+| `translations/<language>.json` | Home Assistant UI texts                                                             |
+
+## Support
+
+Hey dude! Help me out for a couple of :beers: or a :coffee:!
+
+[![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://www.buymeacoffee.com/jesmak)
+
+## License
+
+MIT. The data is FMI's, under CC BY 4.0.
 
 [releases-shield]: https://img.shields.io/github/release/jesmak/fmi.svg?style=for-the-badge
 [release-date-shield]: https://img.shields.io/github/release-date/jesmak/fmi?style=for-the-badge
 [releases]: https://github.com/jesmak/fmi/releases
 [hacs-shield]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
 [hacs]: https://hacs.xyz/docs/faq/custom_repositories/
-[home-assistant-shield]: https://img.shields.io/badge/Home%20Assistant-UI%20setup-green.svg?style=for-the-badge
-[home-assistant]: https://www.home-assistant.io/
 [license-shield]: https://img.shields.io/github/license/jesmak/fmi.svg?style=for-the-badge
-[maintenance-shield]: https://img.shields.io/maintenance/yes/2026.svg?style=for-the-badge
-[commits-shield]: https://img.shields.io/github/commit-activity/y/jesmak/fmi.svg?style=for-the-badge
-[commits]: https://github.com/jesmak/fmi/commits/main
-[bugs-shield]: https://img.shields.io/github/issues/jesmak/fmi/bug?style=for-the-badge&label=bugs&color=red
-[bugs]: https://github.com/jesmak/fmi/labels/bug
-[enhancements-shield]: https://img.shields.io/github/issues/jesmak/fmi/enhancement?style=for-the-badge&label=enhancements&color=blue
-[enhancements]: https://github.com/jesmak/fmi/labels/enhancement
