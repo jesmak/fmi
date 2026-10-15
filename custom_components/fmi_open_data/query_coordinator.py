@@ -25,25 +25,40 @@ from .const import (
     CONF_QUERY_ID,
     CONF_TARGET,
     CONF_TARGET_TYPE,
+    CONF_UNIT,
     DEFAULT_NO_DATA_ISSUE,
     DEFAULT_NO_DATA_ISSUE_HOURS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     MINIMUM_STALE_HOURS,
+    PERIODS,
 )
 from .session import FMIException, FMISession
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def build_unique_id(data: dict[str, Any]) -> str:
-    """Identify a sensor by what it measures, not by what it is called.
+def measurement_name(descriptions: Mapping[str, tuple[str | None, str | None]], lang: str, query_id: str, parameter: str) -> str:
+    """A sensor's default name: FMI's description of the parameter, or the parameter itself, with the query's period."""
+    described = descriptions.get(parameter.lower(), (None, None))[0]
+    name = described or parameter
+    period = next((names for key, names in PERIODS.items() if key in query_id), None)
+    return f"{name}, {period.get(lang, period['eng'])}" if period else name
 
-    The label is a display name the user may rename, so it must not be part of
-    any identity. This is the subentry's unique id, which is what stops the
-    same measurement being added twice.
-    """
+
+def build_unique_id(data: Mapping[str, Any]) -> str:
+    """Identify a sensor of 3.x by what it measures, not by what it is called. Used when moving from before 4.0.0."""
     return "_".join([str(data[CONF_QUERY_ID]), str(data[CONF_TARGET_TYPE]), str(data[CONF_TARGET]), str(data[CONF_PARAMETER])]).lower()
+
+
+def measurement_key(measurement: Mapping[str, Any]) -> str:
+    """Identify a measurement within its station: the query and the parameter, never the name the user may change."""
+    return f"{measurement[CONF_QUERY_ID]}_{measurement[CONF_PARAMETER]}".lower()
+
+
+def station_unique_id(target_type: str, target: Any) -> str:
+    """A station subentry's unique id, which is what stops the same station being added twice."""
+    return f"station_{target_type}_{str(target).strip().lower()}"
 
 
 def get_start_time(query_id: str, now: datetime, data: Mapping[str, Any]) -> datetime | None:
@@ -100,36 +115,44 @@ def stale_after_hours(query_id: str, configured_hours: int) -> int:
 
 
 class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """One sensor: one parameter of one query at one station or forecast point."""
+    """One measurement of a station: one parameter of one query at the station or forecast point."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, subentry: ConfigSubentry):
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, subentry: ConfigSubentry, measurement: Mapping[str, Any]):
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
-            name=f"{DOMAIN} {subentry.title}",
+            name=f"{DOMAIN} {subentry.title} {measurement[CONF_LABEL]}",
             update_interval=timedelta(minutes=DEFAULT_SCAN_INTERVAL),
         )
         self.subentry = subentry
-        self.issue_id = f"no_data_{subentry.subentry_id}"
+        # What the queries need: the measurement with its station and the entry's language.
+        self.measurement: dict[str, Any] = {
+            CONF_LANG: entry.data[CONF_LANG],
+            CONF_TARGET_TYPE: subentry.data[CONF_TARGET_TYPE],
+            CONF_TARGET: subentry.data[CONF_TARGET],
+            **measurement,
+        }
+        self.unique_id = f"{subentry.subentry_id}_{measurement_key(measurement)}"
+        self.issue_id = f"no_data_{self.unique_id}"
         # Whether this outage has been looked into already, so the probe in
         # _async_report_no_data runs once per outage rather than once per update.
         self._reported = False
         # The unit comes from FMI's parameter metadata, which doesn't change, so it is
-        # looked up once rather than with every poll.
-        self._unit: str | None = None
-        self._unit_known = False
+        # looked up once rather than with every poll. A unit the user gave wins, and needs no lookup.
+        self._unit: str | None = measurement.get(CONF_UNIT)
+        self._unit_known = self._unit is not None
 
     @property
     def stale_after_hours(self) -> int:
         configured = self.config_entry.options.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS)
-        return stale_after_hours(str(self.subentry.data[CONF_QUERY_ID]), configured)
+        return stale_after_hours(str(self.measurement[CONF_QUERY_ID]), configured)
 
     def _params(self, now: datetime, filter_parameter: bool, start_time: datetime | None = None) -> dict[str, Any]:
-        return query_params(self.subentry.data, now, filter_parameter, start_time)
+        return query_params(self.measurement, now, filter_parameter, start_time)
 
     async def _async_update_data(self) -> dict[str, Any]:
-        data = self.subentry.data
+        data = self.measurement
         now = dt_util.utcnow()
         is_forecast = "::forecast" in str(data[CONF_QUERY_ID])
 
@@ -183,7 +206,7 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         by a restart. Forecast values are stamped in the future, which makes
         their age negative until the last forecast point falls into the past.
         """
-        data = self.subentry.data
+        data = self.measurement
         newest = max((item["time"] for item in result["data"]), default=None)
 
         if newest is not None:
@@ -231,7 +254,7 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         The polling query is filtered to a single parameter, so it cannot say what
         else the station offers. This unfiltered probe runs only on failure.
         """
-        data = self.subentry.data
+        data = self.measurement
         parameter = data[CONF_PARAMETER]
 
         try:
@@ -241,7 +264,8 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         placeholders = {
-            "label": data[CONF_LABEL],
+            # The station and the measurement, as the sensor is named.
+            "label": f"{self.subentry.title} {data[CONF_LABEL]}",
             "parameter": parameter,
             "query_id": str(data[CONF_QUERY_ID]),
             "target_type": data[CONF_TARGET_TYPE],
@@ -257,7 +281,7 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # The parameter is still served, there is just nothing to report yet.
             return
 
-        _LOGGER.warning(f"{data[CONF_LABEL]}: no data ({translation_key}), available={available}")
+        _LOGGER.warning(f"{placeholders['label']}: no data ({translation_key}), available={available}")
 
         ir.async_create_issue(
             self.hass,

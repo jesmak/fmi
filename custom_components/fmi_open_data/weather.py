@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .const import ATTRIBUTION, CONF_LABEL
+from .const import ATTRIBUTION
 from .weather_coordinator import (
     FMIWeatherCoordinator,
     condition_for,
@@ -20,13 +20,16 @@ from .weather_coordinator import (
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
-    for subentry_id, coordinator in entry.runtime_data.coordinators.items():
+    for coordinator in entry.runtime_data.coordinators:
         if isinstance(coordinator, FMIWeatherCoordinator):
-            async_add_entities([FMIWeather(coordinator)], config_subentry_id=subentry_id)
+            async_add_entities([FMIWeather(coordinator)], config_subentry_id=coordinator.subentry.subentry_id)
 
 
 class FMIWeather(SingleCoordinatorWeatherEntity[FMIWeatherCoordinator]):
     _attr_attribution = ATTRIBUTION
+    # The place's main entity, named by its device.
+    _attr_has_entity_name = True
+    _attr_name = None
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_pressure_unit = UnitOfPressure.HPA
     _attr_native_wind_speed_unit = UnitOfSpeed.METERS_PER_SECOND
@@ -37,8 +40,8 @@ class FMIWeather(SingleCoordinatorWeatherEntity[FMIWeatherCoordinator]):
 
     def __init__(self, coordinator: FMIWeatherCoordinator):
         super().__init__(coordinator)
-        self._attr_unique_id = coordinator.subentry.subentry_id
-        self._attr_name = f"FMI {coordinator.subentry.data.get(CONF_LABEL, coordinator.subentry.title)}"
+        self._attr_unique_id = coordinator.unique_id
+        self._attr_device_info = coordinator.config_entry.runtime_data.devices[coordinator.subentry.subentry_id]
 
     def _now(self, key: str) -> Any:
         row = current_row(self.coordinator.data or [], dt_util.utcnow())

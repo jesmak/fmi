@@ -1,8 +1,8 @@
-"""Diagnostics for bug reports: the settings, every subentry and how its last refresh went.
+"""Diagnostics for bug reports: the settings, every station and place, and how each refresh went.
 
-Places are where the user lives, so their coordinates are redacted, and so are the names, which are often a
-place's name, and a sensor's target unless it is a station. Station and query ids stay. They are public, and they
-are what a bug report needs.
+Places are where the user lives, so their coordinates, names and unique ids are redacted, and so is a station that
+is a place name or a point instead of a station. Station and query ids stay. They are public, and they are what a
+bug report needs.
 """
 
 from typing import Any
@@ -13,19 +13,29 @@ from homeassistant.core import HomeAssistant
 
 from . import FMIConfigEntry
 from .const import CONF_TARGET, CONF_TARGET_TYPE
-from .query_coordinator import FMIQueryCoordinator
+from .query_coordinator import FMIQueryCoordinator, measurement_key
 from .warning_coordinator import FMIWarningsCoordinator
 from .weather_coordinator import FMIWeatherCoordinator
 
 TO_REDACT = {"latitude", "longitude", "label"}
 
 
+def _public(subentry: ConfigSubentry) -> bool:
+    # A station by fmisid, or a forecast point by geoid, is one of FMI's own. A place name, a point or a place of the
+    # user's own is where the user is.
+    return subentry.data.get(CONF_TARGET_TYPE) in ("fmisid", "geoid")
+
+
 def _subentry(subentry: ConfigSubentry) -> dict[str, Any]:
-    # A sensor's target is a station, a place name or coordinates, and its unique id contains the target.
-    # Warnings and weather places have the place in their unique id.
-    public = subentry.data.get(CONF_TARGET_TYPE) == "fmisid"
+    # A station's title and unique id say which station it is. A place has its coordinates in its unique id.
+    public = _public(subentry)
     data = async_redact_data(dict(subentry.data), TO_REDACT if public else TO_REDACT | {CONF_TARGET})
-    return {"type": subentry.subentry_type, "title": REDACTED, "unique_id": subentry.unique_id if public else REDACTED, "data": data}
+    return {
+        "type": subentry.subentry_type,
+        "title": subentry.title if public else REDACTED,
+        "unique_id": subentry.unique_id if public else REDACTED,
+        "data": data,
+    }
 
 
 def _query_data(data: dict[str, Any]) -> dict[str, Any]:
@@ -42,8 +52,15 @@ def _query_data(data: dict[str, Any]) -> dict[str, Any]:
 
 def _coordinator(coordinator: FMIQueryCoordinator | FMIWarningsCoordinator | FMIWeatherCoordinator) -> dict[str, Any]:
     result: dict[str, Any] = {
+        "kind": {FMIQueryCoordinator: "measurement", FMIWarningsCoordinator: "warnings", FMIWeatherCoordinator: "weather"}[
+            type(coordinator)
+        ],
+        "measurement": measurement_key(coordinator.measurement) if isinstance(coordinator, FMIQueryCoordinator) else None,
         "last_update_success": coordinator.last_update_success,
-        "last_exception": repr(coordinator.last_exception) if coordinator.last_exception else None,
+        # FMI's message can repeat the place it was asked about.
+        "last_exception": (repr(exception) if _public(coordinator.subentry) else type(exception).__name__)
+        if (exception := coordinator.last_exception)
+        else None,
         "update_interval": str(coordinator.update_interval),
     }
     data = coordinator.data
@@ -81,7 +98,10 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: FMIConf
         "data": dict(entry.data),
         "options": dict(entry.options),
         "subentries": [
-            {**_subentry(subentry), "coordinator": _coordinator(coordinators[subentry_id]) if subentry_id in coordinators else None}
-            for subentry_id, subentry in entry.subentries.items()
+            {
+                **_subentry(subentry),
+                "coordinators": [_coordinator(coordinator) for coordinator in coordinators if coordinator.subentry is subentry],
+            }
+            for subentry in entry.subentries.values()
         ],
     }

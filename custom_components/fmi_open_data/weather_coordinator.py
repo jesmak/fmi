@@ -72,11 +72,6 @@ KEEP_FORECAST = timedelta(hours=3)
 _unknown_symbols: set[int] = set()
 
 
-def build_weather_unique_id(data: dict[str, Any]) -> str:
-    location = data[CONF_LOCATION]
-    return f"weather_{float(location['latitude']):.4f}_{float(location['longitude']):.4f}"
-
-
 def condition_for(symbol: float | None) -> str | None:
     if symbol is None:
         return None
@@ -218,6 +213,7 @@ class FMIWeatherCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             update_interval=timedelta(minutes=WEATHER_SCAN_INTERVAL),
         )
         self.subentry = subentry
+        self.unique_id = subentry.subentry_id
         self._fetched_at: datetime | None = None
 
     async def _async_update_data(self) -> list[dict[str, Any]]:

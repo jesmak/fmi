@@ -4,6 +4,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from conftest import place
 from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -13,8 +14,10 @@ from custom_components.fmi_open_data.const import (
     CONF_LABEL,
     CONF_LANG,
     CONF_LOCATION,
+    CONF_STRUCTURE,
     CONF_WARNING_TYPES,
     DOMAIN,
+    STRUCTURE_VERSION,
     SUBENTRY_WARNINGS,
     WARNING_TYPES,
 )
@@ -30,8 +33,8 @@ DOCUMENTS = {
     BOTHNIA: (FIXTURES / "cap_sea_wind_bothnia.xml").read_bytes(),
 }
 
-SENSOR = "sensor.fmi_varoitukset_suomenlinna"
-EVENT = "event.fmi_varoitukset_suomenlinna"
+SENSOR = "sensor.varoitukset_suomenlinna_warning_level"
+EVENT = "event.varoitukset_suomenlinna_warning"
 
 
 class FakeApi:
@@ -53,6 +56,7 @@ class FakeApi:
 
 
 def warnings_place(label: str, latitude: float, longitude: float, radius: float = 0) -> ConfigSubentryData:
+    """A warnings subentry as it was before 4.0.0."""
     location = {"latitude": latitude, "longitude": longitude, "radius": radius}
     return ConfigSubentryData(
         subentry_type=SUBENTRY_WARNINGS,
@@ -72,11 +76,8 @@ async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, *places: Config
     entry = MockConfigEntry(
         domain=DOMAIN,
         version=3,
-        data={CONF_LANG: "fin"},
-        subentries_data=list(places)
-        or [
-            warnings_place("Varoitukset Suomenlinna", 60.146, 24.988),
-        ],
+        data={CONF_LANG: "fin", CONF_STRUCTURE: STRUCTURE_VERSION},
+        subentries_data=list(places) or [place("Varoitukset Suomenlinna", 60.146, 24.988)],
     )
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
@@ -87,7 +88,7 @@ async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, *places: Config
 async def _refresh(hass: HomeAssistant, entry: MockConfigEntry, freezer) -> None:
     # The places share one download of the feed for a moment; step past it.
     freezer.tick(60)
-    for coordinator in entry.runtime_data.coordinators.values():
+    for coordinator in entry.runtime_data.coordinators:
         await coordinator.async_refresh()
     await hass.async_block_till_done()
 
@@ -203,10 +204,10 @@ async def test_places_share_one_download_of_the_feed(hass: HomeAssistant, monkey
         hass,
         monkeypatch,
         api,
-        warnings_place("Varoitukset Suomenlinna", 60.146, 24.988),
-        warnings_place("Varoitukset Hanko", 59.823, 22.968, 2000),
+        place("Varoitukset Suomenlinna", 60.146, 24.988),
+        place("Varoitukset Hanko", 59.823, 22.968, 2000),
     )
 
     assert api.feed_requests == 1
-    assert hass.states.get("sensor.fmi_varoitukset_suomenlinna").state == "yellow"
-    assert hass.states.get("sensor.fmi_varoitukset_hanko") is not None
+    assert hass.states.get("sensor.varoitukset_suomenlinna_warning_level").state == "yellow"
+    assert hass.states.get("sensor.varoitukset_hanko_warning_level") is not None

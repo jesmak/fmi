@@ -13,9 +13,9 @@ ATTR_NO_DATA_ISSUE_HOURS = "no_data_issue_hours"
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
-    for subentry_id, coordinator in entry.runtime_data.coordinators.items():
+    for coordinator in entry.runtime_data.coordinators:
         if isinstance(coordinator, FMIQueryCoordinator):
-            async_add_entities([FMIStaleDataBinarySensor(coordinator)], config_subentry_id=subentry_id)
+            async_add_entities([FMIStaleDataBinarySensor(coordinator)], config_subentry_id=coordinator.subentry.subentry_id)
 
 
 class FMIStaleDataBinarySensor(CoordinatorEntity[FMIQueryCoordinator], BinarySensorEntity):
@@ -34,8 +34,9 @@ class FMIStaleDataBinarySensor(CoordinatorEntity[FMIQueryCoordinator], BinarySen
 
     def __init__(self, coordinator: FMIQueryCoordinator):
         super().__init__(coordinator)
-        self._attr_unique_id = coordinator.subentry.subentry_id
-        self._attr_translation_placeholders = {"label": coordinator.subentry.data.get(CONF_LABEL, coordinator.subentry.title)}
+        self._attr_unique_id = coordinator.unique_id
+        self._attr_device_info = coordinator.config_entry.runtime_data.devices[coordinator.subentry.subentry_id]
+        self._attr_translation_placeholders = {"label": coordinator.measurement[CONF_LABEL]}
         self._attr_extra_state_attributes = {ATTR_NO_DATA_ISSUE_HOURS: coordinator.stale_after_hours}
 
     @property

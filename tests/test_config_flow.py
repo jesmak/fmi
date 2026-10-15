@@ -39,7 +39,7 @@ async def test_the_integration_is_set_up_only_once(hass: HomeAssistant):
 
 async def test_changing_the_stale_data_settings_applies_to_the_sensors(hass: HomeAssistant, monkeypatch):
     entry = await _setup(hass, monkeypatch, FakeApi(age=timedelta(hours=30)), **{CONF_NO_DATA_ISSUE_HOURS: 24})
-    stale_sensor = "binary_sensor.fmi_kaisaniemi_air_temperature_stale_data"
+    stale_sensor = "binary_sensor.helsinki_kaisaniemi_air_temperature_stale_data"
     assert hass.states.get(stale_sensor).state == "on"
 
     result = await hass.config_entries.options.async_init(entry.entry_id)

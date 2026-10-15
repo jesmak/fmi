@@ -1,4 +1,4 @@
-"""The event entity of a warnings subentry: fires when FMI issues, updates or cancels a warning for the place."""
+"""The event entity of a place's warnings: fires when FMI issues, updates or cancels a warning for the place."""
 
 from homeassistant.components.event import EventEntity
 from homeassistant.core import HomeAssistant, callback
@@ -6,26 +6,27 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .cap import EVENT_TYPES
-from .const import ATTRIBUTION, CONF_LABEL
+from .const import ATTRIBUTION
 from .warning_coordinator import FMIWarningsCoordinator, WarningsData
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
-    for subentry_id, coordinator in entry.runtime_data.coordinators.items():
+    for coordinator in entry.runtime_data.coordinators:
         if isinstance(coordinator, FMIWarningsCoordinator):
-            async_add_entities([FMIWarningEvent(coordinator)], config_subentry_id=subentry_id)
+            async_add_entities([FMIWarningEvent(coordinator)], config_subentry_id=coordinator.subentry.subentry_id)
 
 
 class FMIWarningEvent(CoordinatorEntity[FMIWarningsCoordinator], EventEntity):
     _attr_attribution = ATTRIBUTION
     _attr_event_types = EVENT_TYPES
+    _attr_has_entity_name = True
     _attr_icon = "mdi:alert-decagram"
     _attr_translation_key = "warning"
 
     def __init__(self, coordinator: FMIWarningsCoordinator):
         super().__init__(coordinator)
-        self._attr_unique_id = coordinator.subentry.subentry_id
-        self._attr_name = f"FMI {coordinator.subentry.data.get(CONF_LABEL, coordinator.subentry.title)}"
+        self._attr_unique_id = coordinator.unique_id
+        self._attr_device_info = coordinator.config_entry.runtime_data.devices[coordinator.subentry.subentry_id]
         self._handled: WarningsData | None = coordinator.data
 
     @callback

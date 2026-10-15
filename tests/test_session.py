@@ -83,16 +83,6 @@ def test_stations_with_their_municipality(monkeypatch):
     assert isinstance(stations[0]["latitude"], float)
 
 
-def test_stations_serving_a_query(monkeypatch):
-    stations = _session(monkeypatch, "fmi_coverage.xml").list_stations_for_query("eng", "fmi::observations::weather::simple", {})
-
-    assert [(station["id"], station["name"], station["region"]) for station in stations] == [
-        ("100971", "Helsinki Kaisaniemi", "Helsinki"),
-        ("100996", "Helsinki Harmaja", "Helsinki"),
-    ]
-    assert (stations[0]["latitude"], stations[0]["longitude"]) == (60.17523, 24.94459)
-
-
 def test_parameter_labels_and_units(monkeypatch):
     descriptions = _session(monkeypatch, "fmi_parameters.xml").get_parameter_descriptions("eng", "fmi::observations::weather::simple")
 
@@ -105,17 +95,38 @@ def test_units(monkeypatch):
 
     assert session.get_unit("eng", "fmi::observations::weather::simple", "T2M") == "°C"
     assert session.get_unit("eng", "fmi::observations::weather::simple", "unknown") is None
-    assert session.get_unit("eng", "stuk::observations::external-radiation::latest::multipointcoverage", "dr_pt10m_avg") == "µSv/h"
 
 
-def test_water_levels_have_their_units_without_fmis_metadata(monkeypatch):
-    def no_metadata(*args):
-        raise AssertionError("FMI's metadata has no unit for the water level")
+def test_station_coverage_says_which_station_reported_what(monkeypatch):
+    # Real hourly observations around Helsinki: Harmaja, on an island, has no precipitation gauge.
+    fields, stations = _session(monkeypatch, "fmi_station_coverage.xml").get_station_coverage("fin", {})
 
-    monkeypatch.setattr(FMISession, "get_parameter_descriptions", no_metadata)
-    session = FMISession()
+    assert len(fields) == 12
+    by_name = {station["name"]: station for station in stations}
+    assert set(by_name) == {"Helsinki Kaisaniemi", "Helsinki Harmaja", "Helsinki Kumpula"}
+    assert by_name["Helsinki Kaisaniemi"]["id"] == "100971"
+    assert by_name["Helsinki Kaisaniemi"]["measured"] == set(fields)
+    assert set(fields) - by_name["Helsinki Harmaja"]["measured"] == {"PRA_PT1H_ACC", "PRI_PT1H_MAX"}
 
-    assert session.get_unit("eng", "fmi::observations::mareograph::instant::simple", "WLEVN2K_PT1S_INSTANT") == "mm"
-    assert session.get_unit("eng", "fmi::observations::mareograph::simple", "WLEV_PT1S_INSTANT") == "mm"
-    assert session.get_unit("eng", "fmi::forecast::sealevel::point::simple", "SeaLevelN2000") == "cm"
-    assert session.get_unit("eng", "fmi::forecast::sealevel::point::simple", "SeaLevel") == "cm"
+
+def test_simple_coverage_says_what_was_reported_where(monkeypatch):
+    # Real sea surface temperatures, which FMI publishes in the ::simple form only: positions, no station ids.
+    fields, measured = _session(monkeypatch, "fmi_simple_coverage.xml").get_simple_coverage("fin", {})
+
+    assert fields == ["TWATER"]
+    assert len(measured) == 10
+    assert all(reported == {"TWATER"} for reported in measured.values())
+    assert all(isinstance(latitude, float) and isinstance(longitude, float) for latitude, longitude in measured)
+
+
+def test_a_forecasts_fixed_points_are_read_as_stations(monkeypatch):
+    # The real sea level forecast over Finland: its points are under one pointMembers, and their ids are geoids,
+    # some of them negative.
+    fields, stations = _session(monkeypatch, "fmi_forecast_points.xml").get_station_coverage("fin", {})
+
+    assert fields == ["SeaLevel", "SeaLevelN2000"]
+    by_name = {station["name"]: station for station in stations}
+    assert len(stations) == 14
+    assert by_name["Hamina"]["id"] == "659169"
+    assert by_name["Kemi"]["id"] == "-10017238"
+    assert by_name["Hamina"]["measured"] == {"SeaLevel", "SeaLevelN2000"}

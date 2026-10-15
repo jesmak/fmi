@@ -30,14 +30,19 @@ from test_warning_entities import FakeApi as WarningsApi
 from custom_components.fmi_open_data.const import (
     CONF_LABEL,
     CONF_LANG,
+    CONF_LOCATION,
+    CONF_MEASUREMENTS,
     CONF_NO_DATA_ISSUE,
     CONF_NO_DATA_ISSUE_HOURS,
+    CONF_STRUCTURE,
     CONF_TARGET,
     DOMAIN,
+    STRUCTURE_VERSION,
     SUBENTRY_SENSOR,
 )
 from custom_components.fmi_open_data.migration import OLD_DOMAIN, OLD_FOLDER_ISSUE
 from custom_components.fmi_open_data.query_coordinator import build_unique_id
+from custom_components.fmi_open_data.structure import place_unique_id
 
 pytestmark = pytest.mark.asyncio
 
@@ -128,22 +133,20 @@ async def _add(hass: HomeAssistant, choice: str | None = "move") -> dict:
 
 
 def _moved(hass: HomeAssistant, entity_id: str, title: str) -> er.RegistryEntry:
+    """The entity is now in the station or place called title, with a unique id of that subentry."""
     [entry] = hass.config_entries.async_entries(DOMAIN)
-    [subentry] = [subentry for subentry in entry.subentries.values() if subentry.title == title]
     registered = er.async_get(hass).async_get(entity_id)
     assert registered is not None, entity_id
-    assert (registered.platform, registered.config_entry_id, registered.config_subentry_id, registered.unique_id) == (
-        DOMAIN,
-        entry.entry_id,
-        subentry.subentry_id,
-        subentry.subentry_id,
-    ), entity_id
+    assert (registered.platform, registered.config_entry_id) == (DOMAIN, entry.entry_id), entity_id
+    subentry = entry.subentries[registered.config_subentry_id]
+    assert subentry.title == title, entity_id
+    assert registered.unique_id.startswith(subentry.subentry_id), entity_id
     return registered
 
 
 async def test_a_3x_entry_moves_with_its_sensors_and_warnings_places(hass: HomeAssistant):
     old = _current_entry(hass)
-    [sensor, _] = old.subentries.values()
+    [sensor, warnings] = old.subentries.values()
     ir.async_create_issue(
         hass, OLD_DOMAIN, f"no_data_{sensor.subentry_id}", is_fixable=False, severity=ir.IssueSeverity.WARNING, translation_key="no_data"
     )
@@ -153,15 +156,17 @@ async def test_a_3x_entry_moves_with_its_sensors_and_warnings_places(hass: HomeA
     [entry] = hass.config_entries.async_entries(DOMAIN)
     assert entry.state is ConfigEntryState.LOADED
     assert entry.version == 3
-    assert entry.data == {CONF_LANG: "eng"}
+    assert entry.data == {CONF_LANG: "eng", CONF_STRUCTURE: STRUCTURE_VERSION}
     assert entry.options == {CONF_NO_DATA_ISSUE: False, CONF_NO_DATA_ISSUE_HOURS: 48}
+    # The sensor and the warnings place of 3.x are a station and a place now.
     assert {(subentry.subentry_type, subentry.title, subentry.unique_id) for subentry in entry.subentries.values()} == {
-        (subentry.subentry_type, subentry.title, subentry.unique_id) for subentry in old.subentries.values()
+        ("station", "Helsinki Kaisaniemi", "station_fmisid_100971"),
+        ("place", "Varoitukset Suomenlinna", place_unique_id(warnings.data[CONF_LOCATION])),
     }
     assert hass.config_entries.async_entries(OLD_DOMAIN) == []
 
-    _moved(hass, "sensor.temperature_outside", "Kaisaniemi Air temperature")
-    _moved(hass, "binary_sensor.fmi_kaisaniemi_air_temperature_stale_data", "Kaisaniemi Air temperature")
+    _moved(hass, "sensor.temperature_outside", "Helsinki Kaisaniemi")
+    _moved(hass, "binary_sensor.fmi_kaisaniemi_air_temperature_stale_data", "Helsinki Kaisaniemi")
     _moved(hass, "sensor.fmi_varoitukset_suomenlinna", "Varoitukset Suomenlinna")
     _moved(hass, "event.fmi_varoitukset_suomenlinna", "Varoitukset Suomenlinna")
     # Nothing was registered a second time under a new entity ID.
@@ -188,24 +193,25 @@ async def test_2x_entries_become_subentries_and_keep_their_entities(hass: HomeAs
     await _add(hass)
 
     [entry] = hass.config_entries.async_entries(DOMAIN)
-    assert entry.data == {CONF_LANG: "fin"}
+    assert entry.data == {CONF_LANG: "fin", CONF_STRUCTURE: STRUCTURE_VERSION}
     # The settings most sensors had.
     assert entry.options == {CONF_NO_DATA_ISSUE: True, CONF_NO_DATA_ISSUE_HOURS: 120}
     subentries = {subentry.title: subentry for subentry in entry.subentries.values()}
-    assert set(subentries) == {"Kaisaniemi Air temperature", "Mannerheimintie Air temperature", "Katajanokka Air temperature"}
-    assert subentries["Kaisaniemi Air temperature"].unique_id == build_unique_id(KAISANIEMI)
-    assert CONF_NO_DATA_ISSUE_HOURS not in subentries["Kaisaniemi Air temperature"].data
-    # Each sensor keeps its own language.
-    assert subentries["Katajanokka Air temperature"].data[CONF_LANG] == "eng"
+    # Each sensor of 2.x is a station of its own, named from FMI's station list or by its id.
+    assert set(subentries) == {"Helsinki Kaisaniemi", "FMI 100742", "FMI 104053"}
+    assert subentries["Helsinki Kaisaniemi"].unique_id == "station_fmisid_100971"
+    [measurement] = subentries["Helsinki Kaisaniemi"].data[CONF_MEASUREMENTS]
+    # Named by the rules, in the entry's language, without the entry's stale data settings.
+    assert measurement[CONF_LABEL] == "Air temperature"
+    assert CONF_LANG not in measurement
+    assert CONF_NO_DATA_ISSUE_HOURS not in measurement
     assert hass.config_entries.async_entries(OLD_DOMAIN) == []
 
-    _moved(hass, "sensor.temperature_outside", "Kaisaniemi Air temperature")
-    _moved(hass, "binary_sensor.fmi_kaisaniemi_air_temperature_stale_data", "Kaisaniemi Air temperature")
-    _moved(hass, "sensor.fmi_katajanokka_air_temperature", "Katajanokka Air temperature")
+    _moved(hass, "sensor.temperature_outside", "Helsinki Kaisaniemi")
+    _moved(hass, "binary_sensor.fmi_kaisaniemi_air_temperature_stale_data", "Helsinki Kaisaniemi")
+    _moved(hass, "sensor.fmi_katajanokka_air_temperature", "FMI 104053")
     # The user had turned this sensor off, and it stays off.
-    assert _moved(hass, "sensor.fmi_mannerheimintie_air_temperature", "Mannerheimintie Air temperature").disabled_by is (
-        er.RegistryEntryDisabler.USER
-    )
+    assert _moved(hass, "sensor.fmi_mannerheimintie_air_temperature", "FMI 100742").disabled_by is (er.RegistryEntryDisabler.USER)
     assert hass.states.get("sensor.temperature_outside").state == "1.5"
     assert ir.async_get(hass).async_get_issue(OLD_DOMAIN, f"no_data_{kaisaniemi.entry_id}") is None
 
@@ -219,7 +225,7 @@ async def test_two_entries_measuring_the_same_thing_become_one_subentry(hass: Ho
 
     [entry] = hass.config_entries.async_entries(DOMAIN)
     assert len(entry.subentries) == 1
-    _moved(hass, "sensor.fmi_kaisaniemi_air_temperature", "Kaisaniemi Air temperature")
+    _moved(hass, "sensor.fmi_kaisaniemi_air_temperature", "Helsinki Kaisaniemi")
     assert er.async_get(hass).async_get("sensor.fmi_helsinki_temperature") is None
 
 
@@ -247,7 +253,7 @@ async def test_an_entry_left_behind_by_an_interrupted_30_migration_moves_too(has
 
     [entry] = hass.config_entries.async_entries(DOMAIN)
     assert len(entry.subentries) == 1
-    _moved(hass, "sensor.my_renamed_temperature", "Kaisaniemi Air temperature")
+    _moved(hass, "sensor.my_renamed_temperature", "Helsinki Kaisaniemi")
     assert er.async_get(hass).async_get("sensor.fmi_helsinki_temperature") is None
     # No new sensor was made in place of the one that was kept.
     assert [
@@ -288,7 +294,7 @@ async def test_the_move_works_while_the_old_folder_still_runs_the_old_entry(hass
         await _add(hass)
 
     assert hass.config_entries.async_entries(OLD_DOMAIN) == []
-    _moved(hass, "sensor.temperature_outside", "Kaisaniemi Air temperature")
+    _moved(hass, "sensor.temperature_outside", "Helsinki Kaisaniemi")
     assert hass.states.get("sensor.temperature_outside").state == "1.5"
 
 
@@ -308,9 +314,9 @@ async def test_an_old_entry_still_being_set_up_is_moved_on_a_retry(hass: HomeAss
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.LOADED
-    assert entry.data == {CONF_LANG: "eng"}
+    assert entry.data == {CONF_LANG: "eng", CONF_STRUCTURE: STRUCTURE_VERSION}
     assert hass.config_entries.async_entries(OLD_DOMAIN) == []
-    _moved(hass, "sensor.temperature_outside", "Kaisaniemi Air temperature")
+    _moved(hass, "sensor.temperature_outside", "Helsinki Kaisaniemi")
     _moved(hass, "event.fmi_varoitukset_suomenlinna", "Varoitukset Suomenlinna")
 
 
@@ -322,7 +328,7 @@ async def test_an_old_entity_without_a_subentry_does_not_stop_the_move(hass: Hom
 
     [entry] = hass.config_entries.async_entries(DOMAIN)
     assert entry.state is ConfigEntryState.LOADED
-    _moved(hass, "sensor.temperature_outside", "Kaisaniemi Air temperature")
+    _moved(hass, "sensor.temperature_outside", "Helsinki Kaisaniemi")
     # It belonged to nothing that moved, so it went with the old entry.
     assert er.async_get(hass).async_get("sensor.leftover") is None
 
@@ -333,7 +339,7 @@ async def test_the_entities_of_a_disabled_3x_entry_stay_disabled(hass: HomeAssis
     await _add(hass)
 
     for entity_id, title in [
-        ("sensor.temperature_outside", "Kaisaniemi Air temperature"),
+        ("sensor.temperature_outside", "Helsinki Kaisaniemi"),
         ("event.fmi_varoitukset_suomenlinna", "Varoitukset Suomenlinna"),
     ]:
         assert _moved(hass, entity_id, title).disabled_by is er.RegistryEntryDisabler.USER
@@ -376,7 +382,7 @@ async def test_a_second_start_moves_nothing(hass: HomeAssistant):
 
     after = {item.entity_id: item for item in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)}
     assert after == before
-    assert entry.data == {CONF_LANG: "eng"}
+    assert entry.data == {CONF_LANG: "eng", CONF_STRUCTURE: STRUCTURE_VERSION}
 
 
 @pytest.mark.parametrize(

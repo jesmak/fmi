@@ -5,12 +5,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER, ConfigSubentryData
+from conftest import place
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.fmi_open_data.const import CONF_LABEL, CONF_LANG, CONF_LOCATION, DOMAIN, SUBENTRY_WEATHER
+from custom_components.fmi_open_data.const import CONF_LANG, CONF_STRUCTURE, DOMAIN, STRUCTURE_VERSION
 from custom_components.fmi_open_data.session import FMIException, FMINoData, FMISession
 from custom_components.fmi_open_data.weather_coordinator import (
     PARAMETERS,
@@ -24,7 +23,7 @@ from custom_components.fmi_open_data.weather_coordinator import (
 FORECAST = (Path(__file__).parent / "fixtures" / "fmi_forecast.xml").read_bytes()
 NOW = "2026-10-15T15:30:00+00:00"
 TAMPERE = {"latitude": 61.4981, "longitude": 23.7608}
-ENTITY = "weather.fmi_saa"
+ENTITY = "weather.saa"
 
 # Every day code in FMI's SmartSymbol documentation.
 SYMBOLS = [1, 2, 4, 6, 7, 9, 11, 14, 17, 21, 24, 27, *range(31, 40), *range(41, 50), *range(51, 60), 61, 64, 67, 71, 74, 77]
@@ -82,15 +81,8 @@ async def _setup(hass: HomeAssistant, monkeypatch, session: FakeSession) -> Mock
     entry = MockConfigEntry(
         domain=DOMAIN,
         version=3,
-        data={CONF_LANG: "fin"},
-        subentries_data=[
-            ConfigSubentryData(
-                subentry_type=SUBENTRY_WEATHER,
-                title="Sää",
-                unique_id="weather_61.4981_23.7608",
-                data={CONF_LOCATION: TAMPERE, CONF_LABEL: "Sää"},
-            )
-        ],
+        data={CONF_LANG: "fin", CONF_STRUCTURE: STRUCTURE_VERSION},
+        subentries_data=[place("Sää", TAMPERE["latitude"], TAMPERE["longitude"], weather=True, warning_types=[])],
     )
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
@@ -311,7 +303,7 @@ async def test_the_last_forecast_is_kept_for_a_while_when_fmi_fails(hass: HomeAs
     freezer.move_to(NOW)
     session = FakeSession()
     entry = await _setup(hass, monkeypatch, session)
-    [coordinator] = entry.runtime_data.coordinators.values()
+    [coordinator] = entry.runtime_data.coordinators
     session.failing = True
 
     freezer.tick(timedelta(hours=2))
@@ -324,68 +316,3 @@ async def test_the_last_forecast_is_kept_for_a_while_when_fmi_fails(hass: HomeAs
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert hass.states.get(ENTITY).state == "unavailable"
-
-
-async def test_adding_moving_and_not_doubling_a_weather_place(hass: HomeAssistant, monkeypatch, freezer, helsinki):
-    freezer.move_to(NOW)
-    session = FakeSession()
-    _use(monkeypatch, session)
-    entry = MockConfigEntry(domain=DOMAIN, version=3, data={CONF_LANG: "fin"})
-    entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    async def add() -> dict:
-        result = await hass.config_entries.subentries.async_init((entry.entry_id, SUBENTRY_WEATHER), context={"source": SOURCE_USER})
-        assert result["type"] is FlowResultType.FORM
-        label = next(key for key in result["data_schema"].schema if key == CONF_LABEL)
-        assert label.description["suggested_value"] == "Sää"
-        result = await hass.config_entries.subentries.async_configure(
-            result["flow_id"], {CONF_LOCATION: {**TAMPERE, "radius": 0}, CONF_LABEL: "Sää"}
-        )
-        await hass.async_block_till_done()
-        return result
-
-    assert (await add())["type"] is FlowResultType.CREATE_ENTRY
-    [subentry] = entry.subentries.values()
-    assert subentry.data == {CONF_LOCATION: TAMPERE, CONF_LABEL: "Sää"}
-    assert hass.states.get(ENTITY).state == "cloudy"
-
-    again = await add()
-    assert again["type"] is FlowResultType.ABORT
-    assert again["reason"] == "already_configured"
-
-    result = await hass.config_entries.subentries.async_init(
-        (entry.entry_id, SUBENTRY_WEATHER), context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry.subentry_id}
-    )
-    result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {CONF_LOCATION: {"latitude": 60.1699, "longitude": 24.9384}, CONF_LABEL: "Sää Helsinki"}
-    )
-    await hass.async_block_till_done()
-
-    assert result["reason"] == "reconfigure_successful"
-    moved = entry.subentries[subentry.subentry_id]
-    assert moved.unique_id == "weather_60.1699_24.9384"
-    assert moved.title == "Sää Helsinki"
-    assert "latlon=60.1699,24.9384" in session.urls[-1]
-    assert hass.states.get(ENTITY).attributes["friendly_name"] == "FMI Sää Helsinki"
-
-
-@pytest.mark.parametrize(
-    ("session", "error"), [(FakeSession(no_data=True), "no_forecast"), (FakeSession(failing=True), "connection_problem")]
-)
-async def test_a_place_without_a_forecast_is_not_added(hass: HomeAssistant, monkeypatch, session: FakeSession, error: str):
-    _use(monkeypatch, session)
-    entry = MockConfigEntry(domain=DOMAIN, version=3, data={CONF_LANG: "fin"})
-    entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    result = await hass.config_entries.subentries.async_init((entry.entry_id, SUBENTRY_WEATHER), context={"source": SOURCE_USER})
-    result = await hass.config_entries.subentries.async_configure(
-        result["flow_id"], {CONF_LOCATION: {"latitude": 0.0, "longitude": 0.0}, CONF_LABEL: "Sää"}
-    )
-
-    assert result["type"] is FlowResultType.FORM
-    assert result["errors"] == {"base": error}
-    assert not entry.subentries

@@ -37,7 +37,6 @@ LANGUAGES = ["eng", "fin"]
 
 CONF_LABEL = "label"
 CONF_LANG = "language"
-CONF_QUERY_LABEL = "query_label"
 CONF_QUERY_ID = "query_id"
 CONF_PARAMETER = "parameter"
 CONF_TARGET_TYPE = "target_type"
@@ -50,8 +49,30 @@ CONF_NO_DATA_ISSUE = "no_data_issue"
 CONF_NO_DATA_ISSUE_HOURS = "no_data_issue_hours"
 CONF_LOCATION = "location"
 CONF_WARNING_TYPES = "warning_types"
+# A unit the user gave for a sensor, which wins over FMI's own; FMI has none for some parameters.
+CONF_UNIT = "unit"
+CONF_MEASUREMENTS = "measurements"
+# Whether a place has the weather forecast.
+CONF_WEATHER = "weather"
+# In the entry's data once its subentries are stations and places, with measurements named by the rules of 4.0.0.
+CONF_STRUCTURE = "structure"
+STRUCTURE_VERSION = 2
 
-# Config subentry types: one subentry per sensor, one per place whose warnings are followed, and one per weather place.
+# The period of an aggregate query, added to a measurement's name so that, say, hourly and daily
+# precipitation at one station are told apart. Names are data in the entry's language, not translations.
+PERIODS = {
+    "::hourly": {"fin": "tunti", "eng": "hourly"},
+    "::daily": {"fin": "vuorokausi", "eng": "daily"},
+    "::monthly": {"fin": "kuukausi", "eng": "monthly"},
+    "::yearly": {"fin": "vuosi", "eng": "yearly"},
+}
+
+# Config subentry types: a station with the measurements read there, and a place with its weather forecast and warnings.
+# Each is a device.
+SUBENTRY_STATION = "station"
+SUBENTRY_PLACE = "place"
+# The subentry types before 4.0.0, one per sensor, warnings place and weather place. Merged into stations and places
+# at the first setup of 4.0.0.
 SUBENTRY_SENSOR = "sensor"
 SUBENTRY_WARNINGS = "warnings"
 SUBENTRY_WEATHER = "weather"
@@ -79,11 +100,9 @@ WARNING_TYPE_KEYS = {warning_type: re.sub(r"(?<!^)(?=[A-Z])", "_", warning_type)
 # In rising order. "none" is the state when no warning is in force.
 WARNING_LEVELS = ["none", "yellow", "orange", "red"]
 DEFAULT_WARNINGS_RADIUS = 1000
-DEFAULT_WARNINGS_LABEL = {"eng": "Warnings", "fin": "Varoitukset"}
 
 # The meteorologists' edited forecast, the one ilmatieteenlaitos.fi shows. It has values for
 # about 9.5 days and NaN after that. The coverage format is some 50 times smaller than ::simple.
 API_FORECAST_QUERY_ID = "fmi::forecast::edited::weather::scandinavia::point::multipointcoverage"
 FORECAST_DAYS = 10
 WEATHER_SCAN_INTERVAL = 30
-DEFAULT_WEATHER_LABEL = {"eng": "Weather", "fin": "Sää"}

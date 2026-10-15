@@ -18,7 +18,6 @@ from .const import (
     CONF_NO_DATA_ISSUE,
     CONF_PARAMETER,
     CONF_QUERY_ID,
-    CONF_QUERY_LABEL,
     CONF_TARGET,
     CONF_TARGET_TYPE,
     CONF_WARNING_TYPES,
@@ -26,7 +25,6 @@ from .const import (
     WARNING_LEVELS,
 )
 from .query_coordinator import FMIQueryCoordinator
-from .session import WATER_LEVEL_UNITS
 from .warning_coordinator import FMIWarningsCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,7 +38,6 @@ ATTR_TIME = "time"
 ATTR_VALUE = "value"
 ATTR_LABEL = "label"
 ATTR_LANGUAGE = "language"
-ATTR_QUERY_NAME = "query_name"
 ATTR_LOCATION_TYPE = "location_type"
 ATTR_LOCATION_ID = "location_id"
 ATTR_FORECAST_HOURS = "forecast_hours"
@@ -54,20 +51,12 @@ ATTR_ACTIVE_WARNINGS = "active_warnings"
 ATTR_WARNINGS = "warnings"
 
 
-def get_query_name(data) -> str | None:
-    # The config flow stores the label as "<title> (<query id>)"; the id is
-    # already exposed separately, so keep only the title here.
-    label = data.get(CONF_QUERY_LABEL)
-    return label.removesuffix(f" ({data.get(CONF_QUERY_ID)})") if label is not None else None
-
-
 def get_config_attributes(coordinator: FMIQueryCoordinator) -> dict:
-    data = coordinator.subentry.data
+    data = coordinator.measurement
     attributes = {
         ATTR_LABEL: data.get(CONF_LABEL),
         ATTR_LANGUAGE: data.get(CONF_LANG),
         ATTR_QUERY_ID: data.get(CONF_QUERY_ID),
-        ATTR_QUERY_NAME: get_query_name(data),
         ATTR_PARAMETER: data.get(CONF_PARAMETER),
         ATTR_LOCATION_TYPE: data.get(CONF_TARGET_TYPE),
         ATTR_LOCATION_ID: data.get(CONF_TARGET),
@@ -88,7 +77,7 @@ def get_warnings_config_attributes(coordinator: FMIWarningsCoordinator) -> dict:
     location = data[CONF_LOCATION]
     return {
         ATTR_LABEL: data.get(CONF_LABEL),
-        ATTR_LANGUAGE: data.get(CONF_LANG),
+        ATTR_LANGUAGE: coordinator.config_entry.data[CONF_LANG],
         ATTR_LATITUDE: location.get("latitude"),
         ATTR_LONGITUDE: location.get("longitude"),
         ATTR_RADIUS: location.get("radius") or 0,
@@ -97,29 +86,31 @@ def get_warnings_config_attributes(coordinator: FMIWarningsCoordinator) -> dict:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
-    for subentry_id, coordinator in entry.runtime_data.coordinators.items():
+    for coordinator in entry.runtime_data.coordinators:
         if isinstance(coordinator, FMIWarningsCoordinator):
             sensor = FMIWarningLevelSensor(coordinator)
         elif not isinstance(coordinator, FMIQueryCoordinator):
             continue
-        elif "::forecast" in str(coordinator.subentry.data[CONF_QUERY_ID]):
+        elif "::forecast" in str(coordinator.measurement[CONF_QUERY_ID]):
             sensor = FMIForecastSensor(coordinator)
         else:
             sensor = FMISensor(coordinator)
-        async_add_entities([sensor], config_subentry_id=subentry_id)
+        async_add_entities([sensor], config_subentry_id=coordinator.subentry.subentry_id)
 
 
 class FMIQuerySensor(CoordinatorEntity[FMIQueryCoordinator], SensorEntity):
     """What observation and forecast sensors have in common."""
 
     _attr_attribution = ATTRIBUTION
+    _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: FMIQueryCoordinator):
         super().__init__(coordinator)
-        data = coordinator.subentry.data
-        self._attr_unique_id = coordinator.subentry.subentry_id
-        self._attr_name = f"FMI {data.get(CONF_LABEL, coordinator.subentry.title)}"
+        self._attr_unique_id = coordinator.unique_id
+        self._attr_device_info = coordinator.config_entry.runtime_data.devices[coordinator.subentry.subentry_id]
+        # The measurement. The station is the device's name, which Home Assistant puts in front.
+        self._attr_name = coordinator.measurement[CONF_LABEL]
         self._config_attributes = get_config_attributes(coordinator)
 
     @property
@@ -129,11 +120,6 @@ class FMIQuerySensor(CoordinatorEntity[FMIQueryCoordinator], SensorEntity):
     @property
     def native_unit_of_measurement(self) -> str | None:
         return self.coordinator.data.get("unit") if self.coordinator.data else None
-
-    @property
-    def device_class(self) -> SensorDeviceClass | None:
-        # A water level is a distance, so the user can pick the unit it is shown in.
-        return SensorDeviceClass.DISTANCE if str(self.coordinator.subentry.data[CONF_PARAMETER]).lower() in WATER_LEVEL_UNITS else None
 
     def _location_attributes(self) -> dict:
         data = self.coordinator.data or {}
@@ -190,13 +176,14 @@ class FMIWarningLevelSensor(CoordinatorEntity[FMIWarningsCoordinator], SensorEnt
     _attr_attribution = ATTRIBUTION
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_icon = "mdi:alert"
+    _attr_has_entity_name = True
     _attr_options = WARNING_LEVELS
     _attr_translation_key = "warning_level"
 
     def __init__(self, coordinator: FMIWarningsCoordinator):
         super().__init__(coordinator)
-        self._attr_unique_id = coordinator.subentry.subentry_id
-        self._attr_name = f"FMI {coordinator.subentry.data.get(CONF_LABEL, coordinator.subentry.title)}"
+        self._attr_unique_id = coordinator.unique_id
+        self._attr_device_info = coordinator.config_entry.runtime_data.devices[coordinator.subentry.subentry_id]
         self._config_attributes = get_warnings_config_attributes(coordinator)
 
     @property

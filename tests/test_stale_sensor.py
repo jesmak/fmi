@@ -12,7 +12,7 @@ from test_no_data import FakeApi, _coordinator, _issue, _setup
 from custom_components.fmi_open_data.const import CONF_LANG, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, CONF_QUERY_ID
 from custom_components.fmi_open_data.query_coordinator import stale_after_hours
 
-STALE_SENSOR = "binary_sensor.fmi_kaisaniemi_air_temperature_stale_data"
+STALE_SENSOR = "binary_sensor.helsinki_kaisaniemi_air_temperature_stale_data"
 
 
 async def test_recent_data_is_not_stale(hass: HomeAssistant, monkeypatch):
@@ -72,4 +72,4 @@ async def test_the_name_follows_home_assistants_language(hass: HomeAssistant, mo
     # The sensor reads FMI's data in Finnish, while Home Assistant itself is in English.
     await _setup(hass, monkeypatch, FakeApi(age=timedelta(hours=1)), **{CONF_LANG: "fin"})
 
-    assert hass.states.get(STALE_SENSOR).attributes["friendly_name"] == "FMI Kaisaniemi Air temperature stale data"
+    assert hass.states.get(STALE_SENSOR).attributes["friendly_name"] == "Helsinki Kaisaniemi Air temperature stale data"

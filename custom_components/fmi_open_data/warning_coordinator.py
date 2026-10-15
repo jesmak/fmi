@@ -4,7 +4,6 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
 from xml.etree.ElementTree import ParseError
 
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
@@ -13,7 +12,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from .cap import EVENT_CANCELLED, CapAlert, FMIWarning, WarningsFilter, parse_alert, parse_warning_feed, warning_changes, warnings_for
-from .const import API_WARNINGS_FEED_URL, CONF_LOCATION, CONF_WARNING_TYPES, DOMAIN, WARNINGS_SCAN_INTERVAL
+from .const import API_WARNINGS_FEED_URL, CONF_LANG, DOMAIN, WARNINGS_SCAN_INTERVAL
 from .session import FMIException, FMISession
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,20 +21,6 @@ _LOGGER = logging.getLogger(__name__)
 FEED_REUSE_TIME = timedelta(seconds=30)
 # How long the last complete warnings are kept while some of FMI's messages cannot be read.
 INCOMPLETE_GRACE = timedelta(hours=1)
-
-
-def build_warnings_unique_id(data: dict[str, Any]) -> str:
-    """Identify a warnings subentry by the place, radius and warning types it follows."""
-    location = data[CONF_LOCATION]
-    return "_".join(
-        [
-            "warnings",
-            f"{float(location['latitude']):.4f}",
-            f"{float(location['longitude']):.4f}",
-            str(round(float(location.get("radius") or 0))),
-            ",".join(sorted(data[CONF_WARNING_TYPES])),
-        ]
-    ).lower()
 
 
 class WarningFeed:
@@ -100,7 +85,9 @@ class FMIWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
             update_interval=timedelta(minutes=WARNINGS_SCAN_INTERVAL),
         )
         self.subentry = subentry
-        self.warnings_filter = WarningsFilter.from_entry_data(subentry.data)
+        self.unique_id = subentry.subentry_id
+        # The warnings' texts in the entry's language.
+        self.warnings_filter = WarningsFilter.from_entry_data({**subentry.data, CONF_LANG: entry.data[CONF_LANG]})
         self._feed = feed
         self._previous: dict[str, FMIWarning] | None = None
         self._incomplete_since: datetime | None = None

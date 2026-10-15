@@ -42,145 +42,153 @@
     }
   },
   "config_subentries": {
-    "sensor": {
-      "entry_type": "Sensor",
+    "station": {
+      "entry_type": "Station",
       "initiate_flow": {
-        "user": "Add sensor",
-        "reconfigure": "Change sensor"
+        "user": "Add measurements",
+        "reconfigure": "Change station"
       },
       "error": {
+        "no_parameters": "Choose at least one thing to measure.",
         "connection_problem": "Could not reach FMI. Try again in a moment.",
-        "no_data": "FMI returned no data for this query, station and parameter. Check the location and try again.",
-        "unknown": "Unknown error"
+        "no_data": "FMI returned no data for this place. Check the place and try again.",
+        "keep_one": "At least one measurement has to stay. The whole station can be removed on the integration page."
       },
       "abort": {
-        "already_configured": "A sensor for this query, station and parameter already exists",
-        "reconfigure_successful": "Sensor updated",
-        "cannot_connect": "Could not reach FMI to list its queries. Try again in a moment."
+        "cannot_connect": "Could not reach FMI. Try again in a moment.",
+        "already_configured": "These measurements are already set up.",
+        "measurements_added": "Measurements added to {stations}.",
+        "reconfigure_successful": "Station updated."
       },
       "step": {
         "user": {
-          "title": "Query",
-          "description": "Choose what you want to measure. The list contains every observation and forecast query FMI publishes.",
+          "title": "What do you want to measure?",
+          "description": "Choose one or more. Search by name, such as rain or snow. The stations are chosen in the next step.",
           "data": {
-            "query_label": "Selected query"
+            "parameters": "Measurements"
           }
         },
-        "location": {
-          "title": "Location",
-          "description": "Pick the station to read from. Stations are ordered by distance from your Home Assistant location.\n\nFor observation queries only the stations that serve the query you chose are listed. Forecast queries are not tied to a station, so every station is offered.\n\nYou can also type a place name, or coordinates as latitude,longitude.",
+        "station": {
+          "title": "Station",
+          "description": "Where is {measurement} read? Nearest first. Listed are the stations that have reported this measurement recently.",
           "data": {
-            "target": "Station, place or coordinates"
+            "station": "Station",
+            "show_all": "Show all of the query's stations"
+          },
+          "data_description": {
+            "show_all": "Also the stations that have not reported this measurement recently."
           }
         },
-        "params": {
-          "title": "Parameter",
-          "description": "Pick the value to read. The list has only the parameters this station actually reports, with their descriptions and units.\n\nIf the parameter you want is missing, you can type its name by hand. The raw query results are at {url}.",
+        "point": {
+          "title": "Forecast location",
+          "description": "Where is the {measurement} forecast for?",
           "data": {
-            "forecast_step": "Time step between two forecast values in minutes",
+            "point": "Place",
+            "place_name": "Place name"
+          },
+          "data_description": {
+            "place_name": "Shown as the device's name, in front of the measurement sensors' names."
+          }
+        },
+        "named_place": {
+          "title": "Place",
+          "description": "This query has no stations. Type the name of the place {measurement} is read for, such as Kotka.",
+          "data": {
+            "place": "Place name"
+          }
+        },
+        "names": {
+          "title": "Names",
+          "description": "The names are filled in. Home Assistant shows the station's name in front of the sensors' names. The names can be changed in Home Assistant later."
+        },
+        "reconfigure": {
+          "title": "Edit station",
+          "menu_options": {
+            "add_measurements": "Add measurements",
+            "measurement": "Change a measurement's settings",
+            "remove_measurements": "Remove measurements"
+          }
+        },
+        "add_measurements": {
+          "title": "Add measurements",
+          "description": "Only the data the station measures is listed.",
+          "data": {
+            "parameters": "Measurements"
+          }
+        },
+        "measurement": {
+          "title": "Measurement",
+          "data": {
+            "measurement": "Measurement"
+          }
+        },
+        "settings": {
+          "title": "Settings",
+          "description": "{measurement}",
+          "data": {
+            "unit": "Unit",
+            "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained.",
             "forecast_hours": "Forecast hours to show",
             "forecast_past_hours": "Forecast history to show (hours)",
-            "parameter": "Parameter to return",
-            "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained."
+            "forecast_step": "Time step between two forecast values in minutes"
+          },
+          "data_description": {
+            "unit": "If you leave the field empty, FMI's own unit is used. It is not available for every parameter."
           }
         },
-        "name": {
-          "title": "Name",
-          "description": "The suggested name comes from the station and parameter you chose.",
+        "remove_measurements": {
+          "title": "Remove measurements",
+          "description": "The entities of the removed measurements are removed.",
           "data": {
-            "label": "Name for the sensor"
-          }
-        },
-        "reconfigure": {
-          "title": "Query",
-          "description": "Change the query, station or parameter the sensor uses. The sensor keeps its history, so you can use this to repair a sensor whose station or parameter has stopped working.",
-          "data": {
-            "query_label": "Selected query"
-          }
-        },
-        "reconfigure_location": {
-          "title": "Location",
-          "description": "Pick the station to read from. Stations are ordered by distance from your Home Assistant location.\n\nFor observation queries only the stations that serve the query you chose are listed. Forecast queries are not tied to a station, so every station is offered.\n\nYou can also type a place name, or coordinates as latitude,longitude.",
-          "data": {
-            "target": "Station, place or coordinates"
-          }
-        },
-        "reconfigure_params": {
-          "title": "Parameter",
-          "description": "Pick the value to read. The list has only the parameters this station actually reports, with their descriptions and units.\n\nIf the parameter you want is missing, you can type its name by hand. The raw query results are at {url}.",
-          "data": {
-            "parameter": "Parameter to return",
-            "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained.",
-            "forecast_step": "Time step between two forecast values in minutes",
-            "forecast_hours": "Forecast hours to show",
-            "forecast_past_hours": "Forecast history to show (hours)"
+            "measurements": "To remove"
           }
         }
       }
     },
-    "warnings": {
-      "entry_type": "Weather warnings",
+    "place": {
+      "entry_type": "Place",
       "initiate_flow": {
-        "user": "Add warnings place",
-        "reconfigure": "Change warnings place"
+        "user": "Add place",
+        "reconfigure": "Change place"
       },
       "error": {
-        "no_warning_types": "Choose at least one warning type."
+        "nothing_followed": "Choose the weather forecast, warning types or both.",
+        "no_forecast": "FMI has no forecast for this place. Pick a place in Finland or nearby.",
+        "connection_problem": "Could not reach FMI. Try again in a moment."
       },
       "abort": {
-        "already_configured": "Warnings for this place and these warning types are already followed",
-        "reconfigure_successful": "Warnings place updated"
+        "already_configured": "This place is already set up.",
+        "reconfigure_successful": "Place updated."
       },
       "step": {
         "user": {
-          "title": "Weather warnings",
+          "title": "Place",
           "description": "Pick the place on the map. A warning is included when its area covers the chosen place, or comes within the circle's radius.\n\nOn an island or by the shore, a radius of a kilometre or two makes sure the warnings for the nearby sea area are included.",
           "data": {
             "location": "Place",
-            "warning_types": "Warning types",
-            "label": "Name"
+            "label": "Name",
+            "weather": "Weather forecast",
+            "warning_types": "Warning types"
+          },
+          "data_description": {
+            "label": "The place's name. Home Assistant shows it in front of the entities' names.",
+            "weather": "The weather entity shows FMI's forecast for it, hour by hour for about nine days, and by day and by half day.",
+            "warning_types": "Empty means no warnings are followed."
           }
         },
         "reconfigure": {
-          "title": "Weather warnings",
+          "title": "Place",
           "description": "Pick the place on the map. A warning is included when its area covers the chosen place, or comes within the circle's radius.\n\nOn an island or by the shore, a radius of a kilometre or two makes sure the warnings for the nearby sea area are included.",
           "data": {
             "location": "Place",
-            "warning_types": "Warning types",
-            "label": "Name"
-          }
-        }
-      }
-    },
-    "weather": {
-      "entry_type": "Weather forecast",
-      "initiate_flow": {
-        "user": "Weather forecast",
-        "reconfigure": "Change weather forecast settings"
-      },
-      "error": {
-        "connection_problem": "Could not reach FMI. Try again in a moment.",
-        "no_forecast": "FMI has no forecast for this place. Pick a place in Finland or nearby."
-      },
-      "abort": {
-        "already_configured": "This place already has a weather entity",
-        "reconfigure_successful": "Weather forecast settings updated"
-      },
-      "step": {
-        "user": {
-          "title": "Weather forecast place",
-          "description": "Pick the place on the map. The weather entity shows FMI's forecast for it, hour by hour for about nine days, and by day and by half day.",
-          "data": {
-            "location": "Place",
-            "label": "Name"
-          }
-        },
-        "reconfigure": {
-          "title": "Weather forecast place",
-          "description": "Pick the place on the map. The weather entity shows FMI's forecast for it, hour by hour for about nine days, and by day and by half day.",
-          "data": {
-            "location": "Place",
-            "label": "Name"
+            "label": "Name",
+            "weather": "Weather forecast",
+            "warning_types": "Warning types"
+          },
+          "data_description": {
+            "label": "The place's name. Home Assistant shows it in front of the entities' names.",
+            "weather": "The weather entity shows FMI's forecast for it, hour by hour for about nine days, and by day and by half day.",
+            "warning_types": "Empty means no warnings are followed."
           }
         }
       }
@@ -214,7 +222,8 @@
           "yellow": "Yellow",
           "orange": "Orange",
           "red": "Red"
-        }
+        },
+        "name": "Warning level"
       }
     },
     "event": {
@@ -227,23 +236,24 @@
               "cancelled": "Cancelled"
             }
           }
-        }
+        },
+        "name": "Warning"
       }
     },
     "binary_sensor": {
       "stale_data": {
-        "name": "FMI {label} stale data"
+        "name": "{label} stale data"
       }
     }
   },
   "issues": {
     "parameter_missing": {
-      "title": "FMI sensor {label} no longer gets data",
-      "description": "The station ({target_type} {target}) no longer reports \"{parameter}\", so the sensor has no value.\n\nParameters this station currently reports: {available}\n\nChange the sensor to use one of these, or remove it."
+      "title": "FMI measurement {label} no longer gets data",
+      "description": "The station ({target_type} {target}) no longer reports \"{parameter}\", so the measurement has no value.\n\nThe station currently reports {available}.\n\nRemove the measurement from the station, and add one of these if you like."
     },
     "no_data": {
-      "title": "FMI sensor {label} no longer gets data",
-      "description": "The query {query_id} returns nothing at all for {target_type} {target}.\n\nThe station may have been decommissioned or renumbered, or it may no longer serve this query. Check the station in FMI's observation download service and reconfigure the sensor with a working identifier."
+      "title": "FMI measurement {label} no longer gets data",
+      "description": "The query {query_id} returns nothing at all for {target_type} {target}.\n\nThe station may have been decommissioned or renumbered, or it may no longer serve this query. Remove the measurement, and add it again at a station that has it."
     },
     "old_folder": {
       "title": "Delete the old FMI folder",

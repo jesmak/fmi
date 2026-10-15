@@ -8,7 +8,7 @@ get_feature directly and move the timestamps around.
 from datetime import timedelta
 
 import pytest
-from homeassistant.config_entries import ConfigSubentryData
+from conftest import station
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.util import dt as dt_util
@@ -22,10 +22,11 @@ from custom_components.fmi_open_data.const import (
     CONF_NO_DATA_ISSUE_HOURS,
     CONF_PARAMETER,
     CONF_QUERY_ID,
+    CONF_STRUCTURE,
     CONF_TARGET,
     CONF_TARGET_TYPE,
     DOMAIN,
-    SUBENTRY_SENSOR,
+    STRUCTURE_VERSION,
 )
 from custom_components.fmi_open_data.query_coordinator import FMIQueryCoordinator
 
@@ -103,15 +104,18 @@ STALE_DATA_SETTINGS = (CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS)
 async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, **overrides) -> MockConfigEntry:
     monkeypatch.setattr("custom_components.fmi_open_data.query_coordinator.FMISession", lambda *a, **kw: api)
     options = {key: value for key, value in overrides.items() if key in STALE_DATA_SETTINGS}
-    data = {**ENTRY_DATA, **{key: value for key, value in overrides.items() if key not in STALE_DATA_SETTINGS}}
+    data = {
+        **ENTRY_DATA,
+        CONF_LABEL: "Air temperature",
+        **{key: value for key, value in overrides.items() if key not in STALE_DATA_SETTINGS},
+    }
+    measurement = {key: value for key, value in data.items() if key not in (CONF_LANG, CONF_TARGET_TYPE, CONF_TARGET)}
     entry = MockConfigEntry(
         domain=DOMAIN,
-        data={CONF_LANG: "eng"},
+        data={CONF_LANG: "eng", CONF_STRUCTURE: STRUCTURE_VERSION},
         options=options,
         version=3,
-        subentries_data=[
-            ConfigSubentryData(data=data, subentry_type=SUBENTRY_SENSOR, title=data[CONF_LABEL], unique_id="test"),
-        ],
+        subentries_data=[station(measurement, target_type=data[CONF_TARGET_TYPE], target=data[CONF_TARGET])],
     )
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
@@ -120,11 +124,12 @@ async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, **overrides) ->
 
 
 def _coordinator(entry: MockConfigEntry) -> FMIQueryCoordinator:
-    return entry.runtime_data.coordinators[next(iter(entry.subentries))]
+    [coordinator] = entry.runtime_data.coordinators
+    return coordinator
 
 
 def _issue(hass: HomeAssistant, entry: MockConfigEntry):
-    return ir.async_get(hass).async_get_issue(DOMAIN, f"no_data_{next(iter(entry.subentries))}")
+    return ir.async_get(hass).async_get_issue(DOMAIN, _coordinator(entry).issue_id)
 
 
 async def test_recent_observation_raises_nothing(hass: HomeAssistant, monkeypatch):
@@ -157,7 +162,7 @@ async def test_data_just_outside_the_poll_window_is_not_reported(hass: HomeAssis
     # The plain 12 h poll came back empty, so a second, wider window was asked for.
     assert len(api.windows) > 1
     # And the value it found is shown rather than nothing.
-    state = hass.states.get("sensor.fmi_kaisaniemi_air_temperature")
+    state = hass.states.get("sensor.helsinki_kaisaniemi_air_temperature")
     assert state.state == "1.5"
     assert state.attributes["latitude"] is not None
 

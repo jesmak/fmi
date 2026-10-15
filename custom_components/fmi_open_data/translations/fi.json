@@ -42,145 +42,153 @@
     }
   },
   "config_subentries": {
-    "sensor": {
-      "entry_type": "Anturi",
+    "station": {
+      "entry_type": "Asema",
       "initiate_flow": {
-        "user": "Lisää anturi",
-        "reconfigure": "Muokkaa anturia"
+        "user": "Lisää mittauksia",
+        "reconfigure": "Muuta asemaa"
       },
       "error": {
+        "no_parameters": "Valitse vähintään yksi mitattava asia.",
         "connection_problem": "FMI:hin ei saatu yhteyttä. Yritä hetken päästä uudelleen.",
-        "no_data": "FMI ei palauttanut dataa tälle kyselylle, asemalle ja parametrille. Tarkista sijainti ja yritä uudelleen.",
-        "unknown": "Tuntematon virhe"
+        "no_data": "Ilmatieteen laitos ei palauttanut tietoja tälle paikalle. Tarkista paikka ja yritä uudelleen.",
+        "keep_one": "Asemalle pitää jäädä ainakin yksi mittaus. Koko aseman voi poistaa integraation sivulta."
       },
       "abort": {
-        "already_configured": "Anturi tälle kyselylle, asemalle ja parametrille on jo olemassa",
-        "reconfigure_successful": "Anturin asetukset päivitetty",
-        "cannot_connect": "FMI:hin ei saatu yhteyttä kyselyjen hakemiseksi. Yritä hetken päästä uudelleen."
+        "cannot_connect": "FMI:hin ei saatu yhteyttä. Yritä hetken päästä uudelleen.",
+        "already_configured": "Nämä mittaukset ovat jo käytössä.",
+        "measurements_added": "Mittaukset lisätty asemille {stations}.",
+        "reconfigure_successful": "Asema päivitetty."
       },
       "step": {
         "user": {
-          "title": "Kysely",
-          "description": "Valitse mitä haluat mitata. Listassa on kaikki FMI:n julkaisemat havainto- ja ennustekyselyt.",
+          "title": "Mitä haluat mitata?",
+          "description": "Valitse yksi tai useampi. Hae nimellä, esimerkiksi sade tai lumi. Asemien valinta tapahtuu seuraavassa vaiheessa.",
           "data": {
-            "query_label": "Valittu kysely"
+            "parameters": "Mittaukset"
           }
         },
-        "location": {
-          "title": "Sijainti",
-          "description": "Valitse asema jolta data luetaan. Asemat on järjestetty etäisyyden mukaan Home Assistant -sijainnistasi.\n\nHavaintokyselyissä listataan vain ne asemat jotka palvelevat valitsemaasi kyselyä. Ennustekyselyt eivät ole sidottu asemaan, joten niissä tarjotaan kaikki asemat.\n\nVoit myös kirjoittaa paikannimen tai koordinaatit muodossa leveysaste,pituusaste.",
+        "station": {
+          "title": "Asema",
+          "description": "Mistä luetaan {measurement}? Lähin ensin. Mukana ovat asemat, jotka ovat raportoineet tämän mittauksen äskettäin.",
           "data": {
-            "target": "Asema, paikka tai koordinaatit"
+            "station": "Asema",
+            "show_all": "Näytä kaikki kyselyn asemat"
+          },
+          "data_description": {
+            "show_all": "Myös asemat, jotka eivät ole ilmoittaneet tätä mittausta äskettäin."
           }
         },
-        "params": {
-          "title": "Parametri",
-          "description": "Valitse luettava arvo. Listalla on vain ne parametrit joita tämä asema oikeasti raportoi, kuvauksineen ja yksiköineen.\n\nJos haluamasi parametri puuttuu, voit kirjoittaa sen nimen käsin. Kyselyn raakatulokset löytyvät osoitteesta {url}.",
+        "point": {
+          "title": "Ennusteen kohde",
+          "description": "Mistä {measurement} ennuste haetaan?",
           "data": {
-            "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
+            "point": "Paikka",
+            "place_name": "Paikan nimi"
+          },
+          "data_description": {
+            "place_name": "Näkyy laitteen nimenä mittausantureiden nimien edessä."
+          }
+        },
+        "named_place": {
+          "title": "Paikka",
+          "description": "Tällä kyselyllä ei ole asemia. Kirjoita paikan nimi, jolle {measurement} luetaan, esimerkiksi Kotka.",
+          "data": {
+            "place": "Paikan nimi"
+          }
+        },
+        "names": {
+          "title": "Nimet",
+          "description": "Nimet on täytetty valmiiksi. Home Assistant näyttää aseman nimen antureiden nimien edessä. Nimiä voi muuttaa Home Assistantissa myöhemmin."
+        },
+        "reconfigure": {
+          "title": "Muokkaa asemaa",
+          "menu_options": {
+            "add_measurements": "Lisää mittauksia",
+            "measurement": "Muuta mittauksen asetuksia",
+            "remove_measurements": "Poista mittauksia"
+          }
+        },
+        "add_measurements": {
+          "title": "Lisää mittauksia",
+          "description": "Mukana ovat vain ne tiedot, mitä asema mittaa.",
+          "data": {
+            "parameters": "Mittaukset"
+          }
+        },
+        "measurement": {
+          "title": "Mittaus",
+          "data": {
+            "measurement": "Mittaus"
+          }
+        },
+        "settings": {
+          "title": "Asetukset",
+          "description": "{measurement}",
+          "data": {
+            "unit": "Yksikkö",
+            "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut.",
             "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
             "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
-            "parameter": "Parametri",
-            "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut."
+            "forecast_step": "Kahden ennusteen aikaväli minuuteissa"
+          },
+          "data_description": {
+            "unit": "Jättäessäsi kentän tyhjäksi, käytetään Ilmatieteen laitoksen omaa yksikköä. Kaikille parametreille sitä ei ole saatavilla."
           }
         },
-        "name": {
-          "title": "Nimi",
-          "description": "Ehdotettu nimi muodostuu valitsemastasi asemasta ja parametrista.",
+        "remove_measurements": {
+          "title": "Poista mittauksia",
+          "description": "Poistettujen mittausten entiteetit poistetaan.",
           "data": {
-            "label": "Anturin nimi"
-          }
-        },
-        "reconfigure": {
-          "title": "Kysely",
-          "description": "Vaihda anturin käyttämä kysely, asema tai parametri. Anturin historia säilyy, joten tällä voit korjata anturin jonka asema tai parametri on lakannut toimimasta.",
-          "data": {
-            "query_label": "Valittu kysely"
-          }
-        },
-        "reconfigure_location": {
-          "title": "Sijainti",
-          "description": "Valitse asema jolta data luetaan. Asemat on järjestetty etäisyyden mukaan Home Assistant -sijainnistasi.\n\nHavaintokyselyissä listataan vain ne asemat jotka palvelevat valitsemaasi kyselyä. Ennustekyselyt eivät ole sidottu asemaan, joten niissä tarjotaan kaikki asemat.\n\nVoit myös kirjoittaa paikannimen tai koordinaatit muodossa leveysaste,pituusaste.",
-          "data": {
-            "target": "Asema, paikka tai koordinaatit"
-          }
-        },
-        "reconfigure_params": {
-          "title": "Parametri",
-          "description": "Valitse luettava arvo. Listalla on vain ne parametrit joita tämä asema oikeasti raportoi, kuvauksineen ja yksiköineen.\n\nJos haluamasi parametri puuttuu, voit kirjoittaa sen nimen käsin. Kyselyn raakatulokset löytyvät osoitteesta {url}.",
-          "data": {
-            "parameter": "Parametri",
-            "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut.",
-            "forecast_step": "Kahden ennusteen aikaväli minuuteissa",
-            "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
-            "forecast_past_hours": "Näytettävä ennustehistoria tunneissa"
+            "measurements": "Poistettavat"
           }
         }
       }
     },
-    "warnings": {
-      "entry_type": "Säävaroitukset",
+    "place": {
+      "entry_type": "Paikka",
       "initiate_flow": {
-        "user": "Lisää varoituspaikka",
-        "reconfigure": "Muokkaa varoituspaikkaa"
+        "user": "Lisää paikka",
+        "reconfigure": "Muuta paikkaa"
       },
       "error": {
-        "no_warning_types": "Valitse vähintään yksi varoitustyyppi."
+        "nothing_followed": "Valitse sääennuste, varoitustyyppejä tai molemmat.",
+        "no_forecast": "Ilmatieteen laitoksella ei ole ennustetta tälle paikalle. Valitse paikka Suomesta tai sen läheltä.",
+        "connection_problem": "FMI:hin ei saatu yhteyttä. Yritä hetken päästä uudelleen."
       },
       "abort": {
-        "already_configured": "Tämän paikan ja näiden varoitustyyppien varoituksia seurataan jo",
-        "reconfigure_successful": "Varoituspaikka päivitetty"
+        "already_configured": "Tämä paikka on jo käytössä.",
+        "reconfigure_successful": "Paikka päivitetty."
       },
       "step": {
         "user": {
-          "title": "Säävaroitukset",
+          "title": "Paikka",
           "description": "Valitse paikka kartalta. Varoitus otetaan mukaan, kun sen alue kattaa valitun paikan tai ulottuu ympyrän säteen sisälle.\n\nSaarella tai rannalla kilometrin tai kahden säde varmistaa, että läheisen merialueen varoitukset tulevat mukaan.",
           "data": {
             "location": "Paikka",
-            "warning_types": "Varoitustyypit",
-            "label": "Nimi"
+            "label": "Nimi",
+            "weather": "Sääennuste",
+            "warning_types": "Varoitustyypit"
+          },
+          "data_description": {
+            "label": "Paikan nimi. Home Assistant näyttää sen entiteettien nimien edessä.",
+            "weather": "Sääentiteetti näyttää Ilmatieteen laitoksen ennusteen paikalle tunneittain noin yhdeksän päivän ajalta sekä päivittäin ja puolen vuorokauden jaksoissa.",
+            "warning_types": "Tyhjä tarkoittaa, ettei varoituksia seurata."
           }
         },
         "reconfigure": {
-          "title": "Säävaroitukset",
+          "title": "Paikka",
           "description": "Valitse paikka kartalta. Varoitus otetaan mukaan, kun sen alue kattaa valitun paikan tai ulottuu ympyrän säteen sisälle.\n\nSaarella tai rannalla kilometrin tai kahden säde varmistaa, että läheisen merialueen varoitukset tulevat mukaan.",
           "data": {
             "location": "Paikka",
-            "warning_types": "Varoitustyypit",
-            "label": "Nimi"
-          }
-        }
-      }
-    },
-    "weather": {
-      "entry_type": "Sääennuste",
-      "initiate_flow": {
-        "user": "Sääennuste",
-        "reconfigure": "Muuta sääennusteen määrityksiä"
-      },
-      "error": {
-        "connection_problem": "FMI:hin ei saatu yhteyttä. Yritä hetken päästä uudelleen.",
-        "no_forecast": "Ilmatieteen laitoksella ei ole ennustetta tälle paikalle. Valitse paikka Suomesta tai sen läheltä."
-      },
-      "abort": {
-        "already_configured": "Tälle paikalle on jo sääentiteetti",
-        "reconfigure_successful": "Sääennusteen määritykset päivitetty"
-      },
-      "step": {
-        "user": {
-          "title": "Sääennusteen paikka",
-          "description": "Valitse paikka kartalta. Sääentiteetti näyttää Ilmatieteen laitoksen ennusteen paikalle tunneittain noin yhdeksän päivän ajalta sekä päivittäin ja puolen vuorokauden jaksoissa.",
-          "data": {
-            "location": "Paikka",
-            "label": "Nimi"
-          }
-        },
-        "reconfigure": {
-          "title": "Sääennusteen paikka",
-          "description": "Valitse paikka kartalta. Sääentiteetti näyttää Ilmatieteen laitoksen ennusteen paikalle tunneittain noin yhdeksän päivän ajalta sekä päivittäin ja puolen vuorokauden jaksoissa.",
-          "data": {
-            "location": "Paikka",
-            "label": "Nimi"
+            "label": "Nimi",
+            "weather": "Sääennuste",
+            "warning_types": "Varoitustyypit"
+          },
+          "data_description": {
+            "label": "Paikan nimi. Home Assistant näyttää sen entiteettien nimien edessä.",
+            "weather": "Sääentiteetti näyttää Ilmatieteen laitoksen ennusteen paikalle tunneittain noin yhdeksän päivän ajalta sekä päivittäin ja puolen vuorokauden jaksoissa.",
+            "warning_types": "Tyhjä tarkoittaa, ettei varoituksia seurata."
           }
         }
       }
@@ -214,7 +222,8 @@
           "yellow": "Keltainen",
           "orange": "Oranssi",
           "red": "Punainen"
-        }
+        },
+        "name": "Varoitustaso"
       }
     },
     "event": {
@@ -227,23 +236,24 @@
               "cancelled": "Peruttu"
             }
           }
-        }
+        },
+        "name": "Varoitus"
       }
     },
     "binary_sensor": {
       "stale_data": {
-        "name": "FMI {label} vanhentunut data"
+        "name": "{label} vanhentunut data"
       }
     }
   },
   "issues": {
     "parameter_missing": {
-      "title": "FMI-anturi {label} ei enää saa dataa",
-      "description": "Asema ({target_type} {target}) ei enää raportoi parametria \"{parameter}\", joten anturille ei tule arvoa.\n\nParametrit joita asema tällä hetkellä raportoi: {available}\n\nMuuta anturi käyttämään jotain näistä, tai poista anturi."
+      "title": "FMI-mittaus {label} ei enää saa dataa",
+      "description": "Asema ({target_type} {target}) ei enää raportoi parametria \"{parameter}\", joten mittaukselle ei tule arvoa.\n\nAsema raportoi tällä hetkellä parametrit {available}.\n\nPoista mittaus asemalta ja lisää halutessasi jokin näistä."
     },
     "no_data": {
-      "title": "FMI-anturi {label} ei enää saa dataa",
-      "description": "Kysely {query_id} ei palauta mitään kohteelle {target_type} {target}.\n\nAsema on voitu poistaa käytöstä tai sen tunniste on vaihtunut, tai asema ei enää palvele tätä kyselyä. Tarkista asema FMI:n havaintojen latauspalvelusta ja päivitä anturin asetukset toimivalla tunnisteella."
+      "title": "FMI-mittaus {label} ei enää saa dataa",
+      "description": "Kysely {query_id} ei palauta mitään kohteelle {target_type} {target}.\n\nAsema on voitu poistaa käytöstä tai sen tunniste on vaihtunut, tai asema ei enää palvele tätä kyselyä. Poista mittaus ja lisää se uudelleen asemalle, jolla se on."
     },
     "old_folder": {
       "title": "Poista FMI:n vanha kansio",

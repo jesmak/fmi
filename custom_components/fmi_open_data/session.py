@@ -10,7 +10,6 @@ from requests import RequestException
 
 from .const import (
     API_DESCRIBE_STORED_QUERIES_URL,
-    API_FINLAND_BBOX,
     API_GET_FEATURE_URL,
     API_GET_PARAMS_URL,
     API_STATIONS_QUERY_ID,
@@ -31,12 +30,6 @@ NAMESPACES = {
     "gmlcov": "http://www.opengis.net/gmlcov/1.0",
     "swe": "http://www.opengis.net/swe/2.0",
 }
-
-# STUK's radiation queries are not in FMI's parameter metadata.
-STUK_UNITS = {"::air": "µBq/m³", "::external-radiation": "µSv/h"}
-# Nor is the water level's unit. The mareograph's observations are in millimetres and the sea level forecast in
-# centimetres: ten days of daily means at Hamina put the observation at 9.6 to 10.8 times the forecast.
-WATER_LEVEL_UNITS = {"wlevn2k_pt1s_instant": "mm", "wlev_pt1s_instant": "mm", "sealeveln2000": "cm", "sealevel": "cm"}
 
 
 class FMIException(Exception):
@@ -179,13 +172,75 @@ class FMISession:
         The station is None when the response has no data at all.
         """
         root = self._xml(feature_url(lang, params))
-        point = root.find(".//gml:MultiPoint/gml:pointMember/gml:Point", NAMESPACES)
+        point = root.find(".//gml:MultiPoint//gml:Point", NAMESPACES)
         station = None
         if point is not None:
             name = point.find("./gml:name", NAMESPACES)
             latitude, longitude = _coords(point.find("./gml:pos", NAMESPACES))
             station = {"name": name.text if name is not None else None, "latitude": latitude, "longitude": longitude}
         return station, _coverage_rows(root)
+
+    def get_station_coverage(self, lang: str, params: dict[str, Any]) -> tuple[list[str], list[dict[str, Any]]]:
+        """Return a multipointcoverage query's parameters, and its stations with the parameters each one reported.
+
+        A station that does not measure a parameter reports nothing but NaN for it. Each station is a dict like
+        list_stations gives, with "measured", the set of parameters it reported at least once. Its id is an fmisid
+        for observations, and for a forecast at fixed points a geoid, which can be negative.
+        """
+        root = self._xml(feature_url(lang, params))
+        fields = [field.attrib["name"] for field in root.iter("{http://www.opengis.net/swe/2.0}field")]
+        stations: dict[tuple[str, str], dict[str, Any]] = {}
+        for point in root.findall(".//gml:MultiPoint//gml:Point", NAMESPACES):
+            fmisid = point.attrib.get(GML_ID, "").removeprefix("point-")
+            position = point.find("./gml:pos", NAMESPACES)
+            if not fmisid.removeprefix("-").isdigit() or position is None or not position.text:
+                continue
+            name = point.find("./gml:name", NAMESPACES)
+            latitude, longitude = position.text.split()[:2]
+            stations[(latitude, longitude)] = {
+                "id": fmisid,
+                "name": name.text if name is not None and name.text else fmisid,
+                "latitude": float(latitude),
+                "longitude": float(longitude),
+                "measured": set(),
+            }
+        if not fields or not stations:
+            return fields, list(stations.values())
+
+        positions = _text(root, ".//gmlcov:positions").split()
+        values = _text(root, ".//gml:doubleOrNilReasonTupleList").split()
+        if len(positions) % 3 or len(values) != len(positions) // 3 * len(fields):
+            raise FMIException("FMI's response has a different number of times and values")
+        # A position is a station's latitude and longitude, written as in its point, and a Unix time.
+        for index in range(len(positions) // 3):
+            station = stations.get((positions[index * 3], positions[index * 3 + 1]))
+            if station is None:
+                continue
+            for offset, name in enumerate(fields):
+                if values[index * len(fields) + offset] != "NaN":
+                    station["measured"].add(name)
+        return fields, list(stations.values())
+
+    def get_simple_coverage(self, lang: str, params: dict[str, Any]) -> tuple[list[str], dict[tuple[float, float], set[str]]]:
+        """Return a ::simple query's parameters, and by position the parameters reported there.
+
+        For the queries FMI publishes in no other form. The simple form says where a value is from by its coordinates
+        only, not by the station's id.
+        """
+        root = self._xml(feature_url(lang, params))
+        fields: list[str] = []
+        measured: dict[tuple[float, float], set[str]] = {}
+        for item in root.findall("./wfs:member/BsWfs:BsWfsElement", NAMESPACES):
+            name = _text(item, "./BsWfs:ParameterName")
+            if name not in fields:
+                fields.append(name)
+            latitude, longitude = _coords(item.find("./BsWfs:Location/gml:Point/gml:pos", NAMESPACES))
+            if latitude is None or longitude is None:
+                continue
+            reported = measured.setdefault((latitude, longitude), set())
+            if _text(item, "./BsWfs:ParameterValue") != "NaN":
+                reported.add(name)
+        return fields, measured
 
     def list_stored_queries(self, lang: str, suffix: str | None = None) -> list[list[str]]:
         """Return [id, title] of the queries that take a station (fmisid), sorted by title."""
@@ -208,44 +263,6 @@ class FMISession:
         root = self._xml(feature_url(lang, params))
         names = {item.text for item in root.findall("./wfs:member/BsWfs:BsWfsElement/BsWfs:ParameterName", NAMESPACES) if item.text}
         return sorted(names, key=str.lower)
-
-    def list_stations_for_query(self, lang: str, query_id: str, params: dict[str, Any]) -> list[dict[str, Any]]:
-        """Return only the stations that actually serve a given stored query.
-
-        The multipointcoverage twin of a query describes the locations it
-        covers, which is exactly the set a sensor could read. Returns an empty
-        list when the query has no such twin, so callers can fall back.
-        """
-        coverage_id = query_id.replace("::simple", "::multipointcoverage")
-        if coverage_id == query_id:
-            return []
-
-        root = self._xml(feature_url(lang, {**params, "storedquery_id": coverage_id, "bbox": API_FINLAND_BBOX}))
-
-        regions = {}
-        for location in root.findall(".//target:Location", NAMESPACES):
-            identifier = location.find("./gml:identifier", NAMESPACES)
-            region = location.find("./target:region", NAMESPACES)
-            if identifier is not None and identifier.text:
-                regions[identifier.text] = region.text if region is not None else None
-
-        stations = []
-        for point in root.findall(".//gml:MultiPoint/gml:pointMember/gml:Point", NAMESPACES):
-            fmisid = point.attrib.get(GML_ID, "").removeprefix("point-")
-            if not fmisid.isdigit():
-                continue
-            name = point.find("./gml:name", NAMESPACES)
-            latitude, longitude = _coords(point.find("./gml:pos", NAMESPACES))
-            stations.append(
-                {
-                    "id": fmisid,
-                    "name": name.text if name is not None and name.text else fmisid,
-                    "region": regions.get(fmisid),
-                    "latitude": latitude,
-                    "longitude": longitude,
-                }
-            )
-        return stations
 
     def list_stations(self, lang: str) -> list[dict[str, Any]]:
         """Return the observation stations FMI currently lists as operational.
@@ -292,8 +309,4 @@ class FMISession:
         return result
 
     def get_unit(self, lang: str, query_id: str, param_name: str) -> str | None:
-        if query_id.startswith("stuk::"):
-            return next((unit for key, unit in STUK_UNITS.items() if key in query_id), None)
-        if param_name.lower() in WATER_LEVEL_UNITS:
-            return WATER_LEVEL_UNITS[param_name.lower()]
         return self.get_parameter_descriptions(lang, query_id).get(param_name.lower(), (None, None))[1]

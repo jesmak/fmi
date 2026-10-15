@@ -1,18 +1,27 @@
 """Config flow.
 
-The config entry holds the language, and its options the stale data settings
-shared by every sensor. Sensors, warnings places and weather places are
-subentries, added and changed from the integration page.
+The config entry holds the language, and its options the stale data settings shared by every measurement.
+Stations and places are subentries, added and changed from the integration page.
+
+Adding measurements starts from what to measure: every parameter FMI's station queries have, in one searchable list.
+Then a station for each one, offering only the stations that reported it, nearest first. Each measurement goes to
+its station's subentry, an existing one or a new one, so one run can add to several stations.
 """
 
 import logging
-import re
-from datetime import timedelta
 from typing import Any
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, ConfigSubentryFlow, OptionsFlow, SubentryFlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    ConfigSubentry,
+    ConfigSubentryFlow,
+    OptionsFlow,
+    SubentryFlowResult,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
     LocationSelector,
@@ -23,44 +32,53 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
 )
 from homeassistant.util import dt as dt_util
-from homeassistant.util.location import distance
 
+from .catalogue import KIND_PLACE, KIND_POINT, KIND_STATIONS, Catalogue, Parameter, async_catalogue, distance_km
 from .const import (
-    API_TIME_FORMAT,
     CONF_FORECAST_HOURS,
     CONF_FORECAST_PAST_HOURS,
     CONF_FORECAST_STEP,
     CONF_LABEL,
     CONF_LANG,
     CONF_LOCATION,
+    CONF_MEASUREMENTS,
     CONF_NEGATIVE_AS_ZERO,
     CONF_NO_DATA_ISSUE,
     CONF_NO_DATA_ISSUE_HOURS,
     CONF_PARAMETER,
     CONF_QUERY_ID,
-    CONF_QUERY_LABEL,
     CONF_TARGET,
     CONF_TARGET_TYPE,
+    CONF_UNIT,
     CONF_WARNING_TYPES,
+    CONF_WEATHER,
     DEFAULT_NO_DATA_ISSUE,
     DEFAULT_NO_DATA_ISSUE_HOURS,
-    DEFAULT_WARNINGS_LABEL,
     DEFAULT_WARNINGS_RADIUS,
-    DEFAULT_WEATHER_LABEL,
     DOMAIN,
     LANGUAGES,
-    SUBENTRY_SENSOR,
-    SUBENTRY_WARNINGS,
-    SUBENTRY_WEATHER,
+    SUBENTRY_PLACE,
+    SUBENTRY_STATION,
     WARNING_TYPE_KEYS,
 )
 from .migration import TITLE, VERSION, moved_entry, old_entries
-from .query_coordinator import build_unique_id, get_start_time, query_params
+from .query_coordinator import measurement_key, measurement_name, query_params, station_unique_id
 from .session import FMIException, FMINoData, FMISession
-from .warning_coordinator import build_warnings_unique_id
-from .weather_coordinator import async_get_forecast, build_weather_unique_id
+from .structure import place_unique_id
+from .weather_coordinator import async_get_forecast
 
 _LOGGER = logging.getLogger(__name__)
+
+CONF_PARAMETERS = "parameters"
+CONF_STATION = "station"
+CONF_SHOW_ALL = "show_all"
+CONF_POINT = "point"
+CONF_PLACE_NAME = "place_name"
+CONF_PLACE = "place"
+CONF_MEASUREMENT = "measurement"
+
+# A forecast measurement's settings until the user changes them.
+FORECAST_DEFAULTS = {CONF_FORECAST_HOURS: 36, CONF_FORECAST_PAST_HOURS: 5, CONF_FORECAST_STEP: 30}
 
 STALE_DATA_SCHEMA = vol.Schema(
     {
@@ -69,22 +87,16 @@ STALE_DATA_SCHEMA = vol.Schema(
     }
 )
 
-WARNINGS_SCHEMA = vol.Schema(
+PLACE_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_LOCATION): LocationSelector(LocationSelectorConfig(radius=True, icon="mdi:alert")),
-        vol.Required(CONF_WARNING_TYPES): SelectSelector(
+        vol.Required(CONF_LOCATION): LocationSelector(LocationSelectorConfig(radius=True, icon="mdi:map-marker")),
+        vol.Required(CONF_LABEL): cv.string,
+        vol.Required(CONF_WEATHER): cv.boolean,
+        vol.Optional(CONF_WARNING_TYPES): SelectSelector(
             SelectSelectorConfig(
                 options=list(WARNING_TYPE_KEYS.values()), multiple=True, translation_key=CONF_WARNING_TYPES, mode=SelectSelectorMode.LIST
             )
         ),
-        vol.Required(CONF_LABEL): cv.string,
-    }
-)
-
-WEATHER_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_LOCATION): LocationSelector(LocationSelectorConfig(radius=False, icon="mdi:weather-partly-cloudy")),
-        vol.Required(CONF_LABEL): cv.string,
     }
 )
 
@@ -94,7 +106,7 @@ def language_schema(default: str) -> vol.Schema:
 
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> str | None:
-    """Read the sensor once as it would be read, and return the error to show, if any."""
+    """Read a measurement once as it would be read, and return the error to show, if any."""
     query_id = str(data[CONF_QUERY_ID])
     try:
         result = await hass.async_add_executor_job(
@@ -110,25 +122,13 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> str | Non
     return None if result["data"] else "no_data"
 
 
-def warning_types_from_form(data: dict[str, Any]) -> dict[str, Any]:
-    """The form's lower-case warning type keys as FMI's warning types, which subentries store."""
-    types_by_key = {key: warning_type for warning_type, key in WARNING_TYPE_KEYS.items()}
-    return {**data, CONF_WARNING_TYPES: [types_by_key.get(key, key) for key in data.get(CONF_WARNING_TYPES) or []]}
-
-
-def warning_types_for_form(data: dict[str, Any]) -> dict[str, Any]:
-    """Stored warning types as the form's lower-case keys."""
-    return {**data, CONF_WARNING_TYPES: [WARNING_TYPE_KEYS.get(t, t) for t in data.get(CONF_WARNING_TYPES) or []]}
-
-
-def validate_warnings_input(data: dict[str, Any]) -> dict[str, str]:
-    if not data.get(CONF_WARNING_TYPES):
-        return {CONF_WARNING_TYPES: "no_warning_types"}
-    return {}
-
-
 def unique_id_taken(entry: ConfigEntry, unique_id: str, except_subentry_id: str | None = None) -> bool:
     return any(subentry.unique_id == unique_id and subentry.subentry_id != except_subentry_id for subentry in entry.subentries.values())
+
+
+def new_measurement(parameter: Parameter, label: str) -> dict[str, Any]:
+    measurement = {CONF_QUERY_ID: parameter.query_id, CONF_PARAMETER: parameter.name, CONF_LABEL: label, CONF_NEGATIVE_AS_ZERO: False}
+    return {**measurement, **FORECAST_DEFAULTS} if "::forecast" in parameter.query_id else measurement
 
 
 class FMIConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -165,7 +165,7 @@ class FMIConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(step_id="user", data_schema=language_schema(default))
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        """Change the default language for new sensors and warnings places."""
+        """Change the language of FMI's texts."""
         entry = self._get_reconfigure_entry()
 
         if user_input is not None:
@@ -183,11 +183,11 @@ class FMIConfigFlow(ConfigFlow, domain=DOMAIN):
     @classmethod
     @callback
     def async_get_supported_subentry_types(cls, config_entry: ConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
-        return {SUBENTRY_SENSOR: SensorSubentryFlow, SUBENTRY_WARNINGS: WarningsSubentryFlow, SUBENTRY_WEATHER: WeatherSubentryFlow}
+        return {SUBENTRY_STATION: StationSubentryFlow, SUBENTRY_PLACE: PlaceSubentryFlow}
 
 
 class StaleDataOptionsFlow(OptionsFlow):
-    """When data counts as stale, and whether a repair issue is raised. Shared by every sensor."""
+    """When data counts as stale, and whether a repair issue is raised. Shared by every measurement."""
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
 
@@ -202,395 +202,352 @@ class StaleDataOptionsFlow(OptionsFlow):
         return self.async_show_form(step_id="init", data_schema=self.add_suggested_values_to_schema(STALE_DATA_SCHEMA, values))
 
 
-class SensorSubentryFlow(ConfigSubentryFlow):
-    """One parameter of one query at one station or forecast point."""
+class StationSubentryFlow(ConfigSubentryFlow):
+    """Measurements at stations: added from what to measure, and changed one station at a time."""
 
     def __init__(self):
-        self.data: dict[str, Any] = {}
-        self.queries: list[list[str]] | None = None
-        self.param_schema: vol.Schema | None = None
-        self.stations: list[dict[str, Any]] | None = None
-        self.descriptions: dict[str, tuple[str, str]] | None = None
+        self.catalogue: Catalogue | None = None
+        # The parameters chosen, and for each the station it is read at: (target type, target, station's name).
+        self.chosen: list[Parameter] = []
+        self.targets: list[tuple[str, str, str]] = []
+        self.show_all = False
+        # When adding to one station from its own reconfigure, the station is not asked.
+        self.fixed_target: tuple[str, str, str] | None = None
+        # The measurement whose settings are being changed.
+        self.key: str | None = None
 
-    async def _async_stations_for_query(self) -> list[dict[str, Any]]:
-        """Stations that serve the chosen query, or all of them as a fallback.
+    @property
+    def _lang(self) -> str:
+        return self._get_entry().data[CONF_LANG]
 
-        Forecast queries are interpolated to a point rather than tied to a
-        station, so they have no station list of their own.
-        """
-        lang = self.data[CONF_LANG]
-        query_id = str(self.data[CONF_QUERY_ID])
-        api = FMISession()
-        now = dt_util.utcnow()
-        start_time = get_start_time(query_id, now, {CONF_FORECAST_PAST_HOURS: 1})
-        params = {
-            "starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
-            "endtime": now.strftime(API_TIME_FORMAT),
-        }
+    async def _async_catalogue(self) -> Catalogue | None:
+        if self.catalogue is None:
+            try:
+                self.catalogue = await async_catalogue(self.hass, self._lang)
+            except FMIException as exception:
+                _LOGGER.warning(f"Could not read FMI's queries: {exception}")
+        return self.catalogue
 
-        stations = await self.hass.async_add_executor_job(api.list_stations_for_query, lang, query_id, params)
-
-        if stations:
-            return stations
-
-        _LOGGER.debug(f"No station list for {query_id}, offering every station")
-        return await self.hass.async_add_executor_job(api.list_stations, lang)
-
-    @staticmethod
-    @callback
-    def _target_type_for(value: str) -> str:
-        """Work out which identifier the user gave, so they need not say."""
-        text = str(value).strip()
-
-        if re.fullmatch(r"-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?", text):
-            return "latlon"
-
-        return "fmisid" if text.isdigit() else "place"
-
-    async def _async_build_target_selector(self):
-        """Offer the stations that serve this query, nearest to home first.
-
-        Falls back to a plain text field if the list cannot be fetched. The
-        selector accepts custom values so place names and coordinates work too.
-        """
-        try:
-            self.stations = stations = await self._async_stations_for_query()
-        except Exception as exception:  # noqa: BLE001 - degrade to a text field, never break the flow
-            _LOGGER.warning(f"Could not list stations: {exception}")
-            return cv.string
-
-        if not stations:
-            return cv.string
-
-        def distance_to_home(station: dict[str, Any]) -> float:
-            if station["latitude"] is None or station["longitude"] is None:
-                return float("inf")
-            metres = distance(self.hass.config.latitude, self.hass.config.longitude, station["latitude"], station["longitude"])
-            return float("inf") if metres is None else metres
-
-        options = []
-        for station in sorted(stations, key=distance_to_home):
-            label = station["name"]
-            if station["region"] and station["region"] not in label:
-                label = f"{label}, {station['region']}"
-            away = distance_to_home(station)
-            suffix = "" if away == float("inf") else f" - {round(away / 1000)} km"
-            options.append(SelectOptionDict(value=station["id"], label=f"{label} ({station['id']}){suffix}"))
-
-        return SelectSelector(SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN, custom_value=True, sort=False))
-
-    async def _async_build_parameter_selector(self):
-        """Offer the parameters the chosen query and station actually report.
-
-        Falls back to a plain text field if the probe fails, so a station that
-        cannot be reached does not dead-end the flow.
-        """
-        query_id = str(self.data[CONF_QUERY_ID])
-        is_forecast = "::forecast" in query_id
-        now = dt_util.utcnow()
-        # A short window is enough to enumerate names; the aggregate queries reuse
-        # the runtime start time so their parameters show up at all.
-        start_time = get_start_time(query_id, now, {CONF_FORECAST_PAST_HOURS: 1})
-        end_time = now + timedelta(hours=12) if is_forecast else None
-
-        params = {
-            "starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
-            "endtime": end_time.strftime(API_TIME_FORMAT) if end_time is not None else None,
-            "storedquery_id": query_id,
-            self.data[CONF_TARGET_TYPE]: self.data[CONF_TARGET],
-        }
-
-        api = FMISession()
-
-        try:
-            names = await self.hass.async_add_executor_job(api.list_parameters, self.data[CONF_LANG], params)
-        except Exception as exception:  # noqa: BLE001 - degrade to a text field, never break the flow
-            _LOGGER.warning(f"Could not list parameters for {query_id}: {exception}")
-            return cv.string
-
-        if not names:
-            return cv.string
-
-        try:
-            self.descriptions = descriptions = await self.hass.async_add_executor_job(
-                api.get_parameter_descriptions, self.data[CONF_LANG], query_id
-            )
-        except Exception:  # noqa: BLE001 - labels are cosmetic, fall back to bare names
-            self.descriptions = descriptions = {}
-
-        options = []
-        for name in names:
-            label, unit = descriptions.get(name.lower(), (None, None))
-            text = name if label is None else f"{name} - {label}"
-            options.append(SelectOptionDict(value=name, label=text if unit is None else f"{text} ({unit})"))
-
-        # custom_value keeps a parameter that the probe window happened to miss reachable.
-        return SelectSelector(SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN, custom_value=True, sort=False))
-
-    @callback
-    def _params_placeholders(self) -> dict[str, str]:
-        now = dt_util.utcnow()
-        query_id = self.data[CONF_QUERY_ID]
-        return {
-            "url": f"https://opendata.fmi.fi/wfs/{self.data[CONF_LANG]}?request=getFeature"
-            f"&storedquery_id={query_id}"
-            f"&starttime={(now - timedelta(hours=1)).strftime(API_TIME_FORMAT)}"
-            f"&endtime={now.strftime(API_TIME_FORMAT)}"
-            f"&{self.data[CONF_TARGET_TYPE]}={self.data[CONF_TARGET]}",
-        }
-
-    async def _async_query_form(self, step_id: str, current: str | None = None) -> SubentryFlowResult:
-        try:
-            self.queries = await self.hass.async_add_executor_job(FMISession().list_stored_queries, self.data[CONF_LANG], "::simple")
-        except FMIException as exception:
-            _LOGGER.warning(f"Could not list FMI's queries: {exception}")
-            return self.async_abort(reason="cannot_connect")
-        choices = [f"{query[1]} ({query[0]})" for query in self.queries]
-        default = next((choice for choice, query in zip(choices, self.queries, strict=True) if query[0] == current), None)
+    def _parameters_form(self, parameters: list[Parameter], step_id: str, errors: dict[str, str] | None = None) -> SubentryFlowResult:
+        options = [SelectOptionDict(value=parameter.value, label=parameter.label) for parameter in parameters]
+        # An empty default, as Home Assistant would otherwise choose the first parameter for the user.
         schema = vol.Schema(
             {
-                vol.Required(CONF_QUERY_LABEL, **({"default": default} if default else {})): vol.All(cv.string, vol.In(choices)),
+                vol.Required(CONF_PARAMETERS, default=[]): SelectSelector(
+                    SelectSelectorConfig(options=options, multiple=True, mode=SelectSelectorMode.DROPDOWN, sort=False)
+                )
             }
         )
-        return self.async_show_form(step_id=step_id, data_schema=schema)
+        return self.async_show_form(step_id=step_id, data_schema=schema, errors=errors or {})
 
-    def _choose_query(self, user_input: dict[str, Any]) -> None:
-        query_id = next((query[0] for query in self.queries if str(user_input[CONF_QUERY_LABEL]) == f"{query[1]} ({query[0]})"), None)
-        self.data.update(user_input, **{CONF_QUERY_ID: query_id})
-        if "::forecast" not in str(query_id):
-            # Left over when an existing forecast sensor is changed to read observations.
-            for key in (CONF_FORECAST_HOURS, CONF_FORECAST_PAST_HOURS, CONF_FORECAST_STEP):
-                self.data.pop(key, None)
+    def _choose(self, user_input: dict[str, Any]) -> bool:
+        self.chosen = [
+            self.catalogue.parameters[value] for value in user_input.get(CONF_PARAMETERS) or [] if value in self.catalogue.parameters
+        ]
+        self.targets = []
+        return bool(self.chosen)
 
-    def _params_schema(self, parameter_selector, values: dict[str, Any]) -> vol.Schema:
-        schema_params = {
-            vol.Required(CONF_PARAMETER, **({"default": values[CONF_PARAMETER]} if values.get(CONF_PARAMETER) else {})): parameter_selector,
-            vol.Required(CONF_NEGATIVE_AS_ZERO, default=values.get(CONF_NEGATIVE_AS_ZERO, False)): cv.boolean,
+    # ---------------- adding measurements ----------------
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """What to measure."""
+        if await self._async_catalogue() is None:
+            return self.async_abort(reason="cannot_connect")
+
+        if user_input is not None:
+            if self._choose(user_input):
+                return await self._async_next_target()
+            return self._parameters_form(list(self.catalogue.parameters.values()), "user", {"base": "no_parameters"})
+
+        return self._parameters_form(list(self.catalogue.parameters.values()), "user")
+
+    async def _async_next_target(self) -> SubentryFlowResult:
+        if len(self.targets) == len(self.chosen):
+            return await self.async_step_names()
+        if self.fixed_target is not None:
+            self.targets.append(self.fixed_target)
+            return await self._async_next_target()
+        parameter = self.chosen[len(self.targets)]
+        # A parameter no station has reported lately, such as wave height while the buoys are ashore for the winter,
+        # starts from every station of its query.
+        self.show_all = not parameter.stations
+        kind = parameter.kind
+        if kind == KIND_STATIONS:
+            return await self.async_step_station()
+        if kind == KIND_POINT:
+            return await self.async_step_point()
+        return await self.async_step_named_place()
+
+    def _placeholders(self) -> dict[str, str]:
+        return {CONF_MEASUREMENT: self.chosen[len(self.targets)].label}
+
+    async def async_step_station(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """The station for one parameter: those that reported it, nearest first, or every station of the query."""
+        parameter = self.chosen[len(self.targets)]
+
+        if user_input is not None and bool(user_input.get(CONF_SHOW_ALL)) == self.show_all:
+            station = next(item for item in self.catalogue.stations[parameter.query_id] if item["id"] == user_input[CONF_STATION])
+            self.targets.append((station["target_type"], station["id"], station["name"]))
+            return await self._async_next_target()
+        if user_input is not None:
+            self.show_all = bool(user_input.get(CONF_SHOW_ALL))
+
+        stations = self.catalogue.stations[parameter.query_id] if self.show_all else parameter.stations
+        options = [
+            SelectOptionDict(value=item["id"], label=f"{item['name']} · {round(distance_km(self.hass, item))} km") for item in stations
+        ]
+        # The station chosen for the previous parameter, when it has this one too, else the nearest.
+        previous = next((target for target_type, target, _ in reversed(self.targets) if target_type in ("fmisid", "geoid")), None)
+        default = previous if any(option["value"] == previous for option in options) else (options[0]["value"] if options else None)
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_STATION, **({"default": default} if default else {})): SelectSelector(
+                    SelectSelectorConfig(options=options, mode=SelectSelectorMode.DROPDOWN, sort=False)
+                ),
+                vol.Required(CONF_SHOW_ALL, default=self.show_all): cv.boolean,
+            }
+        )
+        return self.async_show_form(step_id="station", data_schema=schema, description_placeholders=self._placeholders())
+
+    async def async_step_point(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """The point for a forecast, and what to call it."""
+        parameter = self.chosen[len(self.targets)]
+        errors = {}
+
+        if user_input is not None:
+            point = user_input[CONF_POINT]
+            target = f"{float(point['latitude']):.4f},{float(point['longitude']):.4f}"
+            errors = await self._async_try(parameter, "latlon", target)
+            if not errors:
+                self.targets.append(("latlon", target, user_input[CONF_PLACE_NAME]))
+                return await self._async_next_target()
+
+        values = user_input or {
+            CONF_POINT: {"latitude": self.hass.config.latitude, "longitude": self.hass.config.longitude},
+            CONF_PLACE_NAME: self.hass.config.location_name,
         }
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_POINT): LocationSelector(LocationSelectorConfig(radius=False, icon="mdi:crosshairs-gps")),
+                vol.Required(CONF_PLACE_NAME): cv.string,
+            }
+        )
+        return self.async_show_form(
+            step_id="point",
+            data_schema=self.add_suggested_values_to_schema(schema, values),
+            errors=errors,
+            description_placeholders=self._placeholders(),
+        )
 
-        if "::forecast" in str(self.data[CONF_QUERY_ID]):
-            schema_params[vol.Required(CONF_FORECAST_HOURS, default=values.get(CONF_FORECAST_HOURS, 36))] = cv.positive_int
-            schema_params[vol.Required(CONF_FORECAST_PAST_HOURS, default=values.get(CONF_FORECAST_PAST_HOURS, 5))] = cv.positive_int
-            schema_params[vol.Required(CONF_FORECAST_STEP, default=values.get(CONF_FORECAST_STEP, 30))] = cv.positive_int
+    async def async_step_named_place(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """A place name, for a query that has parameters but no stations."""
+        parameter = self.chosen[len(self.targets)]
+        errors = {}
 
-        return vol.Schema(schema_params)
+        if user_input is not None:
+            place = user_input[CONF_PLACE].strip()
+            errors = await self._async_try(parameter, "place", place)
+            if not errors:
+                self.targets.append(("place", place, place))
+                return await self._async_next_target()
 
-    async def _async_validated(self, user_input: dict[str, Any]) -> dict[str, str]:
-        """Errors from test-reading the sensor with the chosen settings; empty when it works."""
-        try:
-            error = await validate_input(self.hass, {**self.data, **user_input})
-        except Exception:
-            _LOGGER.exception("Unexpected exception")
-            error = "unknown"
+        schema = vol.Schema({vol.Required(CONF_PLACE): cv.string})
+        return self.async_show_form(
+            step_id="named_place",
+            data_schema=self.add_suggested_values_to_schema(schema, user_input or {}),
+            errors=errors,
+            description_placeholders=self._placeholders(),
+        )
+
+    async def _async_try(self, parameter: Parameter, target_type: str, target: str) -> dict[str, str]:
+        """Read the parameter once at a place the user typed or picked, so that a typo shows here."""
+        data = {CONF_LANG: self._lang, CONF_TARGET_TYPE: target_type, CONF_TARGET: target, **new_measurement(parameter, "")}
+        error = await validate_input(self.hass, data)
         return {"base": error} if error else {}
 
-    # ---------------- adding a sensor ----------------
-
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Choose the query. The language comes from the integration's settings."""
-        if not self.data:
-            self.data = {CONF_LANG: self._get_entry().data[CONF_LANG]}
-
-        if user_input is None:
-            return await self._async_query_form("user")
-
-        self._choose_query(user_input)
-
-        return await self.async_step_location()
-
-    async def async_step_location(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+    async def async_step_names(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """A name for each measurement, prefilled by the rules. The field says where it is read and what."""
+        fields: list[tuple[str, Parameter, tuple[str, str, str]]] = []
+        for parameter, target in zip(self.chosen, self.targets, strict=True):
+            field = f"{target[2]} · {parameter.description or parameter.name}"
+            while any(existing == field for existing, _, _ in fields):
+                field += " ·"
+            fields.append((field, parameter, target))
 
         if user_input is None:
-            schema = vol.Schema({vol.Required(CONF_TARGET): await self._async_build_target_selector()})
-            return self.async_show_form(step_id="location", data_schema=schema)
+            schema = vol.Schema({vol.Required(field, default=self._default_name(parameter)): cv.string for field, parameter, _ in fields})
+            return self.async_show_form(step_id="names", data_schema=schema, last_step=True)
 
-        user_input[CONF_TARGET_TYPE] = self._target_type_for(user_input[CONF_TARGET])
-        self.data.update(user_input)
+        measurements = [(target, new_measurement(parameter, user_input[field].strip())) for field, parameter, target in fields]
+        if self.fixed_target is not None:
+            return self._update_station(self._get_reconfigure_subentry(), [measurement for _, measurement in measurements])
+        return self._add_to_stations(measurements)
 
-        return await self.async_step_params()
+    def _default_name(self, parameter: Parameter) -> str:
+        descriptions = {parameter.name.lower(): (parameter.description, None)}
+        return measurement_name(descriptions, self._lang, parameter.query_id, parameter.name)
 
-    async def async_step_params(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+    def _add_to_stations(self, measurements: list[tuple[tuple[str, str, str], dict[str, Any]]]) -> SubentryFlowResult:
+        """Each measurement to its station: added to the station's subentry, or a new subentry for a new station."""
+        entry = self._get_entry()
+        by_station: dict[str, tuple[tuple[str, str, str], list[dict[str, Any]]]] = {}
+        for target, measurement in measurements:
+            by_station.setdefault(station_unique_id(target[0], target[1]), (target, []))[1].append(measurement)
 
-        if user_input is None:
-            self.param_schema = self._params_schema(await self._async_build_parameter_selector(), {})
-            return self.async_show_form(
-                step_id="params", data_schema=self.param_schema, description_placeholders=self._params_placeholders()
-            )
+        added = []
+        for unique_id, ((target_type, target, title), new) in by_station.items():
+            existing = next((subentry for subentry in entry.subentries.values() if subentry.unique_id == unique_id), None)
+            have = {measurement_key(measurement) for measurement in existing.data[CONF_MEASUREMENTS]} if existing else set()
+            new = [measurement for measurement in new if measurement_key(measurement) not in have]
+            if not new:
+                continue
+            if existing is None:
+                data = {CONF_TARGET_TYPE: target_type, CONF_TARGET: target, CONF_MEASUREMENTS: new}
+                self.hass.config_entries.async_add_subentry(
+                    entry, ConfigSubentry(data=data, subentry_type=SUBENTRY_STATION, title=title, unique_id=unique_id)
+                )
+            else:
+                data = {**existing.data, CONF_MEASUREMENTS: [*existing.data[CONF_MEASUREMENTS], *new]}
+                self.hass.config_entries.async_update_subentry(entry, existing, data=data)
+            added.append(f"{title} ({len(new)})")
 
-        errors = await self._async_validated(user_input)
+        if not added:
+            return self.async_abort(reason="already_configured")
+        return self.async_abort(reason="measurements_added", description_placeholders={"stations": ", ".join(added)})
 
-        if not errors:
-            self.data.update(user_input)
-            if unique_id_taken(self._get_entry(), build_unique_id(self.data)):
-                return self.async_abort(reason="already_configured")
-            return await self.async_step_name()
+    def _update_station(self, subentry: ConfigSubentry, new: list[dict[str, Any]]) -> SubentryFlowResult:
+        have = {measurement_key(measurement) for measurement in subentry.data[CONF_MEASUREMENTS]}
+        new = [measurement for measurement in new if measurement_key(measurement) not in have]
+        if not new:
+            return self.async_abort(reason="already_configured")
+        data = {**subentry.data, CONF_MEASUREMENTS: [*subentry.data[CONF_MEASUREMENTS], *new]}
+        return self.async_update_and_abort(self._get_entry(), subentry, data=data)
 
-        return self.async_show_form(
-            step_id="params", data_schema=self.param_schema, errors=errors, description_placeholders=self._params_placeholders()
-        )
-
-    @callback
-    def _default_label(self) -> str:
-        """Suggest a name from the station and parameter already chosen."""
-        target = str(self.data.get(CONF_TARGET, ""))
-        source = target
-
-        if self.data.get(CONF_TARGET_TYPE) == "fmisid" and self.stations:
-            station = next((item for item in self.stations if item["id"] == target), None)
-            if station is not None:
-                source = station["name"]
-
-        parameter = str(self.data.get(CONF_PARAMETER, ""))
-        described = (self.descriptions or {}).get(parameter.lower())
-        measurement = described[0] if described and described[0] else parameter
-
-        return f"{source} {measurement}".strip()
-
-    async def async_step_name(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-
-        if user_input is None:
-            schema = vol.Schema({vol.Required(CONF_LABEL, default=self._default_label()): cv.string})
-            return self.async_show_form(step_id="name", data_schema=schema, last_step=True)
-
-        self.data.update(user_input)
-
-        return self.async_create_entry(title=self.data[CONF_LABEL], data=self.data, unique_id=build_unique_id(self.data))
-
-    # ---------------- changing a sensor ----------------
+    # ---------------- changing a station ----------------
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Repoint an existing sensor at a different station, query or parameter.
+        """Add measurements, change one's settings or remove some. The station itself is not changed."""
+        return self.async_show_menu(step_id="reconfigure", menu_options=["add_measurements", "measurement", "remove_measurements"])
 
-        The name is not editable here: renaming is a plain entity rename and
-        needs no flow of its own.
-        """
+    async def async_step_add_measurements(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """What else to measure at this station: the parameters it has reported."""
+        if await self._async_catalogue() is None:
+            return self.async_abort(reason="cannot_connect")
         subentry = self._get_reconfigure_subentry()
+        target_type, target = subentry.data[CONF_TARGET_TYPE], str(subentry.data[CONF_TARGET])
+        self.fixed_target = (target_type, target, subentry.title)
+        have = {measurement_key(measurement) for measurement in subentry.data[CONF_MEASUREMENTS]}
 
-        if user_input is None:
-            self.data = dict(subentry.data)
-            return await self._async_query_form("reconfigure", self.data.get(CONF_QUERY_ID))
+        def offered(parameter: Parameter) -> bool:
+            if measurement_key({CONF_QUERY_ID: parameter.query_id, CONF_PARAMETER: parameter.name}) in have:
+                return False
+            if target_type in ("fmisid", "geoid"):
+                return any(station["id"] == target for station in parameter.stations)
+            return parameter.kind == (KIND_POINT if target_type == "latlon" else KIND_PLACE)
 
-        self._choose_query(user_input)
+        parameters = [parameter for parameter in self.catalogue.parameters.values() if offered(parameter)]
+        if user_input is not None:
+            if self._choose(user_input):
+                return await self._async_next_target()
+            return self._parameters_form(parameters, "add_measurements", {"base": "no_parameters"})
+        return self._parameters_form(parameters, "add_measurements")
 
-        return await self.async_step_reconfigure_location()
+    def _measurement_options(self) -> list[SelectOptionDict]:
+        measurements = self._get_reconfigure_subentry().data[CONF_MEASUREMENTS]
+        return [
+            SelectOptionDict(value=measurement_key(measurement), label=f"{measurement[CONF_LABEL]} ({measurement[CONF_PARAMETER]})")
+            for measurement in measurements
+        ]
 
-    async def async_step_reconfigure_location(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-
-        if user_input is None:
-            schema = vol.Schema(
-                {
-                    vol.Required(CONF_TARGET, default=self.data.get(CONF_TARGET)): await self._async_build_target_selector(),
-                }
-            )
-            return self.async_show_form(step_id="reconfigure_location", data_schema=schema)
-
-        user_input[CONF_TARGET_TYPE] = self._target_type_for(user_input[CONF_TARGET])
-        self.data.update(user_input)
-
-        return await self.async_step_reconfigure_params()
-
-    async def async_step_reconfigure_params(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        subentry = self._get_reconfigure_subentry()
-
-        if user_input is None:
-            self.param_schema = self._params_schema(await self._async_build_parameter_selector(), self.data)
-            return self.async_show_form(
-                step_id="reconfigure_params",
-                data_schema=self.param_schema,
-                last_step=True,
-                description_placeholders=self._params_placeholders(),
-            )
-
-        errors = await self._async_validated(user_input)
-
-        if not errors:
-            updated = {**self.data, **user_input}
-            unique_id = build_unique_id(updated)
-
-            if unique_id_taken(self._get_entry(), unique_id, except_subentry_id=subentry.subentry_id):
-                return self.async_abort(reason="already_configured")
-
-            return self.async_update_and_abort(self._get_entry(), subentry, data=updated, unique_id=unique_id)
-
-        return self.async_show_form(
-            step_id="reconfigure_params",
-            data_schema=self.param_schema,
-            last_step=True,
-            errors=errors,
-            description_placeholders=self._params_placeholders(),
+    async def async_step_measurement(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """Which measurement's settings to change."""
+        if user_input is not None:
+            self.key = user_input[CONF_MEASUREMENT]
+            return await self.async_step_settings()
+        schema = vol.Schema(
+            {vol.Required(CONF_MEASUREMENT): SelectSelector(SelectSelectorConfig(options=self._measurement_options(), sort=False))}
         )
+        return self.async_show_form(step_id="measurement", data_schema=schema)
 
-
-class WarningsSubentryFlow(ConfigSubentryFlow):
-    """FMI's weather warnings for a place picked on a map."""
-
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        entry = self._get_entry()
-        errors = {}
+    async def async_step_settings(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """A measurement's unit, -1 as 0, and for a forecast, how much of it to show."""
+        subentry = self._get_reconfigure_subentry()
+        measurements = list(subentry.data[CONF_MEASUREMENTS])
+        index = next(index for index, measurement in enumerate(measurements) if measurement_key(measurement) == self.key)
+        measurement = measurements[index]
 
         if user_input is not None:
-            errors = validate_warnings_input(user_input)
+            # A unit left empty is not in the form's data, and then FMI's own applies again.
+            measurements[index] = {**{key: value for key, value in measurement.items() if key != CONF_UNIT}, **user_input}
+            return self.async_update_and_abort(self._get_entry(), subentry, data={**subentry.data, CONF_MEASUREMENTS: measurements})
 
-            if not errors:
-                data = {**warning_types_from_form(user_input), CONF_LANG: entry.data[CONF_LANG]}
-                unique_id = build_warnings_unique_id(data)
-                if unique_id_taken(entry, unique_id):
-                    return self.async_abort(reason="already_configured")
-                return self.async_create_entry(title=data[CONF_LABEL], data=data, unique_id=unique_id)
-
-        language = entry.data[CONF_LANG]
-        values = user_input or {
-            CONF_LOCATION: {
-                "latitude": self.hass.config.latitude,
-                "longitude": self.hass.config.longitude,
-                "radius": DEFAULT_WARNINGS_RADIUS,
-            },
-            CONF_WARNING_TYPES: list(WARNING_TYPE_KEYS.values()),
-            CONF_LABEL: DEFAULT_WARNINGS_LABEL.get(language, DEFAULT_WARNINGS_LABEL["eng"]),
+        fields = {
+            vol.Optional(CONF_UNIT): cv.string,
+            vol.Required(CONF_NEGATIVE_AS_ZERO): cv.boolean,
         }
+        if "::forecast" in str(measurement[CONF_QUERY_ID]):
+            fields |= {vol.Required(key): cv.positive_int for key in FORECAST_DEFAULTS}
+        schema = self.add_suggested_values_to_schema(vol.Schema(fields), {**FORECAST_DEFAULTS, CONF_NEGATIVE_AS_ZERO: False, **measurement})
+        return self.async_show_form(
+            step_id="settings", data_schema=schema, last_step=True, description_placeholders={CONF_MEASUREMENT: measurement[CONF_LABEL]}
+        )
 
-        return self.async_show_form(step_id="user", data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values), errors=errors)
-
-    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Move the place, or change its radius, warning types or name."""
-        entry = self._get_entry()
+    async def async_step_remove_measurements(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        """Remove measurements, but not all of them: that is removing the station."""
         subentry = self._get_reconfigure_subentry()
+        options = self._measurement_options()
         errors = {}
 
         if user_input is not None:
-            errors = validate_warnings_input(user_input)
+            removed = set(user_input.get(CONF_MEASUREMENTS) or [])
+            if len(removed) >= len(options):
+                errors = {"base": "keep_one"}
+            else:
+                measurements = [
+                    measurement for measurement in subentry.data[CONF_MEASUREMENTS] if measurement_key(measurement) not in removed
+                ]
+                return self.async_update_and_abort(self._get_entry(), subentry, data={**subentry.data, CONF_MEASUREMENTS: measurements})
 
-            if not errors:
-                updated = {**subentry.data, **warning_types_from_form(user_input)}
-                unique_id = build_warnings_unique_id(updated)
-
-                if unique_id_taken(entry, unique_id, except_subentry_id=subentry.subentry_id):
-                    return self.async_abort(reason="already_configured")
-
-                return self.async_update_and_abort(entry, subentry, title=updated[CONF_LABEL], data=updated, unique_id=unique_id)
-
-        values = user_input or warning_types_for_form(dict(subentry.data))
-        return self.async_show_form(
-            step_id="reconfigure", data_schema=self.add_suggested_values_to_schema(WARNINGS_SCHEMA, values), errors=errors
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_MEASUREMENTS, default=[]): SelectSelector(
+                    SelectSelectorConfig(options=options, multiple=True, mode=SelectSelectorMode.LIST, sort=False)
+                )
+            }
         )
+        return self.async_show_form(step_id="remove_measurements", data_schema=schema, errors=errors, last_step=True)
 
 
-def weather_place_data(user_input: dict[str, Any]) -> dict[str, Any]:
+def place_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
+    """The form's lower-case warning type keys as FMI's warning types, which subentries store."""
+    types_by_key = {key: warning_type for warning_type, key in WARNING_TYPE_KEYS.items()}
     location = user_input[CONF_LOCATION]
-    return {CONF_LOCATION: {"latitude": location["latitude"], "longitude": location["longitude"]}, CONF_LABEL: user_input[CONF_LABEL]}
+    return {
+        CONF_LOCATION: {"latitude": location["latitude"], "longitude": location["longitude"], "radius": location.get("radius") or 0},
+        CONF_LABEL: user_input[CONF_LABEL].strip(),
+        CONF_WEATHER: user_input[CONF_WEATHER],
+        CONF_WARNING_TYPES: [types_by_key.get(key, key) for key in user_input.get(CONF_WARNING_TYPES) or []],
+    }
 
 
-class WeatherSubentryFlow(ConfigSubentryFlow):
-    """FMI's forecast for a place picked on a map, as a weather entity."""
+def place_for_form(data: dict[str, Any]) -> dict[str, Any]:
+    return {**data, CONF_WARNING_TYPES: [WARNING_TYPE_KEYS.get(warning_type, warning_type) for warning_type in data[CONF_WARNING_TYPES]]}
 
-    async def _async_forecast_error(self, data: dict[str, Any]) -> dict[str, str]:
-        """Try the place's forecast, so that a place FMI has nothing for is caught here."""
-        try:
-            await async_get_forecast(self.hass, self._get_entry().data[CONF_LANG], data[CONF_LOCATION])
-        except FMINoData:
-            return {"base": "no_forecast"}
-        except FMIException:
-            return {"base": "connection_problem"}
+
+class PlaceSubentryFlow(ConfigSubentryFlow):
+    """A place on a map with its weather forecast, the warnings followed there, or both."""
+
+    async def _async_errors(self, data: dict[str, Any]) -> dict[str, str]:
+        if not data[CONF_WEATHER] and not data[CONF_WARNING_TYPES]:
+            return {"base": "nothing_followed"}
+        if data[CONF_WEATHER]:
+            # The forecast is tried, so that a place FMI has nothing for is caught here.
+            try:
+                await async_get_forecast(self.hass, self._get_entry().data[CONF_LANG], data[CONF_LOCATION])
+            except FMINoData:
+                return {"base": "no_forecast"}
+            except FMIException:
+                return {"base": "connection_problem"}
         return {}
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
@@ -598,37 +555,43 @@ class WeatherSubentryFlow(ConfigSubentryFlow):
         errors = {}
 
         if user_input is not None:
-            data = weather_place_data(user_input)
-            unique_id = build_weather_unique_id(data)
+            data = place_from_form(user_input)
+            unique_id = place_unique_id(data[CONF_LOCATION])
             if unique_id_taken(entry, unique_id):
                 return self.async_abort(reason="already_configured")
-            errors = await self._async_forecast_error(data)
+            errors = await self._async_errors(data)
             if not errors:
                 return self.async_create_entry(title=data[CONF_LABEL], data=data, unique_id=unique_id)
 
-        language = entry.data[CONF_LANG]
         values = user_input or {
-            CONF_LOCATION: {"latitude": self.hass.config.latitude, "longitude": self.hass.config.longitude},
-            CONF_LABEL: DEFAULT_WEATHER_LABEL.get(language, DEFAULT_WEATHER_LABEL["eng"]),
+            CONF_LOCATION: {
+                "latitude": self.hass.config.latitude,
+                "longitude": self.hass.config.longitude,
+                "radius": DEFAULT_WARNINGS_RADIUS,
+            },
+            # The place's name, which names its device.
+            CONF_LABEL: self.hass.config.location_name,
+            CONF_WEATHER: True,
+            CONF_WARNING_TYPES: list(WARNING_TYPE_KEYS.values()),
         }
-        return self.async_show_form(step_id="user", data_schema=self.add_suggested_values_to_schema(WEATHER_SCHEMA, values), errors=errors)
+        return self.async_show_form(step_id="user", data_schema=self.add_suggested_values_to_schema(PLACE_SCHEMA, values), errors=errors)
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """Move the place or rename it."""
+        """Move the place, rename it, or change what is followed there."""
         entry = self._get_entry()
         subentry = self._get_reconfigure_subentry()
         errors = {}
 
         if user_input is not None:
-            data = weather_place_data(user_input)
-            unique_id = build_weather_unique_id(data)
+            data = place_from_form(user_input)
+            unique_id = place_unique_id(data[CONF_LOCATION])
             if unique_id_taken(entry, unique_id, except_subentry_id=subentry.subentry_id):
                 return self.async_abort(reason="already_configured")
-            errors = await self._async_forecast_error(data)
+            errors = await self._async_errors(data)
             if not errors:
                 return self.async_update_and_abort(entry, subentry, title=data[CONF_LABEL], data=data, unique_id=unique_id)
 
-        values = user_input or dict(subentry.data)
+        values = user_input or place_for_form(dict(subentry.data))
         return self.async_show_form(
-            step_id="reconfigure", data_schema=self.add_suggested_values_to_schema(WEATHER_SCHEMA, values), errors=errors
+            step_id="reconfigure", data_schema=self.add_suggested_values_to_schema(PLACE_SCHEMA, values), errors=errors
         )
