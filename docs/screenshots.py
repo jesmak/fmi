@@ -582,7 +582,7 @@ def main():
         "resources": [
             "https://github.com/RomRider/apexcharts-card/releases/download/v2.2.3/apexcharts-card.js",
             "https://github.com/benjamin-dcs/gauge-card-pro/releases/download/v2.5.0/gauge-card-pro.js",
-            "../../hass-kortit/compact-rain-gauge-card/dist/compact-rain-gauge-card.js",
+            "../../hass-cards/compact-rain-gauge-card/dist/compact-rain-gauge-card.js",
         ],
         "clock": CLOCK.isoformat(),
         "translations": {"fmi_open_data": "custom_components/fmi_open_data/translations"},
