@@ -121,6 +121,24 @@ def dose_rate() -> list[list]:
     return rows
 
 
+# --- UV at Helsinki Kumpula: the sun a little lower every day, and dimmer still on the rainy ones.
+KUMPULA = math.radians(60.2)
+
+
+def uv_index() -> list[list]:
+    clouds = {day: 0.4 if day == 0 or RAIN_DAYS.get(day, 0) > 1 else random.uniform(0.7, 1.0) for day in range(32)}
+    rows = []
+    for t in hours(31):
+        local = t.astimezone(LOCAL)
+        declination = math.radians(23.44) * math.sin(2 * math.pi * (284 + local.timetuple().tm_yday) / 365)
+        # The middle of the hour, from the solar noon in Helsinki at about 10.20 UTC.
+        hour_angle = math.radians(15 * (t.hour + 0.5 - 10.33))
+        elevation = math.sin(KUMPULA) * math.sin(declination) + math.cos(KUMPULA) * math.cos(declination) * math.cos(hour_angle)
+        clear_sky = 11 * max(0.0, elevation) ** 2.4
+        rows.append([iso(t), round(clear_sky * clouds[(CLOCK.date() - local.date()).days], 1)])
+    return rows
+
+
 # --- The sea: a summer of water temperatures, with an upwelling at Hanko in mid-August.
 def sea_temperature(peak: float, end: float, lag: float, upwelling: float = 0.0) -> list[list]:
     stamps = hours(90)
@@ -340,18 +358,6 @@ def line_chart(
     }
 
 
-WARNINGS_MARKDOWN = """{% set warnings = state_attr('sensor.tampere_warning_level', 'warnings') or [] %}
-{% set active = state_attr('sensor.tampere_warning_level', 'active_warnings') or 0 %}
-{% for w in warnings %}
-<ha-alert alert-type="{{ 'error' if w.level == 'red' else 'warning' }}" title="{{ w.event }}">
-<b>{{ 'In force now.' if loop.index <= active else 'Coming.' }}</b> {{ w.description }} {{ w.impacts }}<br>
-<i>{{ as_timestamp(w.onset) | timestamp_custom('%a %H:%M') }} – {{ as_timestamp(w.expires) | timestamp_custom('%a %H:%M') }}</i>
-</ha-alert>
-{% else %}
-<ha-alert alert-type="success">No warnings</ha-alert>
-{% endfor %}"""
-
-
 def fmt(unit: str, digits: int) -> str:
     """An axis label formatter for apexcharts-card."""
     return f"EVAL:function(value) {{ return value.toFixed({digits}) + ' {unit}'; }}"
@@ -373,6 +379,7 @@ def main():
         "sensor.gulf_of_finland_wave_height": wave_height(0.6, 1.0),
     }
     rain = rain_statistics()
+    uv = uv_index()
 
     def measurement(name: str, value, unit: str, **attributes) -> dict:
         return {
@@ -394,8 +401,13 @@ def main():
                 "device_class": "enum",
                 "options": ["none", "yellow", "orange", "red"],
                 "attribution": ATTR,
+                "icon": "mdi:alert",
                 "label": "Tampere",
                 "language": "en",
+                "latitude": 61.4978,
+                "longitude": 23.761,
+                "radius": 1000,
+                "warning_types": ["wind", "thunderstorm", "rain", "trafficWeather", "pedestrianSafety"],
                 "active_warnings": 1,
                 "warnings": WARNINGS,
             },
@@ -410,6 +422,7 @@ def main():
         "sensor.tampere_pm2_5": measurement("Tampere PM2.5", pm25[-1][1], "µg/m³"),
         "sensor.tampere_pm10": measurement("Tampere PM10", pm10[-1][1], "µg/m³"),
         "sensor.tampere_dose_rate": measurement("Tampere Dose rate", dose[-1][1], "µSv/h"),
+        "sensor.helsinki_kumpula_ultraviolet_irradiance": measurement("Helsinki Kumpula Ultraviolet irradiance", uv[-1][1], "index"),
         "sensor.hanko_water_level": measurement("Hanko Water level", sea_measured[-1][1], "mm"),
         "sensor.hanko_sea_level_forecast": measurement(
             "Hanko Sea level forecast", sea_forecast[6]["value"], "cm", forecast=sea_forecast, forecast_hours=48, forecast_past_hours=6
@@ -422,6 +435,7 @@ def main():
         "sensor.tampere_pm2_5": "µg/m³",
         "sensor.tampere_pm10": "µg/m³",
         "sensor.tampere_dose_rate": "µSv/h",
+        "sensor.helsinki_kumpula_ultraviolet_irradiance": "index",
         "sensor.hanko_water_level": "mm",
         **{entity: "°C" for entity in temps},
         **{entity: "m" for entity in waves},
@@ -431,6 +445,7 @@ def main():
         "sensor.tampere_pm2_5": pm25,
         "sensor.tampere_pm10": pm10,
         "sensor.tampere_dose_rate": dose,
+        "sensor.helsinki_kumpula_ultraviolet_irradiance": uv,
         "sensor.hanko_water_level": [[t, v] for t, v in [(row[0], row[1]) for row in sea_measured]],
         **temps,
         **waves,
@@ -480,7 +495,7 @@ def main():
                     "show_current": False,
                     "show_forecast": True,
                 },
-                {"type": "markdown", "title": "Weather warnings", "content": WARNINGS_MARKDOWN},
+                {"type": "custom:fmi-warnings-card", "entity": "sensor.tampere_warning_level", "title": "Weather warnings"},
                 {
                     "type": "custom:compact-rain-gauge-card",
                     "entity": "sensor.tampere_harmala_precipitation_today",
@@ -575,6 +590,16 @@ def main():
                     fmt("m", 1),
                     yaxis={"min": 0, "max": 3},
                 ),
+                {"type": "heading", "heading": "Sun", "icon": "mdi:weather-sunny"},
+                {
+                    "type": "custom:compact-uv-index-card",
+                    "entity": "sensor.helsinki_kumpula_ultraviolet_irradiance",
+                    "show_yesterday": True,
+                    "show_week": True,
+                    "show_month": True,
+                    "show_daily_chart": True,
+                    "grid_options": {"columns": 12, "rows": "auto"},
+                },
             ],
         },
     ]
@@ -583,6 +608,8 @@ def main():
             "https://github.com/RomRider/apexcharts-card/releases/download/v2.2.3/apexcharts-card.js",
             "https://github.com/benjamin-dcs/gauge-card-pro/releases/download/v2.5.0/gauge-card-pro.js",
             "../../hass-cards/compact-rain-gauge-card/dist/compact-rain-gauge-card.js",
+            "../../hass-cards/compact-uv-index-card/dist/compact-uv-index-card.js",
+            "../../hass-cards/fmi-warnings-card/dist/fmi-warnings-card.js",
         ],
         "clock": CLOCK.isoformat(),
         "translations": {"fmi_open_data": "custom_components/fmi_open_data/translations"},

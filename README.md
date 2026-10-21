@@ -5,8 +5,8 @@ FMI's stations, a weather forecast for any place, and FMI's weather warnings.
 
 [![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![HACS][hacs-shield]][hacs] [![License][license-shield]](LICENSE)
 
-<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-light.png#gh-light-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and the rain in Tampere, the air quality with a month of particles and the dose rate, and the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights">
-<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and the rain in Tampere, the air quality with a month of particles and the dose rate, and the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-light.png#gh-light-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and a traffic warning on a timeline and the rain in Tampere, the air quality with a month of particles and the dose rate, the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights, and a low UV index under the sinking daily peaks of September">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and a traffic warning on a timeline and the rain in Tampere, the air quality with a month of particles and the dose rate, the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights, and a low UV index under the sinking daily peaks of September">
 
 The data in the picture is made up.
 
@@ -23,6 +23,10 @@ stations that measure it, nearest first. A place is a point on a map with FMI's 
 warnings in force there, or both. Each station and place is a device in Home Assistant, so it can be put in an area.
 
 For a one-off chart or a script, an action reads any station's observations over a time range without a sensor.
+
+Two cards show its data on a dashboard. [FMI warnings card](https://github.com/jesmak/fmi-warnings-card) is made for
+its warnings and shows a place's warnings on a timeline. [Compact UV index card](https://github.com/jesmak/compact-uv-index-card)
+shows the UV index that FMI measures at its radiation stations.
 
 No account or API key is needed. FMI's open data service is used anonymously.
 
@@ -178,7 +182,7 @@ A place with warnings has a sensor for the highest warning level in force now, `
 | `language`        | The language of the warning texts                                            |
 | `latitude`, `longitude`, `radius` | The place and the radius in metres                           |
 | `warning_types`   | The warning types followed                                                   |
-| `active_warnings` | The number of warnings in force now                                          |
+| `active_warnings` | The number of warnings in force now, the first ones in `warnings`            |
 | `warnings`        | Every warning that concerns the place, in force or coming up, earliest first |
 
 Only the level is kept in history, not the `warnings` attribute.
@@ -269,23 +273,13 @@ series:
 
 ### The warnings on a dashboard
 
-Every warning that concerns a place, in Home Assistant's own markdown card. The warnings in force come first in the
-list, so the first `active_warnings` of them are the ones in force now.
+Every warning that concerns a place, in force now or coming up, with
+[FMI warnings card](https://github.com/jesmak/fmi-warnings-card). Its README lists the rest of its options.
 
 ```yaml
-type: markdown
+type: custom:fmi-warnings-card
+entity: sensor.cabin_warning_level
 title: Weather warnings
-content: |
-  {% set warnings = state_attr('sensor.cabin_warning_level', 'warnings') or [] %}
-  {% set active = state_attr('sensor.cabin_warning_level', 'active_warnings') or 0 %}
-  {% for w in warnings %}
-  <ha-alert alert-type="{{ 'error' if w.level == 'red' else 'warning' }}" title="{{ w.event }}">
-  <b>{{ 'In force now.' if loop.index <= active else 'Coming.' }}</b> {{ w.description }} {{ w.impacts }}<br>
-  <i>{{ as_timestamp(w.onset) | timestamp_custom('%a %H:%M') }} – {{ as_timestamp(w.expires) | timestamp_custom('%a %H:%M') }}</i>
-  </ha-alert>
-  {% else %}
-  <ha-alert alert-type="success">No warnings</ha-alert>
-  {% endfor %}
 ```
 
 ### A notification when a warning is issued
