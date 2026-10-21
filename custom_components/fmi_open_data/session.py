@@ -37,7 +37,8 @@ class FMIException(Exception):
 
 
 class FMIRefused(FMIException):
-    """FMI answered HTTP 400. The message is FMI's own reason, such as "Too long time interval requested!"."""
+    """FMI answered HTTP 400. The message is FMI's own reason, such as "Too long time interval requested!", or its
+    status line, "400 Bad Request", when it gives none."""
 
 
 class FMINoData(FMIRefused):
@@ -107,15 +108,16 @@ class FMISession:
             response = requests.get(url=url, headers={"User-Agent": USER_AGENT}, timeout=self._timeout)
         except RequestException as exception:
             raise FMIException(f"Communication error {exception}") from exception
+        status = f"{response.status_code} {response.reason or ''}".strip()
         if response.status_code == 400:
             # FMI explains itself in several ExceptionTexts, such as "Too long time interval requested!" and then the
             # limit, and ends with an echo of the request's URI, which is left out.
             texts = re.findall(r"<ExceptionText>([^<]*)", response.content.decode(errors="replace"))
             reasons = [html.unescape(text).strip() for text in texts]
-            message = " ".join(reason for reason in reasons if reason and not reason.startswith("URI:")) or "400 is not valid"
+            message = " ".join(reason for reason in reasons if reason and not reason.startswith("URI:")) or status
             raise (FMINoData if message.startswith("No data available") else FMIRefused)(message)
         if response.status_code != 200:
-            raise FMIException(f"{response.status_code} is not valid")
+            raise FMIException(f"FMI answered {status}")
         return response.content
 
     def _xml(self, url: str) -> ElementTree.Element:

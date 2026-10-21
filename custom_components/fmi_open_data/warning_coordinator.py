@@ -19,8 +19,8 @@ _LOGGER = logging.getLogger(__name__)
 
 # Every place refreshes on the same schedule, so one download serves them all.
 FEED_REUSE_TIME = timedelta(seconds=30)
-# How long the last complete warnings are kept while some of FMI's messages cannot be read.
-INCOMPLETE_GRACE = timedelta(hours=1)
+# How long the last warnings are kept while FMI's feed, or some of the messages in it, cannot be read.
+UNREADABLE_GRACE = timedelta(hours=1)
 
 
 class WarningFeed:
@@ -70,6 +70,7 @@ class WarningsData:
     warnings: dict[str, FMIWarning]
     # What happened since the previous refresh, as (event type, warning).
     changes: list[tuple[str, FMIWarning]]
+    # When the warnings were last worked out from the feed. A refresh that keeps the last warnings keeps this too.
     updated: datetime
 
 
@@ -90,23 +91,31 @@ class FMIWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
         self.warnings_filter = WarningsFilter.from_entry_data({**subentry.data, CONF_LANG: entry.data[CONF_LANG]})
         self._feed = feed
         self._previous: dict[str, FMIWarning] | None = None
+        # Since when FMI's warnings have been incomplete: the feed or some of its messages could not be read.
         self._incomplete_since: datetime | None = None
         self._warned = False
 
     async def _async_update_data(self) -> WarningsData:
+        now = dt_util.utcnow()
         try:
             alerts, unreadable = await self._feed.async_alerts()
         except (FMIException, ParseError) as exception:
+            if self._incomplete_since is None:
+                self._incomplete_since = now
+            # The last warnings are kept while they were worked out less than an hour ago, or FMI's warnings have
+            # been incomplete for less than an hour, so neither an outage nor unreadable messages shorten the other.
+            if self.data is not None and now - max(self.data.updated, self._incomplete_since) < UNREADABLE_GRACE:
+                _LOGGER.debug(f"Could not read FMI's warning feed, keeping the last warnings: {exception}")
+                return WarningsData(self.data.warnings, [], self.data.updated)
             raise UpdateFailed(f"Could not read FMI's warning feed: {exception}") from exception
 
-        now = dt_util.utcnow()
         if not unreadable:
             self._incomplete_since = None
             self._warned = False
         elif self._incomplete_since is None:
             self._incomplete_since = now
 
-        if unreadable and now - self._incomplete_since < INCOMPLETE_GRACE:
+        if unreadable and now - self._incomplete_since < UNREADABLE_GRACE:
             # Without every message, a warning could look cancelled when it is not.
             # Keep what was known and try again at the next refresh.
             if self.data is None:
@@ -115,7 +124,7 @@ class FMIWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
 
         if unreadable and not self._warned:
             self._warned = True
-            _LOGGER.warning(f"Some of FMI's warnings have been unreadable for an hour, showing the rest: {', '.join(unreadable)}")
+            _LOGGER.warning(f"FMI's warnings have been incomplete for an hour, showing the rest: {', '.join(unreadable)}")
 
         current = warnings_for(alerts, self.warnings_filter, now)
         # The first refresh only learns what is already in force: announcing

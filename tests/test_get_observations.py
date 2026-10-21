@@ -172,21 +172,37 @@ def test_fmis_reason_is_read_from_an_http_400(monkeypatch):
         # As FMI sends it: the reason, the limit and an echo of the request, with empty texts between them.
         "long": SimpleNamespace(
             status_code=400,
+            reason="Bad Request",
             content=b"<ExceptionText>Too long time interval requested!</ExceptionText><ExceptionText>\n</ExceptionText>"
             b"<ExceptionText>No more than 168.000000 hours allowed.</ExceptionText><ExceptionText>\n</ExceptionText>"
             b"<ExceptionText>URI: /wfs?fmisid=101237&amp;parameters=t2m</ExceptionText>",
         ),
-        "bogus": SimpleNamespace(status_code=400, content=b"<ExceptionText>Unrecognized parameter &apos;Bogus&apos;</ExceptionText>"),
-        "bare": SimpleNamespace(status_code=400, content=b"Bad Request"),
+        "bogus": SimpleNamespace(
+            status_code=400, reason="Bad Request", content=b"<ExceptionText>Unrecognized parameter &apos;Bogus&apos;</ExceptionText>"
+        ),
+        "bare": SimpleNamespace(status_code=400, reason="Bad Request", content=b"Bad Request"),
+        "no reason": SimpleNamespace(status_code=400, reason="", content=b""),
     }
     monkeypatch.setattr("custom_components.fmi_open_data.session.requests.get", lambda url, **kw: responses[url])
 
     for url, message in [
         ("long", "Too long time interval requested! No more than 168.000000 hours allowed."),
         ("bogus", "Unrecognized parameter 'Bogus'"),
-        ("bare", "400 is not valid"),
+        ("bare", "400 Bad Request"),
+        ("no reason", "400"),
     ]:
         with pytest.raises(FMIRefused) as refused:
             FMISession().get_document(url)
         assert str(refused.value) == message
         assert not isinstance(refused.value, FMINoData)
+
+
+def test_any_other_status_says_what_fmi_answered(monkeypatch):
+    # As alerts.fmi.fi answered during an outage.
+    response = SimpleNamespace(status_code=503, reason="Service Unavailable", content=b"Service unavailable")
+    monkeypatch.setattr("custom_components.fmi_open_data.session.requests.get", lambda url, **kw: response)
+
+    with pytest.raises(FMIException) as error:
+        FMISession().get_document("https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml")
+    assert str(error.value) == "FMI answered 503 Service Unavailable"
+    assert not isinstance(error.value, FMIRefused)

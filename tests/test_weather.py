@@ -154,8 +154,10 @@ def test_a_value_that_is_not_a_number_is_refused():
 
 def test_a_place_outside_fmis_area_is_told_apart_from_a_failure(monkeypatch):
     responses = {
-        "outside": SimpleNamespace(status_code=400, content=b"<ExceptionText>No data available for &apos;0,0&apos;!</ExceptionText>"),
-        "broken": SimpleNamespace(status_code=400, content=b"<ExceptionText>Invalid parameter</ExceptionText>"),
+        "outside": SimpleNamespace(
+            status_code=400, reason="Bad Request", content=b"<ExceptionText>No data available for &apos;0,0&apos;!</ExceptionText>"
+        ),
+        "broken": SimpleNamespace(status_code=400, reason="Bad Request", content=b"<ExceptionText>Invalid parameter</ExceptionText>"),
     }
     monkeypatch.setattr("custom_components.fmi_open_data.session.requests.get", lambda url, **kw: responses[url])
 

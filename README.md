@@ -357,7 +357,8 @@ entity credits FMI in its attribution.
 - **Measurements** are read from FMI's WFS service every five minutes each.
 - **The weather forecast** is FMI's edited point forecast, read every 30 minutes a place.
 - **The warnings** are FMI's [CAP warning feed](https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml), read every ten
-  minutes and shared by every place.
+  minutes and shared by every place. When the feed can't be read, the last warnings are kept for up to an hour before
+  the place's entities become unavailable.
 - **Adding measurements** reads every station query once over Finland to see which stations report what, about 40
   requests, kept for an hour.
 
