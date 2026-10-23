@@ -67,7 +67,9 @@ measurement.
 | Hours without new data       | int  | How old the newest data may be before it counts as stale | 24 |
 
 Daily, monthly and yearly statistics are published only once the day, month or year is over, so for those the
-limit is never shorter than three days, two months or two years.
+limit is never shorter than three days, two months or two years. For STUK's air radioactivity it is never shorter than
+six weeks. FMI lets each query reach back only so far, a week for the 10-minute observations, so a longer limit ends
+there. A measurement silent for all of it counts as stale.
 
 ### Adding measurements
 
@@ -80,7 +82,10 @@ Choose **Add measurements** on the integration page.
    **Show all of the query's stations** for the ones that have not reported it lately. A parameter nobody has
    reported lately, such as wave height while the buoys are ashore for the winter, starts from all of them.
    - A model forecast, such as Harmonie or MEPS, is for any point. Pick it on a map and give the place a name.
-   - STUK's air radioactivity is measured by place, not by station. Type the place's name, such as Kotka.
+   - STUK's air radioactivity is measured by place, not by station. Type the place's name, such as Kotka. Its
+     samples are collected for about a week and analysed one to four weeks later, and a nuclide below the detection
+     limit is left out of a sample. A sensor shows the nuclide's value in the newest sample that has it, with the time
+     that sample's collection ended.
 3. **Names.** Filled in from FMI's description of the parameter, with the period of a daily or hourly query, such
    as "Sademäärä, tunti". Home Assistant shows the station's name in front of it, so the sensor reads
    "Lappeenranta lentoasema Sademäärä, tunti".
@@ -148,8 +153,8 @@ value, a forecast's the next one.
 
 Every measurement also has a diagnostic binary sensor, such as
 `binary_sensor.lappeenranta_lentoasema_sademaara_tunti_stale_data`. It is on while the newest data FMI holds for the
-measurement is older than the limit in the options, and it turns off by itself when data comes back. The age comes
-from FMI's own timestamps, so restarting Home Assistant does not reset it.
+measurement is older than the limit in the options, or than FMI lets the query reach back, and it turns off by itself
+when data comes back. The age comes from FMI's own timestamps, so restarting Home Assistant does not reset it.
 
 FMI removes parameters from stations, and stations are now and then shut down or renumbered. Neither is an error:
 the query just returns nothing. A repair issue then tells you whether the station returns nothing at all, or still
@@ -348,7 +353,7 @@ The data comes from FMI's [open data service](https://en.ilmatieteenlaitos.fi/op
 Radiation and Nuclear Safety Authority STUK's radiation data and the air quality data published there. Every
 entity credits FMI in its attribution.
 
-- **Measurements** are read from FMI's WFS service every five minutes each.
+- **Measurements** are read from FMI's WFS service every five minutes each, STUK's air radioactivity once an hour.
 - **The weather forecast** is FMI's edited point forecast, read every 30 minutes a place.
 - **The warnings** are FMI's [CAP warning feed](https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml), read every ten
   minutes and shared by every place. When the feed can't be read, the last warnings are kept for up to an hour before

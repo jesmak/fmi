@@ -1,6 +1,6 @@
 """How far back each kind of query reaches."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -21,7 +21,8 @@ NOW = datetime(2026, 3, 15, 10, 30, 0, tzinfo=UTC)
         ("fmi::observations::weather::monthly::simple", datetime(2026, 1, 31, tzinfo=UTC), datetime(2025, 11, 1, tzinfo=UTC)),
         ("fmi::observations::weather::yearly::simple", NOW, datetime(2024, 1, 1, 0, 0, tzinfo=UTC)),
         ("fmi::observations::weather::simple", NOW, datetime(2026, 3, 14, 22, 30, tzinfo=UTC)),
-        ("stuk::observations::air::radionuclide-activity-concentration::latest::simple", NOW, None),
+        ("stuk::observations::air::radionuclide-activity-concentration::latest::simple", NOW, NOW - timedelta(days=42)),
+        ("stuk::observations::external-radiation::latest::simple", NOW, None),
     ],
 )
 def test_start_time(query_id: str, now: datetime, expected: datetime | None) -> None:

@@ -13,6 +13,7 @@ from .const import (
     API_GET_FEATURE_URL,
     API_GET_PARAMS_URL,
     API_STATIONS_QUERY_ID,
+    STUK_AIR_SAMPLES_QUERY_ID,
     USER_AGENT,
 )
 
@@ -29,6 +30,7 @@ NAMESPACES = {
     "omop": "http://inspire.ec.europa.eu/schemas/omop/2.9",
     "gmlcov": "http://www.opengis.net/gmlcov/1.0",
     "swe": "http://www.opengis.net/swe/2.0",
+    "om": "http://www.opengis.net/om/2.0",
 }
 
 
@@ -43,6 +45,12 @@ class FMIRefused(FMIException):
 
 class FMINoData(FMIRefused):
     """FMI has nothing for the request, such as a forecast for a place outside its area."""
+
+
+def allowed_hours(refusal: FMIRefused) -> float | None:
+    """The longest time range FMI allows the query, when it refused one as too long and said so."""
+    found = re.search(r"No more than ([\d.]+) hours allowed", str(refusal))
+    return float(found.group(1)) if found else None
 
 
 def normalize_value(value: str, negative_as_zero: bool) -> str:
@@ -87,6 +95,27 @@ def _coverage_rows(root: ElementTree.Element) -> list[dict[str, Any]]:
                 raise FMIException(f"FMI's response has {value} as {name}") from exception
         rows.append(row)
     return rows
+
+
+def _air_samples(root: ElementTree.Element) -> list[dict[str, Any]]:
+    """STUK's air samples, each a coverage of its own with its own fields: a nuclide below the detection limit is left
+    out of the sample. A sample's time is the end of its collection, as in the ::simple form."""
+    samples = []
+    for member in root.findall("./wfs:member", NAMESPACES):
+        fields = [field.attrib["name"] for field in member.iter("{http://www.opengis.net/swe/2.0}field")]
+        values = _text(member, ".//gml:doubleOrNilReasonTupleList").split()
+        if len(values) != len(fields):
+            raise FMIException("FMI's response has a different number of fields and values")
+        latitude, longitude = _coords(member.find(".//gmlcov:positions", NAMESPACES))
+        samples.append(
+            {
+                "time": datetime.fromisoformat(_text(member, ".//om:phenomenonTime//gml:endPosition")),
+                "latitude": latitude,
+                "longitude": longitude,
+                "values": dict(zip(fields, values, strict=True)),
+            }
+        )
+    return samples
 
 
 def feature_url(lang: str, params: dict[str, Any]) -> str:
@@ -135,6 +164,19 @@ class FMISession:
             "parameter": target_param,
             "data": [],
         }
+
+        if params["storedquery_id"] == STUK_AIR_SAMPLES_QUERY_ID:
+            # Always the newest: the samples are in the order they were analysed, not collected.
+            found = []
+            for sample in _air_samples(root):
+                values = {name.lower(): value for name, value in sample["values"].items()}
+                if values.get(target_param.lower(), "NaN") != "NaN":
+                    found.append((sample, values[target_param.lower()]))
+            if found:
+                sample, value = max(found, key=lambda pair: pair[0]["time"])
+                result.update(latitude=sample["latitude"], longitude=sample["longitude"])
+                result["data"] = [{"time": sample["time"], "value": normalize_value(value, negative_as_zero)}]
+            return result
 
         for item in root.findall("./wfs:member/BsWfs:BsWfsElement", NAMESPACES):
             if result["latitude"] is None:
@@ -263,6 +305,9 @@ class FMISession:
         will be able to read.
         """
         root = self._xml(feature_url(lang, params))
+        if params["storedquery_id"] == STUK_AIR_SAMPLES_QUERY_ID:
+            names = {name for sample in _air_samples(root) for name in sample["values"]}
+            return sorted(names, key=str.lower)
         names = {item.text for item in root.findall("./wfs:member/BsWfs:BsWfsElement/BsWfs:ParameterName", NAMESPACES) if item.text}
         return sorted(names, key=str.lower)
 

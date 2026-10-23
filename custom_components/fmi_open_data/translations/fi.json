@@ -33,7 +33,7 @@
     "step": {
       "init": {
         "title": "Vanhentunut data",
-        "description": "Kun anturin uusin data on tätä vanhempaa, käännetään vanhentuneesta datasta kertova binäärianturi päälle, ja korjausilmoitus voi kertoa mikä on vialla.\n\nAsetus koskee kaikkia antureita. Vuorokausi-, kuukausi- ja vuositilastot julkaistaan vasta jakson päätyttyä, joten niille raja ei ole koskaan lyhyempi kuin kolme vuorokautta, kaksi kuukautta tai kaksi vuotta.",
+        "description": "Kun anturin uusin data on tätä vanhempaa, käännetään vanhentuneesta datasta kertova binäärianturi päälle, ja korjausilmoitus voi kertoa mikä on vialla.\n\nAsetus koskee kaikkia antureita. Vuorokausi-, kuukausi- ja vuositilastot julkaistaan vasta jakson päätyttyä, joten niille raja ei ole koskaan lyhyempi kuin kolme vuorokautta, kaksi kuukautta tai kaksi vuotta, ja STUKin ilman radioaktiivisuudelle kuusi viikkoa. FMI antaa kunkin kyselyn ulottua vain tietyn ajan taaksepäin, 10 minuutin havainnoille viikon, eikä pidempi raja ulotu sen yli.",
         "data": {
           "no_data_issue": "Tee korjausilmoitus kun anturi lakkaa saamasta dataa",
           "no_data_issue_hours": "Tunteja ilman uutta dataa ennen kuin data tulkitaan vanhentuneeksi"

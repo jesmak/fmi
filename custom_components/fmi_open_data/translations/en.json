@@ -33,7 +33,7 @@
     "step": {
       "init": {
         "title": "Stale data",
-        "description": "When a sensor's newest data is older than this, the binary sensor for stale data turns on, and a repair issue can tell you what is wrong.\n\nThe setting applies to every sensor. Daily, monthly and yearly statistics are only reported once the period is over, so for those the limit is never shorter than three days, two months or two years.",
+        "description": "When a sensor's newest data is older than this, the binary sensor for stale data turns on, and a repair issue can tell you what is wrong.\n\nThe setting applies to every sensor. Daily, monthly and yearly statistics are only reported once the period is over, so for those the limit is never shorter than three days, two months or two years, and for STUK's air radioactivity six weeks. FMI lets each query reach back only so far, a week for the 10-minute observations, and a longer limit ends there.",
         "data": {
           "no_data_issue": "Raise a repair issue when a sensor stops getting data",
           "no_data_issue_hours": "Hours without new data before the data is considered stale"

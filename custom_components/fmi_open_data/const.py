@@ -20,12 +20,25 @@ DEFAULT_SCAN_INTERVAL = 5
 # counts as stale after a generous delay. Both settings apply to every sensor.
 DEFAULT_NO_DATA_ISSUE = True
 DEFAULT_NO_DATA_ISSUE_HOURS = 24
+# STUK's air radionuclides are weekly filter samples, analysed one to four weeks
+# after they end. FMI's ::latest query gives the sample analysed last, which need
+# not be the newest one, and a nuclide below the detection limit is left out of a
+# sample altogether. So a sensor reads every sample of a few weeks instead, and
+# shows the nuclide's value in the newest sample that has it.
+STUK_AIR_QUERY_ID = "stuk::observations::air::radionuclide-activity-concentration::latest::simple"
+STUK_AIR_SAMPLES_QUERY_ID = "stuk::observations::air::radionuclide-activity-concentration::multipointcoverage"
+STUK_AIR_DAYS = 42
+# New samples come weekly, and six weeks of them make a few dozen kilobytes.
+STUK_AIR_SCAN_INTERVAL = 60
+
 # Aggregate queries report a period only once it is over, so their newest value
-# can legitimately be a whole period old. The stale data limit never goes below these.
+# can legitimately be a whole period old, and STUK's air samples are weeks old by
+# the time they are analysed. The stale data limit never goes below these.
 MINIMUM_STALE_HOURS = {
     "::daily": 3 * 24,
     "::monthly": 62 * 24,
     "::yearly": 2 * 366 * 24,
+    STUK_AIR_QUERY_ID: STUK_AIR_DAYS * 24,
 }
 
 # Every warning in force, 0-5 days ahead. The feed lists CAP documents; each one

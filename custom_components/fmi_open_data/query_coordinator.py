@@ -32,8 +32,12 @@ from .const import (
     DOMAIN,
     MINIMUM_STALE_HOURS,
     PERIODS,
+    STUK_AIR_DAYS,
+    STUK_AIR_QUERY_ID,
+    STUK_AIR_SAMPLES_QUERY_ID,
+    STUK_AIR_SCAN_INTERVAL,
 )
-from .session import FMIException, FMISession
+from .session import FMIException, FMIRefused, FMISession, allowed_hours
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -76,6 +80,8 @@ def get_start_time(query_id: str, now: datetime, data: Mapping[str, Any]) -> dat
         return now.replace(year=months // 12, month=months % 12 + 1, day=1, hour=0, minute=0, second=0)
     if "::yearly" in query_id:
         return now.replace(year=now.year - 2, month=1, day=1, hour=0, minute=0, second=0)
+    if query_id == STUK_AIR_QUERY_ID:
+        return now - timedelta(days=STUK_AIR_DAYS)
     if query_id.startswith("stuk::"):
         return None
     return now - timedelta(hours=12)
@@ -94,7 +100,8 @@ def query_params(
         "starttime": start_time.strftime(API_TIME_FORMAT) if start_time is not None else None,
         "endtime": end_time.strftime(API_TIME_FORMAT) if end_time is not None else None,
         "timestep": data.get(CONF_FORECAST_STEP) if is_forecast else None,
-        "storedquery_id": query_id,
+        # A STUK air measurement keeps the query it was added with, but is read from every sample in the window.
+        "storedquery_id": STUK_AIR_SAMPLES_QUERY_ID if query_id == STUK_AIR_QUERY_ID else query_id,
         data[CONF_TARGET_TYPE]: data[CONF_TARGET],
     }
     if filter_parameter:
@@ -107,8 +114,9 @@ def query_params(
 def stale_after_hours(query_id: str, configured_hours: int) -> int:
     """The age in hours at which a sensor's data counts as stale.
 
-    The setting is shared by every sensor, so for aggregate queries it is raised
-    to a whole reporting period: their newest value can legitimately be that old.
+    The setting is shared by every sensor, so it is raised for the queries whose
+    newest value can legitimately be older: to a whole reporting period for the
+    aggregate ones, and to six weeks for STUK's air samples.
     """
     minimum = max((hours for marker, hours in MINIMUM_STALE_HOURS.items() if marker in query_id), default=0)
     return max(configured_hours, minimum)
@@ -123,7 +131,9 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             _LOGGER,
             config_entry=entry,
             name=f"{DOMAIN} {subentry.title} {measurement[CONF_LABEL]}",
-            update_interval=timedelta(minutes=DEFAULT_SCAN_INTERVAL),
+            update_interval=timedelta(
+                minutes=STUK_AIR_SCAN_INTERVAL if measurement[CONF_QUERY_ID] == STUK_AIR_QUERY_ID else DEFAULT_SCAN_INTERVAL
+            ),
         )
         self.subentry = subentry
         # What the queries need: the measurement with its station and the entry's language.
@@ -142,6 +152,9 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # looked up once rather than with every poll. A unit the user gave wins, and needs no lookup.
         self._unit: str | None = measurement.get(CONF_UNIT)
         self._unit_known = self._unit is not None
+        # The longest window FMI allows the query, from start to end, once it has refused a longer one. Learned rather
+        # than listed, as each query has a limit of its own and FMI documents none of them.
+        self._max_window: timedelta | None = None
 
     @property
     def stale_after_hours(self) -> int:
@@ -196,10 +209,10 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return result
 
     async def _async_is_stale(self, now: datetime, grace: timedelta, is_forecast: bool, result: dict[str, Any]) -> bool:
-        """Whether the newest value FMI holds for this sensor is older than the grace period.
+        """Whether the newest value FMI holds for this sensor is older than the grace period, or than FMI lets the
+        query reach back.
 
-        When the poll came back empty but a value within the grace period exists,
-        that value goes into the result.
+        When the poll came back empty but the wider query finds a value, that value goes into the result.
 
         The age comes from FMI's own timestamps rather than from how long this
         run of Home Assistant has been seeing empty updates, so it is not reset
@@ -221,21 +234,23 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # An empty result only says that the poll window held nothing, and that
         # window is an hour for the hourly queries, so on its own it dates
         # nothing. Where the grace period reaches further back than the window,
-        # ask again over the whole of it before calling the sensor stale.
+        # ask again over as much of it as FMI allows before calling the sensor stale.
         window_start = get_start_time(str(data[CONF_QUERY_ID]), now, data)
 
         if window_start is None or window_start <= now - grace:
             return True
 
+        # Data older than FMI lets the query reach can't be dated, so silence over all of that counts as stale too.
         try:
-            widened = await self.hass.async_add_executor_job(
-                FMISession().get_feature,
-                data[CONF_LANG],
-                self._params(now, True, now - grace),
-                data[CONF_PARAMETER],
-                is_forecast is False,
-                data.get(CONF_NEGATIVE_AS_ZERO, False),
-            )
+            try:
+                widened = await self._async_read_since(now, now - self._reach(grace, is_forecast), is_forecast)
+            except FMIRefused as exception:
+                hours = allowed_hours(exception)
+                if hours is None or self._max_window is not None:
+                    raise
+                # A minute short, as FMI measures the window by its own clock and refuses a minute over.
+                self._max_window = timedelta(hours=hours, minutes=-1)
+                widened = await self._async_read_since(now, now - self._reach(grace, is_forecast), is_forecast)
         except FMIException as exception:
             # Better to say nothing than to report an outage the network invented.
             _LOGGER.debug(f"Could not date the last data for {data[CONF_LABEL]}: {exception}")
@@ -247,6 +262,25 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             result.update(data=widened["data"], latitude=widened["latitude"], longitude=widened["longitude"])
 
         return newest is None or now - newest >= grace
+
+    def _reach(self, grace: timedelta, is_forecast: bool) -> timedelta:
+        """How far back the stale check asks: the grace period, within FMI's limit once it is known. FMI's limit is on
+        the whole window, which for a forecast also runs its hours ahead."""
+        if self._max_window is None:
+            return grace
+        ahead = timedelta(hours=self.measurement[CONF_FORECAST_HOURS]) if is_forecast else timedelta()
+        return min(grace, self._max_window - ahead)
+
+    async def _async_read_since(self, now: datetime, start_time: datetime, is_forecast: bool) -> dict[str, Any]:
+        data = self.measurement
+        return await self.hass.async_add_executor_job(
+            FMISession().get_feature,
+            data[CONF_LANG],
+            self._params(now, True, start_time),
+            data[CONF_PARAMETER],
+            is_forecast is False,
+            data.get(CONF_NEGATIVE_AS_ZERO, False),
+        )
 
     async def _async_report_no_data(self, probe_params: dict[str, Any]) -> None:
         """Work out why a sensor is empty and raise a repair issue if it is broken.

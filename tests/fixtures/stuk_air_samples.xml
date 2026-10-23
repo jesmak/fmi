@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wfs:FeatureCollection
+  timeStamp="2026-10-23T10:00:00Z"
+  numberMatched="3"
+  numberReturned="3"
+  xmlns:wfs="http://www.opengis.net/wfs/2.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:om="http://www.opengis.net/om/2.0"
+  xmlns:ompr="http://inspire.ec.europa.eu/schemas/ompr/3.0"
+  xmlns:omso="http://inspire.ec.europa.eu/schemas/omso/3.0"
+  xmlns:gml="http://www.opengis.net/gml/3.2"
+  xmlns:gmd="http://www.isotc211.org/2005/gmd"
+  xmlns:gco="http://www.isotc211.org/2005/gco"
+  xmlns:swe="http://www.opengis.net/swe/2.0"
+  xmlns:gmlcov="http://www.opengis.net/gmlcov/1.0"
+  xmlns:sam="http://www.opengis.net/sampling/2.0"
+  xmlns:sams="http://www.opengis.net/samplingSpatial/2.0"
+  xmlns:target="http://xml.fmi.fi/namespace/om/atmosphericfeatures/1.1"
+  xsi:schemaLocation="http://www.opengis.net/wfs/2.0 http://schemas.opengis.net/wfs/2.0/wfs.xsd
+  http://www.opengis.net/gmlcov/1.0 http://schemas.opengis.net/gmlcov/1.0/gmlcovAll.xsd
+  http://www.opengis.net/sampling/2.0 http://schemas.opengis.net/sampling/2.0/samplingFeature.xsd
+  http://www.opengis.net/samplingSpatial/2.0 http://schemas.opengis.net/samplingSpatial/2.0/spatialSamplingFeature.xsd
+  http://www.opengis.net/swe/2.0 http://schemas.opengis.net/sweCommon/2.0/swe.xsd
+  http://inspire.ec.europa.eu/schemas/ompr/3.0 https://inspire.ec.europa.eu/schemas/ompr/3.0/Processes.xsd
+  http://inspire.ec.europa.eu/schemas/omso/3.0 https://inspire.ec.europa.eu/schemas/omso/3.0/SpecialisedObservations.xsd
+  http://xml.fmi.fi/namespace/om/atmosphericfeatures/1.1 https://xml.fmi.fi/schema/om/atmosphericfeatures/1.1/atmosphericfeatures.xsd">
+
+  <wfs:member>
+    <omso:PointObservation gml:id="WFS-sample">
+      <om:phenomenonTime>
+        <gml:TimePeriod gml:id="time1-1-1">
+          <gml:beginPosition>2026-09-28T09:35:00Z</gml:beginPosition>
+          <gml:endPosition>2026-10-05T14:40:00Z</gml:endPosition>
+        </gml:TimePeriod>
+      </om:phenomenonTime>
+      <om:resultTime>
+        <gml:TimeInstant gml:id="time2-1-1">
+          <gml:timePosition>2026-10-14T11:37:00Z</gml:timePosition>
+        </gml:TimeInstant>
+      </om:resultTime>
+      <om:procedure xlink:href="http://xml.fmi.fi/inspire/process/stuk/air_radionuclides"/>
+      <om:parameter>
+        <om:NamedValue>
+          <om:name xlink:href="https://inspire.ec.europa.eu/codeList/ProcessParameterValue/value/analysisNumber"/>
+          <om:value>
+            <gml:integerValue>1</gml:integerValue>
+          </om:value>
+        </om:NamedValue>
+      </om:parameter>
+     <om:observedProperty  xlink:href="https://opendata.fmi.fi/meta?observableProperty=observation&amp;param=AC_P7D_avg&amp;language=eng"/>
+      <om:featureOfInterest>
+        <sams:SF_SpatialSamplingFeature gml:id="sampling-feature-1-1-1-fmisid-103429">
+          <sam:sampledFeature>
+            <target:Location gml:id="obsloc-1-fmisid-103429-pos">
+              <gml:identifier codeSpace="http://xml.fmi.fi/namespace/stationcode/fmisid">103429</gml:identifier>
+              
+              <gml:name codeSpace="http://xml.fmi.fi/namespace/locationcode/name">Kotka</gml:name>
+              <target:representativePoint xlink:href="#point-1-fmisid-103429"/>
+              <target:region codeSpace="http://xml.fmi.fi/namespace/location/region">Kotka</target:region>
+              <target:region codeSpace="http://xml.fmi.fi/namespace/location/country">Finland</target:region>
+            </target:Location>
+          </sam:sampledFeature>
+          <sams:shape>
+            <gml:Point gml:id="point-1-fmisid-103429" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+              <gml:name>Kotka</gml:name>
+              <gml:pos>60.48318 26.91808</gml:pos>
+            </gml:Point>
+          </sams:shape>
+        </sams:SF_SpatialSamplingFeature>
+      </om:featureOfInterest>
+      <om:result>
+          <gmlcov:MultiPointCoverage gml:id="mpcv1-1-1-1">
+            <gml:domainSet>
+              <gmlcov:SimpleMultiPoint gml:id="mp1-1-1-1" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+                <gmlcov:positions>60.48318 26.91808</gmlcov:positions>
+              </gmlcov:SimpleMultiPoint>
+            </gml:domainSet>
+            <gml:rangeSet>
+              <gml:DataBlock>
+                <gml:rangeParameters />
+                <gml:doubleOrNilReasonTupleList>120000 2100.00 6 1.20 8 0.30 20</gml:doubleOrNilReasonTupleList>
+              </gml:DataBlock>
+            </gml:rangeSet>
+            <gml:coverageFunction>
+              <gml:CoverageMappingRule>
+                <gml:ruleDefinition>Linear</gml:ruleDefinition>
+              </gml:CoverageMappingRule>
+            </gml:coverageFunction>
+            <gmlcov:rangeType>
+              <swe:DataRecord>
+                <swe:field name="air-volume">
+                  <swe:Quantity>
+                    <swe:label>Air volume</swe:label>
+                    <swe:uom code="m3"/>
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Be-7">
+                  <swe:Quantity>
+                    <swe:label>Beryllium 7 activity concentration</swe:label>
+                    <swe:uom code="uBq/m3" />
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Be-7-uncertainty">
+                  <swe:Quantity>
+                    <swe:label>Relative uncertainty of Beryllium 7 result</swe:label>
+                    <swe:uom code="%"/>
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Cs-137">
+                  <swe:Quantity>
+                    <swe:label>Cesium 137 activity concentration</swe:label>
+                    <swe:uom code="uBq/m3" />
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Cs-137-uncertainty">
+                  <swe:Quantity>
+                    <swe:label>Relative uncertainty of Cesium 137 result</swe:label>
+                    <swe:uom code="%"/>
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Na-22">
+                  <swe:Quantity>
+                    <swe:label>Sodium 22 activity concentration</swe:label>
+                    <swe:uom code="uBq/m3" />
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Na-22-uncertainty">
+                  <swe:Quantity>
+                    <swe:label>Relative uncertainty of Sodium 22 result</swe:label>
+                    <swe:uom code="%"/>
+                  </swe:Quantity>
+                </swe:field>
+              </swe:DataRecord>
+            </gmlcov:rangeType>
+          </gmlcov:MultiPointCoverage>
+      </om:result>
+    </omso:PointObservation>
+  </wfs:member>
+  <wfs:member>
+    <omso:PointObservation gml:id="WFS-sample">
+      <om:phenomenonTime>
+        <gml:TimePeriod gml:id="time1-1-3">
+          <gml:beginPosition>2026-10-05T14:45:00Z</gml:beginPosition>
+          <gml:endPosition>2026-10-12T13:33:00Z</gml:endPosition>
+        </gml:TimePeriod>
+      </om:phenomenonTime>
+      <om:resultTime>
+        <gml:TimeInstant gml:id="time2-1-3">
+          <gml:timePosition>2026-10-22T08:31:00Z</gml:timePosition>
+        </gml:TimeInstant>
+      </om:resultTime>
+      <om:procedure xlink:href="http://xml.fmi.fi/inspire/process/stuk/air_radionuclides"/>
+      <om:parameter>
+        <om:NamedValue>
+          <om:name xlink:href="https://inspire.ec.europa.eu/codeList/ProcessParameterValue/value/analysisNumber"/>
+          <om:value>
+            <gml:integerValue>1</gml:integerValue>
+          </om:value>
+        </om:NamedValue>
+      </om:parameter>
+     <om:observedProperty  xlink:href="https://opendata.fmi.fi/meta?observableProperty=observation&amp;param=AC_P7D_avg&amp;language=eng"/>
+      <om:featureOfInterest>
+        <sams:SF_SpatialSamplingFeature gml:id="sampling-feature-1-1-3-fmisid-103429">
+          <sam:sampledFeature>
+            <target:Location gml:id="obsloc-3-fmisid-103429-pos">
+              <gml:identifier codeSpace="http://xml.fmi.fi/namespace/stationcode/fmisid">103429</gml:identifier>
+              
+              <gml:name codeSpace="http://xml.fmi.fi/namespace/locationcode/name">Kotka</gml:name>
+              <target:representativePoint xlink:href="#point-3-fmisid-103429"/>
+              <target:region codeSpace="http://xml.fmi.fi/namespace/location/region">Kotka</target:region>
+              <target:region codeSpace="http://xml.fmi.fi/namespace/location/country">Finland</target:region>
+            </target:Location>
+          </sam:sampledFeature>
+          <sams:shape>
+            <gml:Point gml:id="point-3-fmisid-103429" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+              <gml:name>Kotka</gml:name>
+              <gml:pos>60.48318 26.91808</gml:pos>
+            </gml:Point>
+          </sams:shape>
+        </sams:SF_SpatialSamplingFeature>
+      </om:featureOfInterest>
+      <om:result>
+          <gmlcov:MultiPointCoverage gml:id="mpcv1-1-1-3">
+            <gml:domainSet>
+              <gmlcov:SimpleMultiPoint gml:id="mp1-1-1-3" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+                <gmlcov:positions>60.48318 26.91808</gmlcov:positions>
+              </gmlcov:SimpleMultiPoint>
+            </gml:domainSet>
+            <gml:rangeSet>
+              <gml:DataBlock>
+                <gml:rangeParameters />
+                <gml:doubleOrNilReasonTupleList>128000 800.00 7 NaN NaN</gml:doubleOrNilReasonTupleList>
+              </gml:DataBlock>
+            </gml:rangeSet>
+            <gml:coverageFunction>
+              <gml:CoverageMappingRule>
+                <gml:ruleDefinition>Linear</gml:ruleDefinition>
+              </gml:CoverageMappingRule>
+            </gml:coverageFunction>
+            <gmlcov:rangeType>
+              <swe:DataRecord>
+                <swe:field name="air-volume">
+                  <swe:Quantity>
+                    <swe:label>Air volume</swe:label>
+                    <swe:uom code="m3"/>
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Be-7">
+                  <swe:Quantity>
+                    <swe:label>Beryllium 7 activity concentration</swe:label>
+                    <swe:uom code="uBq/m3" />
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Be-7-uncertainty">
+                  <swe:Quantity>
+                    <swe:label>Relative uncertainty of Beryllium 7 result</swe:label>
+                    <swe:uom code="%"/>
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Cs-137">
+                  <swe:Quantity>
+                    <swe:label>Cesium 137 activity concentration</swe:label>
+                    <swe:uom code="uBq/m3" />
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Cs-137-uncertainty">
+                  <swe:Quantity>
+                    <swe:label>Relative uncertainty of Cesium 137 result</swe:label>
+                    <swe:uom code="%"/>
+                  </swe:Quantity>
+                </swe:field>
+              </swe:DataRecord>
+            </gmlcov:rangeType>
+          </gmlcov:MultiPointCoverage>
+      </om:result>
+    </omso:PointObservation>
+  </wfs:member>
+<wfs:member>
+    <omso:PointObservation gml:id="WFS-sample">
+      <om:phenomenonTime>
+        <gml:TimePeriod gml:id="time1-1-2">
+          <gml:beginPosition>2026-09-21T16:15:00Z</gml:beginPosition>
+          <gml:endPosition>2026-09-28T09:32:00Z</gml:endPosition>
+        </gml:TimePeriod>
+      </om:phenomenonTime>
+      <om:resultTime>
+        <gml:TimeInstant gml:id="time2-1-2">
+          <gml:timePosition>2026-10-22T08:36:00Z</gml:timePosition>
+        </gml:TimeInstant>
+      </om:resultTime>
+      <om:procedure xlink:href="http://xml.fmi.fi/inspire/process/stuk/air_radionuclides"/>
+      <om:parameter>
+        <om:NamedValue>
+          <om:name xlink:href="https://inspire.ec.europa.eu/codeList/ProcessParameterValue/value/analysisNumber"/>
+          <om:value>
+            <gml:integerValue>1</gml:integerValue>
+          </om:value>
+        </om:NamedValue>
+      </om:parameter>
+     <om:observedProperty  xlink:href="https://opendata.fmi.fi/meta?observableProperty=observation&amp;param=AC_P7D_avg&amp;language=eng"/>
+      <om:featureOfInterest>
+        <sams:SF_SpatialSamplingFeature gml:id="sampling-feature-1-1-2-fmisid-103429">
+          <sam:sampledFeature>
+            <target:Location gml:id="obsloc-2-fmisid-103429-pos">
+              <gml:identifier codeSpace="http://xml.fmi.fi/namespace/stationcode/fmisid">103429</gml:identifier>
+              
+              <gml:name codeSpace="http://xml.fmi.fi/namespace/locationcode/name">Kotka</gml:name>
+              <target:representativePoint xlink:href="#point-2-fmisid-103429"/>
+              <target:region codeSpace="http://xml.fmi.fi/namespace/location/region">Kotka</target:region>
+              <target:region codeSpace="http://xml.fmi.fi/namespace/location/country">Finland</target:region>
+            </target:Location>
+          </sam:sampledFeature>
+          <sams:shape>
+            <gml:Point gml:id="point-2-fmisid-103429" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+              <gml:name>Kotka</gml:name>
+              <gml:pos>60.48318 26.91808</gml:pos>
+            </gml:Point>
+          </sams:shape>
+        </sams:SF_SpatialSamplingFeature>
+      </om:featureOfInterest>
+      <om:result>
+          <gmlcov:MultiPointCoverage gml:id="mpcv1-1-1-2">
+            <gml:domainSet>
+              <gmlcov:SimpleMultiPoint gml:id="mp1-1-1-2" srsName="http://www.opengis.net/def/crs/EPSG/0/4258" srsDimension="2">
+                <gmlcov:positions>60.48318 26.91808</gmlcov:positions>
+              </gmlcov:SimpleMultiPoint>
+            </gml:domainSet>
+            <gml:rangeSet>
+              <gml:DataBlock>
+                <gml:rangeParameters />
+                <gml:doubleOrNilReasonTupleList>125000 1000.00 5 250.00 5 0.90 7</gml:doubleOrNilReasonTupleList>
+              </gml:DataBlock>
+            </gml:rangeSet>
+            <gml:coverageFunction>
+              <gml:CoverageMappingRule>
+                <gml:ruleDefinition>Linear</gml:ruleDefinition>
+              </gml:CoverageMappingRule>
+            </gml:coverageFunction>
+            <gmlcov:rangeType>
+              <swe:DataRecord>
+                <swe:field name="air-volume">
+                  <swe:Quantity>
+                    <swe:label>Air volume</swe:label>
+                    <swe:uom code="m3"/>
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Be-7">
+                  <swe:Quantity>
+                    <swe:label>Beryllium 7 activity concentration</swe:label>
+                    <swe:uom code="uBq/m3" />
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Be-7-uncertainty">
+                  <swe:Quantity>
+                    <swe:label>Relative uncertainty of Beryllium 7 result</swe:label>
+                    <swe:uom code="%"/>
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Pb-210">
+                  <swe:Quantity>
+                    <swe:label>Pb-210 activity concentration</swe:label>
+                    <swe:uom code="uBq/m3" />
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Pb-210-uncertainty">
+                  <swe:Quantity>
+                    <swe:label>Relative uncertainty of Pb-210 result</swe:label>
+                    <swe:uom code="%"/>
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Cs-137">
+                  <swe:Quantity>
+                    <swe:label>Cesium 137 activity concentration</swe:label>
+                    <swe:uom code="uBq/m3" />
+                  </swe:Quantity>
+                </swe:field>
+                <swe:field name="Cs-137-uncertainty">
+                  <swe:Quantity>
+                    <swe:label>Relative uncertainty of Cesium 137 result</swe:label>
+                    <swe:uom code="%"/>
+                  </swe:Quantity>
+                </swe:field>
+              </swe:DataRecord>
+            </gmlcov:rangeType>
+          </gmlcov:MultiPointCoverage>
+      </om:result>
+    </omso:PointObservation>
+  </wfs:member>
+  </wfs:FeatureCollection>
