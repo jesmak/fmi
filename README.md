@@ -435,8 +435,8 @@ response_variable: rain
 
 ## Upgrading from the separate warnings card
 
-The warnings card used to be a repository of its own, [FMI warnings card](https://github.com/jesmak/fmi-warnings-card).
-It now comes with the integration, and the separate one is no longer updated. If you installed it, remove it in HACS,
+The warnings card used to be a repository of its own, FMI warnings card. It now comes with the integration, and the
+separate repository has been removed. If you installed it, remove it in HACS,
 and check that its resource (`/hacsfiles/fmi-warnings-card/…`) is gone from Settings › Dashboards › Resources. Until
 it is, the log warns about it at every start. Your dashboards need no changes, as the card's type stays
 `custom:fmi-warnings-card`.
