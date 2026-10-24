@@ -34,10 +34,9 @@ No account or API key is needed. FMI's open data service is used anonymously.
 
 ### With HACS
 
-1. Add this repository to HACS custom repositories with type **Integration**
-2. Search for FMI Open Data in HACS and download it
-3. Restart Home Assistant
-4. Add FMI Open Data in Settings › Devices & services
+1. Search for FMI Open Data in HACS and download it
+2. Restart Home Assistant
+3. Add FMI Open Data in Settings › Devices & services
 
 ### Manual
 
@@ -409,6 +408,6 @@ MIT. The data is FMI's, under CC BY 4.0.
 [releases-shield]: https://img.shields.io/github/release/jesmak/fmi.svg?style=for-the-badge
 [release-date-shield]: https://img.shields.io/github/release-date/jesmak/fmi?style=for-the-badge
 [releases]: https://github.com/jesmak/fmi/releases
-[hacs-shield]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
-[hacs]: https://hacs.xyz/docs/faq/custom_repositories/
+[hacs-shield]: https://img.shields.io/badge/HACS-Default-green.svg?style=for-the-badge
+[hacs]: https://my.home-assistant.io/redirect/hacs_repository/?owner=jesmak&repository=fmi&category=integration
 [license-shield]: https://img.shields.io/github/license/jesmak/fmi.svg?style=for-the-badge
