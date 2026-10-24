@@ -1,0 +1,46 @@
+{
+    "common": {
+        "name": "FMI-varoitukset",
+        "description": "Ilmatieteen laitoksen sää- ja merivaroitukset valitulle paikalle",
+        "invalid_configuration": "Virheellinen konfiguraatio. Valitse fmi-integraation varoitusanturi.",
+        "invalid_max_height": "Enimmäiskorkeuden (max_height) on oltava positiivinen luku pikseleinä.",
+        "no_entity": "Entiteettiä {entity} ei löydy",
+        "not_warnings": "{entity} ei ole fmi-integraation varoitusanturi",
+        "unavailable": "Varoitukset eivät ole juuri nyt saatavilla",
+        "no_warnings": "Ei varoituksia",
+        "now": "nyt",
+        "period": "{start} – {end}",
+        "from": "{start} alkaen",
+        "probability": "Todennäköisyys {value} %"
+    },
+    "levels": {
+        "yellow": "Keltainen varoitus",
+        "orange": "Oranssi varoitus",
+        "red": "Punainen varoitus"
+    },
+    "types": {
+        "wind": "Tuuli",
+        "seaWind": "Tuuli merellä",
+        "thunderstorm": "Rajuilma",
+        "seaThunderstorm": "Rajuilma merellä",
+        "rain": "Rankkasade",
+        "trafficWeather": "Liikenne",
+        "pedestrianSafety": "Jalankulku",
+        "forestFireWeather": "Metsäpalo",
+        "hotWeather": "Helle",
+        "coldWeather": "Pakkanen",
+        "uvNote": "UV",
+        "seaWaveHeight": "Aallokko",
+        "seaWaterHeight": "Vedenkorkeus",
+        "seaIcing": "Jäätäminen"
+    },
+    "editor": {
+        "entity": "Varoitusanturi",
+        "entity_helper": "fmi-integraation varoitusanturi",
+        "title": "Otsikko",
+        "show_timeline": "Näytä aikajana",
+        "show_timeline_helper": "Tämä päivä ja kaksi seuraavaa, palkki kullekin varoitukselle",
+        "max_height": "Enimmäiskorkeus",
+        "max_height_helper": "Pikseleinä. Lista muuttuu vieritettäväksi, mikäli varoituksia on enemmän kuin näkymään mahtuu."
+    }
+}

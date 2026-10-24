@@ -24,9 +24,9 @@ warnings in force there, or both. Each station and place is a device in Home Ass
 
 For a one-off chart or a script, an action reads any station's observations over a time range without a sensor.
 
-Two cards show its data on a dashboard. [FMI warnings card](https://github.com/jesmak/fmi-warnings-card) is made for
-its warnings and shows a place's warnings on a timeline. [Compact UV index card](https://github.com/jesmak/compact-uv-index-card)
-shows the UV index that FMI measures at its radiation stations.
+The integration comes with a [card for its warnings](#warnings-card), which shows a place's warnings on a timeline.
+[Compact UV index card](https://github.com/jesmak/compact-uv-index-card) shows the UV index that FMI measures at its
+radiation stations.
 
 No account or API key is needed. FMI's open data service is used anonymously.
 
@@ -37,6 +37,7 @@ No account or API key is needed. FMI's open data service is used anonymously.
 1. Search for FMI Open Data in HACS and download it
 2. Restart Home Assistant
 3. Add FMI Open Data in Settings › Devices & services
+4. Refresh your browser, so that the [warnings card](#warnings-card) shows up in the card picker
 
 ### Manual
 
@@ -45,6 +46,7 @@ No account or API key is needed. FMI's open data service is used anonymously.
    folder
 3. Restart Home Assistant
 4. Add FMI Open Data in Settings › Devices & services
+5. Refresh your browser, so that the [warnings card](#warnings-card) shows up in the card picker
 
 ## Settings
 
@@ -244,6 +246,104 @@ FMI limits how long a range one request may cover, differently for each query. I
 observations, a month for the hourly ones and a year for the daily ones. A longer range is refused with FMI's own
 reason, which tells the limit. A range with nothing in it returns an empty list.
 
+## Warnings card
+
+<p>
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-storm-light.png#gh-light-mode-only" width="400" alt="Weather warnings on a timeline of Thursday to Saturday, a yellow traffic weather warning and an orange wind warning in force now and a yellow pedestrian weather warning on Friday morning, with a row for each warning and its times under the timeline">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-storm-dark.png#gh-dark-mode-only" width="400" alt="Weather warnings on a timeline of Thursday to Saturday, a yellow traffic weather warning and an orange wind warning in force now and a yellow pedestrian weather warning on Friday morning, with a row for each warning and its times under the timeline">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-sea-light.png#gh-light-mode-only" width="400" alt="Sea warnings on a timeline, an orange wind warning for sea areas and a yellow wave height warning in force now and a yellow sea level warning from Friday to Saturday, with a row for each warning">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-sea-dark.png#gh-dark-mode-only" width="400" alt="Sea warnings on a timeline, an orange wind warning for sea areas and a yellow wave height warning in force now and a yellow sea level warning from Friday to Saturday, with a row for each warning">
+</p>
+
+The integration comes with a dashboard card for the warnings of one place, those in force now and those coming up in the
+next few days, each on a row of its own in its level's colour. Tapping a row opens the warning's level, FMI's
+description of it, its typical impacts and its probability. A timeline above the rows shows when each warning starts
+and ends.
+
+The integration serves the card itself and adds it to the dashboards' resources when it starts, so the card is always
+the integration's own version. With the resources set in YAML (`resource_mode: yaml`), it can't add or update
+itself, and the log says which line to add, change or remove.
+
+### Card options
+
+The card has a visual editor. Add **FMI warnings** from the card picker and choose the place's warning level
+sensor. The options can also be written by hand.
+
+| Name            | Type    | Description                                                                | Default |
+| --------------- | ------- | -------------------------------------------------------------------------- | ------- |
+| `type`          | string  | **Required.** `custom:fmi-warnings-card`                                   |         |
+| `entity`        | string  | **Required.** A place's [warning level](#warning-level) sensor             |         |
+| `title`         | string  | A title above the warnings                                                 | none    |
+| `show_timeline` | boolean | The timeline of today and the next two days above the rows                 | `true`  |
+| `max_height`    | number  | The card's maximum height in pixels. A longer list of warnings scrolls     | none    |
+
+### The rows
+
+Each warning has a row with a stripe and an icon in the warning level's colour, the warning's name as FMI gives it, and
+when it is in force. The rows go by when each warning starts, the more severe first of two starting at once, so those in
+force come first and say they started `now`. Those coming up follow, slightly dimmed, with the weekday and time they
+start and end. A time a week or more away shows its date instead of its weekday. A warning that ends is dropped within a
+minute, without waiting for the sensor's next update. Tapping a row opens it to show the warning's level and details,
+and the chevron at its end turns. One row is open at a time, and an opened row is scrolled into view.
+
+The names and texts are in the language the integration was set up in. The card's own texts, such as `now` and the
+weekdays, follow Home Assistant's language, and the times follow the 12- or 24-hour clock chosen in your profile.
+
+### The timeline
+
+Today and the two days after it, a bar for each warning, and a line at the current moment. Warnings with enough time
+between them share a lane, and those that overlap or meet get lanes of their own. The bars carry the warning type's icon
+and a short name when there is room for it, and the icon alone when there isn't. Tapping a bar opens its warning's row.
+A warning further ahead than the timeline reaches is in the rows only.
+
+It can be left out with `show_timeline: false`:
+
+<p>
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-no-timeline-light.png#gh-light-mode-only" width="510" alt="The same three weather warnings as rows only, without the timeline or a title">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-no-timeline-dark.png#gh-dark-mode-only" width="510" alt="The same three weather warnings as rows only, without the timeline or a title">
+</p>
+
+### No warnings
+
+Most days there are none, and the card says so:
+
+<p>
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-no-warnings-light.png#gh-light-mode-only" width="510" alt="The card with a green check mark and the text No warnings">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-no-warnings-dark.png#gh-dark-mode-only" width="510" alt="The card with a green check mark and the text No warnings">
+</p>
+
+To hide the card instead, use the card's visibility settings in Home Assistant (see
+[the example](#the-warnings-on-a-dashboard)).
+
+### Sizes
+
+The card fills a section by default and can be made as narrow as two thirds of one. On a narrow card the timeline's bars
+show their icons only. A row's time moves under its name whenever the two don't fit side by side, and a name too long
+for its line is cut short until the row is opened:
+
+<p>
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-narrow-light.png#gh-light-mode-only" width="250" alt="The three weather warnings on a narrow card, the timeline's bars with icons only, each row's name cut short and its time under it">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-narrow-dark.png#gh-dark-mode-only" width="250" alt="The three weather warnings on a narrow card, the timeline's bars with icons only, each row's name cut short and its time under it">
+</p>
+
+When the card is held to a height, by `max_height` or by a fixed number of rows in a sections view, the title and the
+timeline stay in place and only the warnings scroll:
+
+<p>
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-light.png#gh-light-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the last row cut off at the bottom where the list of warnings scrolls">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-dark.png#gh-dark-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the last row cut off at the bottom where the list of warnings scrolls">
+</p>
+
+### Colours
+
+The levels use Home Assistant's amber, orange and red. A theme can change them:
+
+| Variable                      | Default                        |
+| ----------------------------- | ------------------------------ |
+| `--fmi-warnings-yellow-color` | `var(--amber-color, #ffc107)`  |
+| `--fmi-warnings-orange-color` | `var(--orange-color, #ff9800)` |
+| `--fmi-warnings-red-color`    | `var(--red-color, #f44336)`    |
+
 ## Examples
 
 ### The sea level, measured and forecast
@@ -277,13 +377,24 @@ series:
 
 ### The warnings on a dashboard
 
-Every warning that concerns a place, in force now or coming up, with
-[FMI warnings card](https://github.com/jesmak/fmi-warnings-card). Its README lists the rest of its options.
+Every warning that concerns a place, in force now or coming up, with the [warnings card](#warnings-card):
 
 ```yaml
 type: custom:fmi-warnings-card
 entity: sensor.cabin_warning_level
 title: Weather warnings
+```
+
+The card hidden while no warning is in force. The sensor's state is the highest level in force now, so this hides the
+card even when a warning is coming up later:
+
+```yaml
+type: custom:fmi-warnings-card
+entity: sensor.cabin_warning_level
+visibility:
+  - condition: state
+    entity: sensor.cabin_warning_level
+    state_not: none
 ```
 
 ### A notification when a warning is issued
@@ -317,6 +428,14 @@ data:
   start: "{{ now() - timedelta(days=7) }}"
 response_variable: rain
 ```
+
+## Upgrading from the separate warnings card
+
+The warnings card used to be a repository of its own, [FMI warnings card](https://github.com/jesmak/fmi-warnings-card).
+It now comes with the integration, and the separate one is no longer updated. If you installed it, remove it in HACS,
+and check that its resource (`/hacsfiles/fmi-warnings-card/…`) is gone from Settings › Dashboards › Resources. Until
+it is, the log warns about it at every start. Your dashboards need no changes, as the card's type stays
+`custom:fmi-warnings-card`.
 
 ## Upgrading from 3.x
 
@@ -366,6 +485,9 @@ The texts are in `custom_components/fmi_open_data/translations/`, one JSON file 
 `fi.json`. To add a language, copy `en.json` to the new language's code and translate the values. FMI's own names of
 queries, parameters and warnings come from FMI in English or Finnish.
 
+The warnings card's texts are in `frontend/src/localize/languages/`, in the same way. The card finds a new file by
+itself and uses it when Home Assistant is set to that language. A text left out falls back to English.
+
 ## Development
 
 Requires Python 3.14.
@@ -378,6 +500,19 @@ python3.14 -m venv .venv
 ```
 
 The tests run on made-up data and trimmed real responses from FMI's public stations, without network access.
+
+The warnings card is in `frontend/` and requires Node 22.13 or newer:
+
+```
+cd frontend
+npm install
+npm run check
+```
+
+`npm run check` typechecks, lints, checks formatting, runs the tests and builds
+`custom_components/fmi_open_data/www/fmi-warnings-card.js`, which is the file the integration serves and is committed
+to the repository. The card carries the integration's version from `manifest.json`. To have git refuse a commit whose
+built card doesn't match `frontend/`, run `git config core.hooksPath .githooks` once.
 
 | Path                           | What it contains                                                                    |
 | ------------------------------ | ----------------------------------------------------------------------------------- |
@@ -393,7 +528,9 @@ The tests run on made-up data and trimmed real responses from FMI's public stati
 | `sensor.py`, `binary_sensor.py`, `event.py`, `weather.py` | The entities                             |
 | `services.py`                  | The `get_observations` action                                                       |
 | `diagnostics.py`               | The diagnostics download, with places left out                                      |
+| `card.py`, `www/`              | Serving the warnings card and adding it to the dashboards' resources                |
 | `translations/<language>.json` | Home Assistant UI texts                                                             |
+| `frontend/`                    | The warnings card's source, tests and build                                         |
 
 ## Support
 

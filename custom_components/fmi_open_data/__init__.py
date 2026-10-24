@@ -17,6 +17,7 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.typing import ConfigType
 
+from .card import async_add_card_resource, async_remove_card_resource, async_serve_card
 from .const import (
     CONF_MEASUREMENTS,
     CONF_STRUCTURE,
@@ -61,6 +62,7 @@ type FMIConfigEntry = ConfigEntry[FMIRuntimeData]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_services(hass)
+    await async_serve_card(hass)
     return True
 
 
@@ -71,6 +73,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> bool:
     if entry.data.get(CONF_STRUCTURE) != STRUCTURE_VERSION:
         await async_restructure(hass, entry)
     seen = _subentries(entry)
+    await async_add_card_resource(hass)
 
     feed = WarningFeed(hass)
     coordinators: list[FMIQueryCoordinator | FMIWarningsCoordinator | FMIWeatherCoordinator] = []
@@ -115,6 +118,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> bool
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> None:
+    await async_remove_card_resource(hass)
     # Repair issues are not persistent, but they would stay until a restart.
     for domain, issue_id in list(ir.async_get(hass).issues):
         if domain == DOMAIN:

@@ -4,7 +4,7 @@
         "https://github.com/benjamin-dcs/gauge-card-pro/releases/download/v2.5.0/gauge-card-pro.js",
         "../../hass-cards/compact-rain-gauge-card/dist/compact-rain-gauge-card.js",
         "../../hass-cards/compact-uv-index-card/dist/compact-uv-index-card.js",
-        "../../hass-cards/fmi-warnings-card/dist/fmi-warnings-card.js"
+        "custom_components/fmi_open_data/www/fmi-warnings-card.js"
     ],
     "clock": "2026-09-24T14:00:00+03:00",
     "translations": {
@@ -58,7 +58,7 @@
                 "attribution": "Data provided by Finnish Meteorological Institute (FMI)",
                 "icon": "mdi:alert",
                 "label": "Tampere",
-                "language": "en",
+                "language": "eng",
                 "latitude": 61.4978,
                 "longitude": 23.761,
                 "radius": 1000,
@@ -475,6 +475,194 @@
                 "unit_of_measurement": "m",
                 "state_class": "measurement",
                 "attribution": "Data provided by Finnish Meteorological Institute (FMI)"
+            }
+        },
+        "sensor.lahti_warning_level": {
+            "state": "orange",
+            "attributes": {
+                "friendly_name": "Lahti Warning level",
+                "device_class": "enum",
+                "options": [
+                    "none",
+                    "yellow",
+                    "orange",
+                    "red"
+                ],
+                "attribution": "Data provided by Finnish Meteorological Institute (FMI)",
+                "icon": "mdi:alert",
+                "label": "Lahti",
+                "language": "eng",
+                "warning_types": [
+                    "wind",
+                    "thunderstorm",
+                    "rain",
+                    "trafficWeather",
+                    "pedestrianSafety"
+                ],
+                "active_warnings": 2,
+                "warnings": [
+                    {
+                        "id": "urn:oid:fi.fmi.warning.2.1.20260924.0815",
+                        "type": "trafficWeather",
+                        "level": "yellow",
+                        "event": "Traffic weather warning",
+                        "severity": "Moderate",
+                        "onset": "2026-09-24T09:00:00+03:00",
+                        "expires": "2026-09-24T21:00:00+03:00",
+                        "headline": "Yellow traffic weather warning: Päijät-Häme, Thu 9.00 - 21.00",
+                        "description": "Driving conditions are poor because of heavy rain and strong wind.",
+                        "impacts": "Standing water may make roads slippery.",
+                        "probability": null,
+                        "areas": [
+                            "Päijät-Häme"
+                        ],
+                        "parameters": {}
+                    },
+                    {
+                        "id": "urn:oid:fi.fmi.warning.2.1.20260924.1104",
+                        "type": "wind",
+                        "level": "orange",
+                        "event": "Wind warning for land areas",
+                        "severity": "Severe",
+                        "onset": "2026-09-24T12:00:00+03:00",
+                        "expires": "2026-09-25T03:00:00+03:00",
+                        "headline": "Orange wind warning for land areas: Päijät-Häme, Thu 12.00 - Fri 3.00",
+                        "description": "South-westerly gusts of 20–25 m/s.",
+                        "impacts": "Trees may fall. Power cuts are likely.",
+                        "probability": 60,
+                        "areas": [
+                            "Päijät-Häme"
+                        ],
+                        "parameters": {
+                            "windIntensity": 25,
+                            "windIntensityUom": "m/s",
+                            "windDirection": 225
+                        }
+                    },
+                    {
+                        "id": "urn:oid:fi.fmi.warning.2.1.20260924.1140",
+                        "type": "pedestrianSafety",
+                        "level": "yellow",
+                        "event": "Pedestrian weather warning",
+                        "severity": "Moderate",
+                        "onset": "2026-09-25T06:00:00+03:00",
+                        "expires": "2026-09-25T12:00:00+03:00",
+                        "headline": "Yellow pedestrian weather warning: Päijät-Häme, Fri 6.00 - 12.00",
+                        "description": "Wet leaves make pavements very slippery in places.",
+                        "impacts": "Falls are more likely than usual.",
+                        "probability": null,
+                        "areas": [
+                            "Päijät-Häme"
+                        ],
+                        "parameters": {}
+                    }
+                ]
+            }
+        },
+        "sensor.pori_warning_level": {
+            "state": "orange",
+            "attributes": {
+                "friendly_name": "Pori Warning level",
+                "device_class": "enum",
+                "options": [
+                    "none",
+                    "yellow",
+                    "orange",
+                    "red"
+                ],
+                "attribution": "Data provided by Finnish Meteorological Institute (FMI)",
+                "icon": "mdi:alert",
+                "label": "Pori",
+                "language": "eng",
+                "warning_types": [
+                    "seaWind",
+                    "seaThunderstorm",
+                    "seaWaveHeight",
+                    "seaWaterHeight",
+                    "seaIcing"
+                ],
+                "active_warnings": 2,
+                "warnings": [
+                    {
+                        "id": "urn:oid:fi.fmi.warning.2.1.20260924.0532",
+                        "type": "seaWind",
+                        "level": "orange",
+                        "event": "Wind warning for sea areas",
+                        "severity": "Severe",
+                        "onset": "2026-09-24T06:00:00+03:00",
+                        "expires": "2026-09-25T15:00:00+03:00",
+                        "headline": "Orange wind warning for sea areas: The Bothnian Sea, Thu 6.00 - Fri 15.00",
+                        "description": "Storm warning: south-westerly wind 25 m/s.",
+                        "impacts": "Dangerous for all vessels.",
+                        "probability": 80,
+                        "areas": [
+                            "Southern Bothnian Sea"
+                        ],
+                        "parameters": {
+                            "windIntensity": 25,
+                            "windIntensityUom": "m/s",
+                            "windDirection": 225
+                        }
+                    },
+                    {
+                        "id": "urn:oid:fi.fmi.warning.2.1.20260924.0547",
+                        "type": "seaWaveHeight",
+                        "level": "yellow",
+                        "event": "Wave height warning",
+                        "severity": "Moderate",
+                        "onset": "2026-09-24T09:00:00+03:00",
+                        "expires": "2026-09-25T18:00:00+03:00",
+                        "headline": "Yellow wave height warning: The Bothnian Sea, Thu 9.00 - Fri 18.00",
+                        "description": "Significant wave height up to 5 metres.",
+                        "impacts": "Dangerous for small vessels.",
+                        "probability": null,
+                        "areas": [
+                            "Southern Bothnian Sea"
+                        ],
+                        "parameters": {}
+                    },
+                    {
+                        "id": "urn:oid:fi.fmi.warning.2.1.20260924.0603",
+                        "type": "seaWaterHeight",
+                        "level": "yellow",
+                        "event": "Sea level warning",
+                        "severity": "Moderate",
+                        "onset": "2026-09-25T00:00:00+03:00",
+                        "expires": "2026-09-26T06:00:00+03:00",
+                        "headline": "Yellow sea level warning: Pori, Fri 0.00 - Sat 6.00",
+                        "description": "The sea level rises to 80–100 cm above the mean.",
+                        "impacts": "Low-lying shores may flood.",
+                        "probability": null,
+                        "areas": [
+                            "Pori"
+                        ],
+                        "parameters": {}
+                    }
+                ]
+            }
+        },
+        "sensor.turku_warning_level": {
+            "state": "none",
+            "attributes": {
+                "friendly_name": "Turku Warning level",
+                "device_class": "enum",
+                "options": [
+                    "none",
+                    "yellow",
+                    "orange",
+                    "red"
+                ],
+                "attribution": "Data provided by Finnish Meteorological Institute (FMI)",
+                "icon": "mdi:alert",
+                "label": "Turku",
+                "language": "eng",
+                "warning_types": [
+                    "wind",
+                    "thunderstorm",
+                    "rain"
+                ],
+                "active_warnings": 0,
+                "warnings": []
             }
         }
     },
@@ -51805,6 +51993,60 @@
                         ]
                     }
                 ]
+            }
+        },
+        {
+            "name": "warnings-storm",
+            "width": 500,
+            "card": {
+                "type": "custom:fmi-warnings-card",
+                "entity": "sensor.lahti_warning_level",
+                "title": "Weather warnings"
+            }
+        },
+        {
+            "name": "warnings-sea",
+            "width": 500,
+            "card": {
+                "type": "custom:fmi-warnings-card",
+                "entity": "sensor.pori_warning_level",
+                "title": "Sea warnings"
+            }
+        },
+        {
+            "name": "warnings-no-warnings",
+            "width": 500,
+            "card": {
+                "type": "custom:fmi-warnings-card",
+                "entity": "sensor.turku_warning_level",
+                "title": "Weather warnings"
+            }
+        },
+        {
+            "name": "warnings-no-timeline",
+            "width": 500,
+            "card": {
+                "type": "custom:fmi-warnings-card",
+                "entity": "sensor.lahti_warning_level",
+                "show_timeline": false
+            }
+        },
+        {
+            "name": "warnings-max-height",
+            "width": 500,
+            "card": {
+                "type": "custom:fmi-warnings-card",
+                "entity": "sensor.lahti_warning_level",
+                "title": "Weather warnings",
+                "max_height": 280
+            }
+        },
+        {
+            "name": "warnings-narrow",
+            "width": 240,
+            "card": {
+                "type": "custom:fmi-warnings-card",
+                "entity": "sensor.lahti_warning_level"
             }
         }
     ]

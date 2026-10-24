@@ -1,0 +1,46 @@
+{
+    "common": {
+        "name": "FMI warnings",
+        "description": "The Finnish Meteorological Institute's weather and sea warnings for a chosen place",
+        "invalid_configuration": "Invalid configuration. Choose a warnings sensor of the fmi integration.",
+        "invalid_max_height": "max_height must be a positive number of pixels.",
+        "no_entity": "Entity {entity} not found",
+        "not_warnings": "{entity} is not a warnings sensor of the fmi integration",
+        "unavailable": "The warnings are not available right now",
+        "no_warnings": "No warnings",
+        "now": "now",
+        "period": "{start} – {end}",
+        "from": "from {start}",
+        "probability": "Probability {value}%"
+    },
+    "levels": {
+        "yellow": "Yellow warning",
+        "orange": "Orange warning",
+        "red": "Red warning"
+    },
+    "types": {
+        "wind": "Wind",
+        "seaWind": "Sea wind",
+        "thunderstorm": "Thunderstorm",
+        "seaThunderstorm": "Sea thunderstorm",
+        "rain": "Heavy rain",
+        "trafficWeather": "Traffic",
+        "pedestrianSafety": "Pedestrians",
+        "forestFireWeather": "Forest fire",
+        "hotWeather": "Heat",
+        "coldWeather": "Cold",
+        "uvNote": "UV",
+        "seaWaveHeight": "Waves",
+        "seaWaterHeight": "Sea level",
+        "seaIcing": "Icing"
+    },
+    "editor": {
+        "entity": "Warnings sensor",
+        "entity_helper": "A warnings sensor of the fmi integration",
+        "title": "Title",
+        "show_timeline": "Show the timeline",
+        "show_timeline_helper": "Today and the next two days, a bar for each warning",
+        "max_height": "Maximum height",
+        "max_height_helper": "In pixels. The list becomes scrollable when there are more warnings than fit in the view."
+    }
+}

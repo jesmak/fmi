@@ -1,0 +1,45 @@
+{
+    "name": "fmi-warnings-card",
+    "description": "The dashboard card that comes with the FMI Open Data integration, for the weather warnings of a place",
+    "keywords": [
+        "home-assistant",
+        "homeassistant",
+        "hass",
+        "lovelace",
+        "custom-cards",
+        "weather",
+        "warnings",
+        "fmi"
+    ],
+    "type": "module",
+    "private": true,
+    "license": "MIT",
+    "repository": "git@github.com:jesmak/fmi.git",
+    "engines": {
+        "node": ">=22.13"
+    },
+    "scripts": {
+        "build": "node scripts/build.mjs",
+        "typecheck": "tsc",
+        "lint": "eslint .",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "check": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build"
+    },
+    "dependencies": {
+        "lit": "^3.3.3"
+    },
+    "devDependencies": {
+        "@eslint/compat": "^2.1.1",
+        "@eslint/js": "^10.0.1",
+        "esbuild": "^0.28.2",
+        "eslint": "^10.10.0",
+        "happy-dom": "^21.0.4",
+        "prettier": "^3.9.6",
+        "typescript": "~6.0.3",
+        "typescript-eslint": "^8.72.0",
+        "vitest": "^5.0.0"
+    }
+}

@@ -228,7 +228,9 @@ def hourly_forecast() -> list[dict]:
     return out
 
 
-def warning(identifier, kind, level, event, onset, expires, headline, description, impacts, parameters):
+def warning(
+    identifier, kind, level, event, onset, expires, headline, description, impacts, parameters, areas=("Pirkanmaa",), probability=None
+):
     return {
         "id": f"urn:oid:fi.fmi.warning.2.1.{identifier}",
         "type": kind,
@@ -240,8 +242,8 @@ def warning(identifier, kind, level, event, onset, expires, headline, descriptio
         "headline": headline,
         "description": description,
         "impacts": impacts,
-        "probability": None,
-        "areas": ["Pirkanmaa"],
+        "probability": probability,
+        "areas": list(areas),
         "parameters": parameters,
     }
 
@@ -272,6 +274,131 @@ WARNINGS = [
         {},
     ),
 ]
+
+# The warnings card's own screenshots: a stormy day inland and at sea, and a place with none.
+CARD_WARNINGS = {
+    "Lahti": [
+        warning(
+            "20260924.0815",
+            "trafficWeather",
+            "yellow",
+            "Traffic weather warning",
+            "2026-09-24T09:00:00+03:00",
+            "2026-09-24T21:00:00+03:00",
+            "Yellow traffic weather warning: Päijät-Häme, Thu 9.00 - 21.00",
+            "Driving conditions are poor because of heavy rain and strong wind.",
+            "Standing water may make roads slippery.",
+            {},
+            areas=("Päijät-Häme",),
+        ),
+        warning(
+            "20260924.1104",
+            "wind",
+            "orange",
+            "Wind warning for land areas",
+            "2026-09-24T12:00:00+03:00",
+            "2026-09-25T03:00:00+03:00",
+            "Orange wind warning for land areas: Päijät-Häme, Thu 12.00 - Fri 3.00",
+            "South-westerly gusts of 20–25 m/s.",
+            "Trees may fall. Power cuts are likely.",
+            {"windIntensity": 25, "windIntensityUom": "m/s", "windDirection": 225},
+            areas=("Päijät-Häme",),
+            probability=60,
+        ),
+        warning(
+            "20260924.1140",
+            "pedestrianSafety",
+            "yellow",
+            "Pedestrian weather warning",
+            "2026-09-25T06:00:00+03:00",
+            "2026-09-25T12:00:00+03:00",
+            "Yellow pedestrian weather warning: Päijät-Häme, Fri 6.00 - 12.00",
+            "Wet leaves make pavements very slippery in places.",
+            "Falls are more likely than usual.",
+            {},
+            areas=("Päijät-Häme",),
+        ),
+    ],
+    "Pori": [
+        warning(
+            "20260924.0532",
+            "seaWind",
+            "orange",
+            "Wind warning for sea areas",
+            "2026-09-24T06:00:00+03:00",
+            "2026-09-25T15:00:00+03:00",
+            "Orange wind warning for sea areas: The Bothnian Sea, Thu 6.00 - Fri 15.00",
+            "Storm warning: south-westerly wind 25 m/s.",
+            "Dangerous for all vessels.",
+            {"windIntensity": 25, "windIntensityUom": "m/s", "windDirection": 225},
+            areas=("Southern Bothnian Sea",),
+            probability=80,
+        ),
+        warning(
+            "20260924.0547",
+            "seaWaveHeight",
+            "yellow",
+            "Wave height warning",
+            "2026-09-24T09:00:00+03:00",
+            "2026-09-25T18:00:00+03:00",
+            "Yellow wave height warning: The Bothnian Sea, Thu 9.00 - Fri 18.00",
+            "Significant wave height up to 5 metres.",
+            "Dangerous for small vessels.",
+            {},
+            areas=("Southern Bothnian Sea",),
+        ),
+        warning(
+            "20260924.0603",
+            "seaWaterHeight",
+            "yellow",
+            "Sea level warning",
+            "2026-09-25T00:00:00+03:00",
+            "2026-09-26T06:00:00+03:00",
+            "Yellow sea level warning: Pori, Fri 0.00 - Sat 6.00",
+            "The sea level rises to 80–100 cm above the mean.",
+            "Low-lying shores may flood.",
+            {},
+            areas=("Pori",),
+        ),
+    ],
+    "Turku": [],
+}
+CARD_TYPES = {
+    "Lahti": ["wind", "thunderstorm", "rain", "trafficWeather", "pedestrianSafety"],
+    "Pori": ["seaWind", "seaThunderstorm", "seaWaveHeight", "seaWaterHeight", "seaIcing"],
+    "Turku": ["wind", "thunderstorm", "rain"],
+}
+
+
+def card_place(label: str) -> dict:
+    """A warnings place that only the card's own shots show."""
+    warnings = CARD_WARNINGS[label]
+    now = [w for w in warnings if w["onset"] <= CLOCK.isoformat() < w["expires"]]
+    levels = ["none", "yellow", "orange", "red"]
+    return {
+        "state": max((w["level"] for w in now), key=levels.index, default="none"),
+        "attributes": {
+            "friendly_name": f"{label} Warning level",
+            "device_class": "enum",
+            "options": levels,
+            "attribution": ATTR,
+            "icon": "mdi:alert",
+            "label": label,
+            "language": "eng",
+            "warning_types": CARD_TYPES[label],
+            "active_warnings": len(now),
+            "warnings": warnings,
+        },
+    }
+
+
+def card_shot(name: str, width: int, place: str, **options) -> dict:
+    return {
+        "name": f"warnings-{name}",
+        "width": width,
+        "card": {"type": "custom:fmi-warnings-card", "entity": f"sensor.{place.lower()}_warning_level", **options},
+    }
+
 
 AIR_LINES = {
     "pm25": [(11, "Satisfactory", "#ffdd3a"), (26, "Fair", "#ffa600")],
@@ -403,7 +530,7 @@ def main():
                 "attribution": ATTR,
                 "icon": "mdi:alert",
                 "label": "Tampere",
-                "language": "en",
+                "language": "eng",
                 "latitude": 61.4978,
                 "longitude": 23.761,
                 "radius": 1000,
@@ -603,13 +730,14 @@ def main():
             ],
         },
     ]
+    states |= {f"sensor.{label.lower()}_warning_level": card_place(label) for label in CARD_WARNINGS}
     plan = {
         "resources": [
             "https://github.com/RomRider/apexcharts-card/releases/download/v2.2.3/apexcharts-card.js",
             "https://github.com/benjamin-dcs/gauge-card-pro/releases/download/v2.5.0/gauge-card-pro.js",
             "../../hass-cards/compact-rain-gauge-card/dist/compact-rain-gauge-card.js",
             "../../hass-cards/compact-uv-index-card/dist/compact-uv-index-card.js",
-            "../../hass-cards/fmi-warnings-card/dist/fmi-warnings-card.js",
+            "custom_components/fmi_open_data/www/fmi-warnings-card.js",
         ],
         "clock": CLOCK.isoformat(),
         "translations": {"fmi_open_data": "custom_components/fmi_open_data/translations"},
@@ -643,7 +771,15 @@ def main():
         "entities": {"sensor.tampere_warning_level": {"platform": "fmi_open_data", "translation_key": "warning_level"}},
         "states": states,
         "statistics": statistics,
-        "shots": [{"name": "dashboard", "width": 1280, "view": {"type": "sections", "max_columns": 3, "sections": sections}}],
+        "shots": [
+            {"name": "dashboard", "width": 1280, "view": {"type": "sections", "max_columns": 3, "sections": sections}},
+            card_shot("storm", 500, "Lahti", title="Weather warnings"),
+            card_shot("sea", 500, "Pori", title="Sea warnings"),
+            card_shot("no-warnings", 500, "Turku", title="Weather warnings"),
+            card_shot("no-timeline", 500, "Lahti", show_timeline=False),
+            card_shot("max-height", 500, "Lahti", title="Weather warnings", max_height=280),
+            card_shot("narrow", 240, "Lahti"),
+        ],
     }
     Path(__file__).with_name("screenshots.json").write_text(json.dumps(plan, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")
     print(sum(len(s["mean"]) for s in statistics.values()), "rows of statistics")
