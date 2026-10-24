@@ -25,8 +25,12 @@ warnings in force there, or both. Each station and place is a device in Home Ass
 For a one-off chart or a script, an action reads any station's observations over a time range without a sensor.
 
 The integration comes with a [card for its warnings](#warnings-card), which shows a place's warnings on a timeline.
-[Compact UV index card](https://github.com/jesmak/compact-uv-index-card) shows the UV index that FMI measures at its
-radiation stations.
+
+Two other cards suit its measurements, such as those in the picture above. They are cards of their own, installed
+separately, and need nothing from this integration, as they work with any sensor of their kind.
+[Compact rain gauge card](https://github.com/jesmak/compact-rain-gauge-card) shows the day's rain from a precipitation
+sensor as a filling drop, and [Compact UV index card](https://github.com/jesmak/compact-uv-index-card) shows a UV index,
+such as the one FMI measures at its radiation stations.
 
 No account or API key is needed. FMI's open data service is used anonymously.
 
