@@ -124,6 +124,7 @@ async def test_switching_the_forecast_off_removes_the_weather_entity(hass: HomeA
     await hass.async_block_till_done()
 
     assert result["reason"] == "reconfigure_successful"
+    assert result.get("translation_domain") is None, "the integration's own text"
     assert entry.subentries[subentry.subentry_id].data[CONF_LOCATION]["radius"] == 5000
     assert er.async_get(hass).async_get("weather.tampere") is None
     assert hass.states.get("sensor.tampere_warning_level").attributes["radius"] == 5000

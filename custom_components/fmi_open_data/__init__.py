@@ -72,7 +72,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> bool:
     await async_check_old_folder(hass)
     if entry.data.get(CONF_STRUCTURE) != STRUCTURE_VERSION:
         await async_restructure(hass, entry)
-    seen = _subentries(entry)
+    # A change saved before the update listener is added below has nothing to reload the entry, so it is looked for then.
+    # Taken after the migrations above, which save to the entry themselves and must not reload it.
+    modified = entry.modified_at
     await async_add_card_resource(hass)
 
     feed = WarningFeed(hass)
@@ -101,9 +103,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> bool:
 
     # Adding, changing or removing a subentry, or changing the settings, reloads everything.
     entry.async_on_unload(entry.add_update_listener(async_update_listener))
-    # A flow can change several subentries in a row. The first change starts a reload at once, so this setup may
-    # have begun before the rest, while no listener was there to hear them.
-    if _subentries(entry) != seen:
+    if entry.modified_at != modified:
         hass.config_entries.async_schedule_reload(entry.entry_id)
 
     return True
@@ -128,10 +128,6 @@ async def async_remove_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> None
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Every entry of this domain is created at version 3, and a newer one means Home Assistant was downgraded.
     return entry.version <= 3
-
-
-def _subentries(entry: FMIConfigEntry) -> dict[str, str]:
-    return {subentry_id: repr((subentry.title, dict(subentry.data))) for subentry_id, subentry in entry.subentries.items()}
 
 
 def _remove_dropped_entities(hass: HomeAssistant, entry: FMIConfigEntry, coordinators) -> None:

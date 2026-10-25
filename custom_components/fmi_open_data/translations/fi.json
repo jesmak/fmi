@@ -2,7 +2,7 @@
   "config": {
     "abort": {
       "single_instance_allowed": "FMI Open Data on jo käytössä. Lisää anturit ja varoitukset integraation sivulta.",
-      "reconfigure_successful": "Asetukset tallennettu"
+      "reconfigure_successful": "Asetukset tallennettu."
     },
     "step": {
       "old_setup": {

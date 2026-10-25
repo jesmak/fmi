@@ -421,7 +421,7 @@ class StationSubentryFlow(ConfigSubentryFlow):
         if not new:
             return self.async_abort(reason="already_configured")
         data = {**subentry.data, CONF_MEASUREMENTS: [*subentry.data[CONF_MEASUREMENTS], *new]}
-        return self.async_update_and_abort(self._get_entry(), subentry, data=data)
+        return self.async_update_and_abort(self._get_entry(), subentry, data=data, reason="reconfigure_successful")
 
     # ---------------- changing a station ----------------
 
@@ -479,7 +479,9 @@ class StationSubentryFlow(ConfigSubentryFlow):
         if user_input is not None:
             # A unit left empty is not in the form's data, and then FMI's own applies again.
             measurements[index] = {**{key: value for key, value in measurement.items() if key != CONF_UNIT}, **user_input}
-            return self.async_update_and_abort(self._get_entry(), subentry, data={**subentry.data, CONF_MEASUREMENTS: measurements})
+            return self.async_update_and_abort(
+                self._get_entry(), subentry, data={**subentry.data, CONF_MEASUREMENTS: measurements}, reason="reconfigure_successful"
+            )
 
         fields = {
             vol.Optional(CONF_UNIT): cv.string,
@@ -506,7 +508,9 @@ class StationSubentryFlow(ConfigSubentryFlow):
                 measurements = [
                     measurement for measurement in subentry.data[CONF_MEASUREMENTS] if measurement_key(measurement) not in removed
                 ]
-                return self.async_update_and_abort(self._get_entry(), subentry, data={**subentry.data, CONF_MEASUREMENTS: measurements})
+                return self.async_update_and_abort(
+                    self._get_entry(), subentry, data={**subentry.data, CONF_MEASUREMENTS: measurements}, reason="reconfigure_successful"
+                )
 
         schema = vol.Schema(
             {
@@ -589,7 +593,9 @@ class PlaceSubentryFlow(ConfigSubentryFlow):
                 return self.async_abort(reason="already_configured")
             errors = await self._async_errors(data)
             if not errors:
-                return self.async_update_and_abort(entry, subentry, title=data[CONF_LABEL], data=data, unique_id=unique_id)
+                return self.async_update_and_abort(
+                    entry, subentry, title=data[CONF_LABEL], data=data, unique_id=unique_id, reason="reconfigure_successful"
+                )
 
         values = user_input or place_for_form(dict(subentry.data))
         return self.async_show_form(

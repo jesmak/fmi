@@ -235,6 +235,7 @@ async def test_adding_to_a_station_offers_what_it_measures(hass: HomeAssistant, 
     result = await _configure(hass, result, {"Helsinki Kaisaniemi · Sademäärä": "Sademäärä"})
 
     assert result["reason"] == "reconfigure_successful"
+    assert result.get("translation_domain") is None, "the integration's own text"
     [subentry] = entry.subentries.values()
     assert [measurement["parameter"] for measurement in subentry.data[CONF_MEASUREMENTS]] == ["t2m", "ws_10min", "r_1h"]
 
@@ -246,6 +247,7 @@ async def test_a_measurements_unit(hass: HomeAssistant, entry: MockConfigEntry):
     result = await _configure(hass, result, {CONF_UNIT: "K", "negative_as_zero": True})
 
     assert result["reason"] == "reconfigure_successful"
+    assert result.get("translation_domain") is None, "the integration's own text"
     [subentry] = entry.subentries.values()
     assert subentry.data[CONF_MEASUREMENTS][0][CONF_UNIT] == "K"
     assert subentry.data[CONF_MEASUREMENTS][0]["negative_as_zero"] is True
@@ -260,6 +262,7 @@ async def test_removing_a_measurement_removes_its_entities(hass: HomeAssistant, 
     result = await _configure(hass, result, {CONF_MEASUREMENTS: [f"{WEATHER}_ws_10min"]})
 
     assert result["reason"] == "reconfigure_successful"
+    assert result.get("translation_domain") is None, "the integration's own text"
     [subentry] = entry.subentries.values()
     assert [measurement["parameter"] for measurement in subentry.data[CONF_MEASUREMENTS]] == ["t2m"]
     registry = er.async_get(hass)

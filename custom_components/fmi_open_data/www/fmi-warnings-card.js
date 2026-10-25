@@ -1,4 +1,4 @@
-/*! fmi-warnings-card 4.1.0 | MIT License */
+/*! fmi-warnings-card 4.1.1 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -704,7 +704,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "4.1.0";
+var CARD_VERSION = "4.1.1";
 var TICK_MS = 6e4;
 var TIMELINE_DAYS = 3;
 var LEVELS = ["yellow", "orange", "red"];
