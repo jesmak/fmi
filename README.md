@@ -273,13 +273,13 @@ itself, and the log says which line to add, change or remove.
 The card has a visual editor. Add **FMI warnings** from the card picker and choose the place's warning level
 sensor. The options can also be written by hand.
 
-| Name            | Type    | Description                                                                | Default |
-| --------------- | ------- | -------------------------------------------------------------------------- | ------- |
-| `type`          | string  | **Required.** `custom:fmi-warnings-card`                                   |         |
-| `entity`        | string  | **Required.** A place's [warning level](#warning-level) sensor             |         |
-| `title`         | string  | A title above the warnings                                                 | none    |
-| `show_timeline` | boolean | The timeline of today and the next two days above the rows                 | `true`  |
-| `max_height`    | number  | The card's maximum height in pixels. A longer list of warnings scrolls     | none    |
+| Name            | Type    | Description                                                            | Default  |
+| --------------- | ------- | ---------------------------------------------------------------------- | -------- |
+| `type`          | string  | `custom:fmi-warnings-card`                                             | required |
+| `entity`        | string  | A place's [warning level](#warning-level) sensor                       | required |
+| `title`         | string  | A title above the warnings                                             |          |
+| `show_timeline` | boolean | The timeline of today and the next two days above the rows             | `true`   |
+| `max_height`    | number  | The card's maximum height in pixels. A longer list of warnings scrolls |          |
 
 ### The rows
 
