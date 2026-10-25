@@ -2,8 +2,8 @@
  * Bundles src/ into the single file the integration serves,
  * custom_components/fmi_open_data/www/fmi-warnings-card.js
  *
- * The card carries the integration's version, as the two are released together. lit is bundled; Home Assistant doesn't hand cards a copy of it. The output is
- * not minified, so anyone can read what runs in their browser.
+ * The card carries the integration's version, as the two are released together. lit is bundled, as Home Assistant
+ * doesn't hand cards a copy of it. The output is not minified, so anyone can read what runs in their browser.
  */
 import { build } from "esbuild";
 import { readFile, readdir } from "node:fs/promises";
