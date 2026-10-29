@@ -11,7 +11,9 @@ import { repeat } from "lit/directives/repeat.js";
 
 import { CARD_VERSION, FALLBACK_ICON, LEVEL_COLORS, TICK_MS, TYPE_ICONS } from "./const";
 import "./editor";
+import { ScrollFade, fadeStyles } from "./fade";
 import type { HomeAssistant } from "./hass";
+import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
 import type { FmiWarningsCardConfig, Warning } from "./types";
 import { isWarningsSensor, moment, timeline, visibleWarnings, warningsSensors } from "./warnings";
@@ -19,6 +21,7 @@ import type { Shown } from "./warnings";
 
 export class FmiWarningsCard extends LitElement {
     @property({ attribute: false }) public hass?: HomeAssistant;
+    @property({ attribute: false }) public layout?: string;
     @state() private config?: FmiWarningsCardConfig;
     /** The one warning opened to show its details, by its key from `rowKeys`. Opening another closes it. */
     @state() private opened?: string;
@@ -29,6 +32,12 @@ export class FmiWarningsCard extends LitElement {
     /** Counts the minutes, so the card redraws for the time even when its sensor hasn't changed. */
     @state() private tick = 0;
     private ticker?: ReturnType<typeof setInterval>;
+
+    constructor() {
+        super();
+        // Fades the body's edges while the card is held to a height, through the card's own lifecycle.
+        new ScrollFade(this, () => (this.heightStyle() ? this.renderRoot.querySelectorAll<HTMLElement>(".body") : []));
+    }
 
     public static getConfigElement(): HTMLElement {
         return document.createElement("fmi-warnings-card-editor");
@@ -43,24 +52,27 @@ export class FmiWarningsCard extends LitElement {
         if (!config || typeof config.entity !== "string" || config.entity === "") {
             throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
         }
-        if (config.max_height !== undefined && !(typeof config.max_height === "number" && config.max_height > 0)) {
-            throw new Error(translate(browserLanguage(), "common.invalid_max_height"));
+        if (!validHeight(config)) {
+            throw new Error(translate(browserLanguage(), "common.invalid_height"));
         }
         this.config = config;
     }
 
-    /** In units of 50 px, for a masonry view: the title, the timeline and a row per warning, no more than the height it is held to. */
+    /** In units of 50 px, for a masonry view: the title, the timeline and a row per warning, or the height it is held to. */
     public getCardSize(): number {
         const now = Date.now();
         const shown = visibleWarnings(this.hass?.states[this.config?.entity ?? ""]?.attributes.warnings, now);
         const drawn = this.config?.show_timeline !== false && timeline(shown, now, this.language(), this.timeZone()).bars.length > 0;
         const size = (this.config?.title ? 1 : 0) + (drawn ? 2 : 0) + Math.max(1, shown.length);
-        return this.config?.max_height ? Math.max(1, Math.min(size, Math.round(this.config.max_height / 50))) : size;
+        return heightCardSize(this.config ?? {}, size, this.minimumHeight());
     }
 
-    /** In a sections view the card takes a whole section by default and is never narrower than two thirds of one. */
+    /**
+     * In a sections view the card takes a whole section by default and is never narrower than two thirds of one, nor
+     * lower than its minimum height.
+     */
     public getGridOptions(): Record<string, unknown> {
-        return { columns: 12, min_columns: 8, rows: "auto" };
+        return { columns: 12, min_columns: 8, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
     }
 
     /** A warning moves from coming up to in force, and one that has expired goes, between the sensor's updates. */
@@ -77,7 +89,16 @@ export class FmiWarningsCard extends LitElement {
 
     protected shouldUpdate(changed: PropertyValues): boolean {
         const previous = changed.get("hass") as HomeAssistant | undefined;
-        if (changed.has("config") || changed.has("opened") || changed.has("tick") || !this.config || !changed.has("hass") || !previous) {
+        // The layout decides whether the card is held to a height, even when a change of the house comes with it.
+        if (
+            changed.has("config") ||
+            changed.has("layout") ||
+            changed.has("opened") ||
+            changed.has("tick") ||
+            !this.config ||
+            !changed.has("hass") ||
+            !previous
+        ) {
             return true;
         }
         // Home Assistant hands the card every state change in the house; only its own sensor matters.
@@ -100,9 +121,8 @@ export class FmiWarningsCard extends LitElement {
         if (!this.hass || !this.config) {
             return nothing;
         }
-        const maxHeight = this.config.max_height;
         return html`
-            <ha-card style=${maxHeight ? `max-height:${maxHeight}px` : ""}>
+            <ha-card style=${this.heightStyle()}>
                 ${this.config.title ? html`<h1 class="card-title">${this.config.title}</h1>` : nothing} ${this.content(this.config.entity)}
             </ha-card>
         `;
@@ -127,13 +147,15 @@ export class FmiWarningsCard extends LitElement {
         }
         // Keyed, so each warning keeps its own row as others come and go, and an open one isn't drawn into a closed one.
         return html`
-            ${this.config?.show_timeline === false ? nothing : this.timeline(shown, now, keys)}
-            <div class="rows">
-                ${repeat(
-                    shown,
-                    ({ warning }) => keys.get(warning)!,
-                    (item) => this.row(item, keys.get(item.warning)!, now),
-                )}
+            <div class="body">
+                ${this.config?.show_timeline === false ? nothing : this.timeline(shown, now, keys)}
+                <div class="rows">
+                    ${repeat(
+                        shown,
+                        ({ warning }) => keys.get(warning)!,
+                        (item) => this.row(item, keys.get(item.warning)!, now),
+                    )}
+                </div>
             </div>
         `;
     }
@@ -261,7 +283,7 @@ export class FmiWarningsCard extends LitElement {
         scrollTo([...this.renderRoot.querySelectorAll<HTMLElement>(".row")].find((element) => element.dataset.key === key));
     }
 
-    /** Once a row a tap opened has slid open, scrolls the list or the page just enough to show it. */
+    /** Once a row a tap opened has slid open, scrolls the body or the page just enough to show it. */
     private opening = (event: TransitionEvent): void => {
         const row = (event.currentTarget as HTMLElement).closest<HTMLElement>(".row");
         if (event.propertyName !== "grid-template-rows" || event.target !== event.currentTarget || row?.dataset.key !== this.revealing) {
@@ -270,6 +292,23 @@ export class FmiWarningsCard extends LitElement {
         this.revealing = undefined;
         scrollTo(row);
     };
+
+    /**
+     * The lowest the card is held to, in pixels: its padding, the title when it has one, a timeline of one lane when it
+     * is shown, and one warning row. The padding (with the card's border), the title and the timeline as measured on a
+     * full section's width, the row estimated from the styles.
+     */
+    private minimumHeight(): number {
+        const padding = 34;
+        const title = 41;
+        const timeline = 75;
+        const row = 40;
+        return padding + (this.config?.title ? title : 0) + (this.config?.show_timeline === false ? 0 : timeline) + row;
+    }
+
+    private heightStyle(): string {
+        return heightStyle(this.config ?? {}, this.layout, this.minimumHeight());
+    }
 
     private timeZone(): string | undefined {
         return this.hass?.locale?.time_zone === "server" ? this.hass.config?.time_zone : undefined;
@@ -285,329 +324,341 @@ export class FmiWarningsCard extends LitElement {
     }
 
     static get styles(): CSSResultGroup {
-        return css`
-            :host {
-                display: block;
-                height: 100%;
-            }
+        return [
+            css`
+                :host {
+                    display: block;
+                    height: 100%;
+                }
 
-            /*
-             * The card is the container its layout measures, so it follows its own width, in a sections view or not.
-             * Held to a height, by max_height or a fixed number of rows in a sections view, only the rows scroll.
-             */
-            /*
-             * Held lower than its title and timeline, it shows less rather than drawing over the card below. Clipped, not
-             * hidden, which would make the card a scroller that bringing a row into view could scroll out of place.
-             */
-            ha-card {
-                overflow: clip;
-                container-type: inline-size;
-                box-sizing: border-box;
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-                padding: 16px;
-                font-variant-numeric: tabular-nums;
-            }
+                /*
+                 * The card is the container its layout measures, so it follows its own width, in a sections view or not.
+                 * Held to a height, fixed or at most, or by a fixed number of rows in a sections view, the title stays and the
+                 * timeline scrolls with the rows, as its lanes follow the warnings and could otherwise leave no room for a
+                 * row. The card is never lower than its title, a timeline of one lane and a row. Clipped, not hidden,
+                 * which would make the card a scroller that bringing a row into view could scroll out of place.
+                 */
+                ha-card {
+                    overflow: clip;
+                    container-type: inline-size;
+                    box-sizing: border-box;
+                    height: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    padding: 16px;
+                    font-variant-numeric: tabular-nums;
+                }
 
-            ha-card > * {
-                flex: none;
-            }
+                ha-card > * {
+                    flex: none;
+                }
 
-            /* Never sideways, where a turning chevron would otherwise flash a scrollbar for a moment. */
-            ha-card > .rows {
-                flex: 0 1 auto;
-                min-height: 0;
-                overflow-x: hidden;
-                overflow-y: auto;
-                scrollbar-width: thin;
-            }
+                /*
+                 * Never sideways, where a turning chevron would otherwise flash a scrollbar for a moment. It reaches out over
+                 * the card's padding to the sides, so its clipped edges don't cut what sits at the content's edge, such as the
+                 * timeline's "now" label near midnight.
+                 */
+                ha-card > .body {
+                    margin: 0 -16px;
+                    padding: 0 16px;
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow-x: hidden;
+                    overflow-y: auto;
+                    overscroll-behavior: contain;
+                    scrollbar-width: thin;
+                }
 
-            .card-title {
-                margin: 0 0 12px;
-                font-size: var(--ha-card-header-font-size, 24px);
-                font-weight: var(--ha-font-weight-normal, 400);
-                line-height: 1.2;
-            }
+                .card-title {
+                    margin: 0 0 12px;
+                    font-size: var(--ha-card-header-font-size, 24px);
+                    font-weight: var(--ha-font-weight-normal, 400);
+                    line-height: 1.2;
+                }
 
-            .message {
-                color: var(--secondary-text-color);
-            }
+                .message {
+                    color: var(--secondary-text-color);
+                }
 
-            .empty {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                color: var(--secondary-text-color);
-            }
+                .empty {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    color: var(--secondary-text-color);
+                }
 
-            .empty ha-icon {
-                flex: none;
-                color: var(--success-color, #43a047);
-            }
+                .empty ha-icon {
+                    flex: none;
+                    color: var(--success-color, #43a047);
+                }
 
-            .timeline {
-                position: relative;
-                margin-bottom: 8px;
-                padding-top: 16px;
-            }
+                .timeline {
+                    position: relative;
+                    margin-bottom: 8px;
+                    padding-top: 16px;
+                }
 
-            .now-label {
-                position: absolute;
-                top: 0;
-                transform: translateX(-50%);
-                font-size: 11px;
-                line-height: 14px;
-                color: var(--primary-text-color);
-            }
+                .now-label {
+                    position: absolute;
+                    top: 0;
+                    transform: translateX(-50%);
+                    font-size: 11px;
+                    line-height: 14px;
+                    color: var(--primary-text-color);
+                }
 
-            .lanes {
-                position: relative;
-                padding: 2px 0;
-            }
+                .lanes {
+                    position: relative;
+                    padding: 2px 0;
+                }
 
-            .lane {
-                position: relative;
-                height: 22px;
-                margin: 4px 0;
-            }
+                .lane {
+                    position: relative;
+                    height: 22px;
+                    margin: 4px 0;
+                }
 
-            .midnight,
-            .now {
-                position: absolute;
-                top: 0;
-                bottom: 0;
-            }
+                .midnight,
+                .now {
+                    position: absolute;
+                    top: 0;
+                    bottom: 0;
+                }
 
-            .midnight {
-                width: 1px;
-                background: var(--divider-color);
-            }
+                .midnight {
+                    width: 1px;
+                    background: var(--divider-color);
+                }
 
-            /* Behind the bars, which come after it. */
-            .now {
-                width: 2px;
-                margin-left: -1px;
-                background: var(--primary-text-color);
-                opacity: 0.7;
-            }
+                /* Behind the bars, which come after it. */
+                .now {
+                    width: 2px;
+                    margin-left: -1px;
+                    background: var(--primary-text-color);
+                    opacity: 0.7;
+                }
 
-            .now-label,
-            .now {
-                pointer-events: none;
-            }
+                .now-label,
+                .now {
+                    pointer-events: none;
+                }
 
-            .bar {
-                position: absolute;
-                cursor: pointer;
-                top: 0;
-                box-sizing: border-box;
-                min-width: 22px;
-                height: 22px;
-                display: flex;
-                flex-wrap: wrap;
-                align-items: center;
-                column-gap: 4px;
-                padding: 0 3px;
-                border-radius: 6px;
-                font-size: 12px;
-                line-height: 22px;
-                white-space: nowrap;
-                overflow: hidden;
-            }
+                .bar {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    box-sizing: border-box;
+                    min-width: 22px;
+                    height: 22px;
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    column-gap: 4px;
+                    padding: 0 3px;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    line-height: 22px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                }
 
-            .bar ha-icon {
-                --mdc-icon-size: 16px;
-                flex: none;
-                width: 16px;
-                height: 22px;
-                display: inline-flex;
-                align-items: center;
-            }
+                .bar ha-icon {
+                    --mdc-icon-size: 16px;
+                    flex: none;
+                    width: 16px;
+                    height: 22px;
+                    display: inline-flex;
+                    align-items: center;
+                }
 
-            /* A label that doesn't fit whole wraps to a second line, which the bar's height hides, leaving the icon alone. */
-            .bar .label {
-                flex: none;
-            }
-
-            /* Below 400 px inside the padding, the bars are too short to name. The rows below say what each is. */
-            @container (max-width: 399px) {
+                /* A label that doesn't fit whole wraps to a second line, which the bar's height hides, leaving the icon alone. */
                 .bar .label {
-                    display: none;
+                    flex: none;
                 }
-            }
 
-            .days {
-                position: relative;
-                height: 16px;
-                border-top: 1px solid var(--divider-color);
-                font-size: 12px;
-                line-height: 16px;
-                color: var(--secondary-text-color);
-            }
+                /* Below 400 px inside the padding, the bars are too short to name. The rows below say what each is. */
+                @container (max-width: 399px) {
+                    .bar .label {
+                        display: none;
+                    }
+                }
 
-            .days span {
-                position: absolute;
-                padding-left: 4px;
-            }
+                .days {
+                    position: relative;
+                    height: 16px;
+                    border-top: 1px solid var(--divider-color);
+                    font-size: 12px;
+                    line-height: 16px;
+                    color: var(--secondary-text-color);
+                }
 
-            .row {
-                display: flex;
-                gap: 10px;
-                border-top: 1px solid var(--divider-color);
-            }
+                .days span {
+                    position: absolute;
+                    padding-left: 4px;
+                }
 
-            .row:first-child {
-                border-top: none;
-            }
+                .row {
+                    display: flex;
+                    gap: 10px;
+                    border-top: 1px solid var(--divider-color);
+                }
 
-            .stripe {
-                flex: none;
-                width: 4px;
-                margin: 8px 0;
-                border-radius: 2px;
-            }
+                .row:first-child {
+                    border-top: none;
+                }
 
-            .row-body {
-                flex: 1;
-                min-width: 0;
-            }
+                .stripe {
+                    flex: none;
+                    width: 4px;
+                    margin: 8px 0;
+                    border-radius: 2px;
+                }
 
-            /* Drawn inside, where the list's clipped edges can't cut it. */
-            .summary:focus-visible {
-                outline-offset: -2px;
-            }
+                .row-body {
+                    flex: 1;
+                    min-width: 0;
+                }
 
-            .summary {
-                position: relative;
-                display: grid;
-                grid-template-columns: 24px minmax(0, 1fr) 20px;
-                align-items: center;
-                gap: 10px;
-                width: 100%;
-                padding: 8px 0;
-                border: none;
-                background: none;
-                color: inherit;
-                font: inherit;
-                font-size: 14px;
-                text-align: left;
-                cursor: pointer;
-            }
+                /* Drawn inside, where the body's clipped edges can't cut it. */
+                .summary:focus-visible {
+                    outline-offset: -2px;
+                }
 
-            /* The name and the time on one line while both fit whole; the time moves under the name when they don't. */
-            .text {
-                display: flex;
-                flex-wrap: wrap;
-                align-items: baseline;
-                gap: 2px 10px;
-                min-width: 0;
-            }
+                .summary {
+                    position: relative;
+                    display: grid;
+                    grid-template-columns: 24px minmax(0, 1fr) 20px;
+                    align-items: center;
+                    gap: 10px;
+                    width: 100%;
+                    padding: 8px 0;
+                    border: none;
+                    background: none;
+                    color: inherit;
+                    font: inherit;
+                    font-size: 14px;
+                    text-align: left;
+                    cursor: pointer;
+                }
 
-            /* One line, cut short when even a line of its own is too narrow. An opened row shows it whole. */
-            .name {
-                flex: 1 1 auto;
-                min-width: 0;
-                overflow: hidden;
-                white-space: nowrap;
-                text-overflow: ellipsis;
-            }
+                /* The name and the time on one line while both fit whole; the time moves under the name when they don't. */
+                .text {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: baseline;
+                    gap: 2px 10px;
+                    min-width: 0;
+                }
 
-            .summary[aria-expanded="true"] .name {
-                white-space: normal;
-                overflow-wrap: anywhere;
-            }
+                /* One line, cut short when even a line of its own is too narrow. An opened row shows it whole. */
+                .name {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    overflow: hidden;
+                    white-space: nowrap;
+                    text-overflow: ellipsis;
+                }
 
-            .time {
-                font-size: 13px;
-                color: var(--secondary-text-color);
-            }
+                .summary[aria-expanded="true"] .name {
+                    white-space: normal;
+                    overflow-wrap: anywhere;
+                }
 
-            .chevron {
-                --mdc-icon-size: 20px;
-                display: flex;
-                color: var(--secondary-text-color);
-                transition: transform 0.2s;
-            }
+                .time {
+                    font-size: 13px;
+                    color: var(--secondary-text-color);
+                }
 
-            .summary[aria-expanded="true"] .chevron {
-                transform: rotate(180deg);
-            }
-
-            .upcoming .summary ha-icon,
-            .upcoming .name {
-                opacity: 0.75;
-            }
-
-            /* The details are always there, folded to nothing and inert while the row is closed, so opening can slide. */
-            .expander {
-                display: grid;
-                grid-template-rows: 0fr;
-                transition: grid-template-rows 0.2s ease;
-            }
-
-            .expander.open {
-                grid-template-rows: 1fr;
-            }
-
-            .clip {
-                min-height: 0;
-                overflow: hidden;
-            }
-
-            /* Over in a moment rather than not at all, so the row is still brought into view when it ends. */
-            @media (prefers-reduced-motion: reduce) {
-                .expander,
                 .chevron {
-                    transition-duration: 1ms;
+                    --mdc-icon-size: 20px;
+                    display: flex;
+                    color: var(--secondary-text-color);
+                    transition: transform 0.2s;
                 }
-            }
 
-            .details {
-                display: grid;
-                gap: 4px;
-                padding: 0 0 10px 34px;
-                font-size: 13px;
-                line-height: 1.4;
-                overflow-wrap: anywhere;
-            }
+                .summary[aria-expanded="true"] .chevron {
+                    transform: rotate(180deg);
+                }
 
-            .visually-hidden {
-                position: absolute;
-                width: 1px;
-                height: 1px;
-                overflow: hidden;
-                clip-path: inset(50%);
-                white-space: nowrap;
-            }
+                .upcoming .summary ha-icon,
+                .upcoming .name {
+                    opacity: 0.75;
+                }
 
-            .level {
-                font-weight: var(--ha-font-weight-medium, 500);
-            }
+                /* The details are always there, folded to nothing and inert while the row is closed, so opening can slide. */
+                .expander {
+                    display: grid;
+                    grid-template-rows: 0fr;
+                    transition: grid-template-rows 0.2s ease;
+                }
 
-            .impacts {
-                font-style: italic;
-                color: var(--secondary-text-color);
-            }
+                .expander.open {
+                    grid-template-rows: 1fr;
+                }
 
-            .probability {
-                color: var(--secondary-text-color);
-            }
-        `;
+                .clip {
+                    min-height: 0;
+                    overflow: hidden;
+                }
+
+                /* Over in a moment rather than not at all, so the row is still brought into view when it ends. */
+                @media (prefers-reduced-motion: reduce) {
+                    .expander,
+                    .chevron {
+                        transition-duration: 1ms;
+                    }
+                }
+
+                .details {
+                    display: grid;
+                    gap: 4px;
+                    padding: 0 0 10px 34px;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    overflow-wrap: anywhere;
+                }
+
+                .visually-hidden {
+                    position: absolute;
+                    width: 1px;
+                    height: 1px;
+                    overflow: hidden;
+                    clip-path: inset(50%);
+                    white-space: nowrap;
+                }
+
+                .level {
+                    font-weight: var(--ha-font-weight-medium, 500);
+                }
+
+                .impacts {
+                    font-style: italic;
+                    color: var(--secondary-text-color);
+                }
+
+                .probability {
+                    color: var(--secondary-text-color);
+                }
+            `,
+            fadeStyles,
+        ];
     }
 }
 
-/** Scrolls the list or the page just enough to show a row, its top first if it is taller than the list's view. */
+/** Scrolls the body or the page just enough to show a row, its top first if it is taller than the body shows between its fades. */
 function scrollTo(row: HTMLElement | null | undefined): void {
     if (!row) {
         return;
     }
     const behavior = (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false) ? "auto" : "smooth";
-    const list = row.closest<HTMLElement>(".rows");
-    // Taller than the list's view and starting above it, a row would be lined up by its bottom, its name out of sight.
-    if (list && row.offsetHeight > list.clientHeight) {
-        list.scrollTo({ top: list.scrollTop + row.getBoundingClientRect().top - list.getBoundingClientRect().top, behavior });
-        list.scrollIntoView({ block: "nearest", behavior });
+    const body = row.closest<HTMLElement>(".body");
+    // A body that fades keeps its fade length clear at each end as scroll padding, as fadeStyles sets it.
+    const padding = body?.classList.contains("fades") ? Math.min(24, body.clientHeight / 4) : 0;
+    // Taller than the view between the paddings and starting above it, a row would be lined up by its bottom, its name
+    // out of sight, so it is lined up by its top instead, under the top fade.
+    if (body && row.offsetHeight > body.clientHeight - 2 * padding) {
+        body.scrollTo({ top: body.scrollTop + row.getBoundingClientRect().top - body.getBoundingClientRect().top - padding, behavior });
+        body.scrollIntoView({ block: "nearest", behavior });
         return;
     }
     row.scrollIntoView({ block: "nearest", behavior });

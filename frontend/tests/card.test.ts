@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "../src/fmi-warnings-card";
 import type { FmiWarningsCard } from "../src/fmi-warnings-card";
 import type { HomeAssistant } from "../src/hass";
+import { browserLanguage, translate } from "../src/localize/localize";
 import type { Warning } from "../src/types";
 
 const ENTITY = "sensor.fmi_example_warning_level";
@@ -48,10 +49,11 @@ function hass(state: string, warnings: unknown[] = []): HomeAssistant {
     };
 }
 
-async function card(state: HomeAssistant, config: Record<string, unknown> = { entity: ENTITY }): Promise<FmiWarningsCard> {
+async function card(state: HomeAssistant, config: Record<string, unknown> = { entity: ENTITY }, layout?: string): Promise<FmiWarningsCard> {
     const element = document.createElement("fmi-warnings-card") as FmiWarningsCard;
     element.setConfig({ type: "custom:fmi-warnings-card", ...config } as never);
     element.hass = state;
+    element.layout = layout;
     document.body.append(element);
     await element.updateComplete;
     return element;
@@ -204,7 +206,9 @@ describe("fmi-warnings-card", () => {
     it("counts the timeline in its size for a masonry view only when it is drawn", async () => {
         expect((await card(hass("orange", [WIND]))).getCardSize()).toBe(3);
         expect((await card(hass("orange", [WIND]), { entity: ENTITY, max_height: 600 })).getCardSize()).toBe(3);
-        expect((await card(hass("orange", [WIND]), { entity: ENTITY, max_height: 100 })).getCardSize()).toBe(2);
+        // A limit below the minimum is raised to it.
+        expect((await card(hass("orange", [WIND]), { entity: ENTITY, max_height: 100 })).getCardSize()).toBe(3);
+        expect((await card(hass("orange", [WIND]), { entity: ENTITY, height: 400 })).getCardSize()).toBe(8);
         expect((await card(hass("orange", [WIND]), { entity: ENTITY, show_timeline: false })).getCardSize()).toBe(1);
         const far = { ...PEDESTRIANS, onset: "2026-10-23T06:00:00+03:00", expires: "2026-10-23T12:00:00+03:00" };
         expect((await card(hass("none", [far]))).getCardSize()).toBe(1);
@@ -255,26 +259,42 @@ describe("fmi-warnings-card", () => {
         expect(root.querySelectorAll(".row").length).toBe(1);
     });
 
-    it("brings a row taller than its list's view into view by its top, so its name shows", async () => {
-        const element = await card(hass("orange", [WIND]), { entity: ENTITY, max_height: 150 });
+    // Held, the body fades and keeps min(24, a quarter of its view) clear at each end, so a row is lined up by its top once
+    // it is taller than the view less both paddings. In auto it doesn't fade, so only a row taller than the view is.
+    it.each<[string, Record<string, unknown>, number, number, number | undefined]>([
+        ["taller than its body's view, by its top, under the top fade", { max_height: 300 }, 140, 60, 205],
+        ["taller than the view between the fades, though not the body, by its top too", { max_height: 300 }, 170, 200, 196],
+        ["fitting between the fades, only just into view", { max_height: 300 }, 140, 200, undefined],
+        ["exactly as tall as the view between the fades, only just into view", { max_height: 300 }, 152, 200, undefined],
+        ["a pixel taller than the view between the fades, by its top", { max_height: 300 }, 153, 200, 196],
+        ["taller than a short body's view between its quarter-length fades, by its top", { max_height: 300 }, 40, 60, 205],
+        ["in auto, with no fades to keep clear, only just into view", {}, 170, 200, undefined],
+    ])("brings an opened row into view %s", async (_name, extra, rowHeight, bodyHeight, top) => {
+        const element = await card(hass("orange", [WIND]), { entity: ENTITY, ...extra });
         const row = element.shadowRoot!.querySelector<HTMLElement>(".row")!;
-        const list = element.shadowRoot!.querySelector<HTMLElement>(".rows")!;
-        Object.defineProperty(row, "offsetHeight", { value: 140 });
-        Object.defineProperty(list, "clientHeight", { value: 60 });
-        // The row's top 80 px above the list's, with the list scrolled 300 px down: its top is at 220.
+        const body = element.shadowRoot!.querySelector<HTMLElement>(".body")!;
+        Object.defineProperty(row, "offsetHeight", { value: rowHeight });
+        Object.defineProperty(body, "clientHeight", { value: bodyHeight });
+        // The row's top 80 px above the body's, with the body scrolled 300 px down: its top is at 220, less the fade length.
         row.getBoundingClientRect = () => ({ top: 20 }) as DOMRect;
-        list.getBoundingClientRect = () => ({ top: 100 }) as DOMRect;
-        list.scrollTop = 300;
-        list.scrollTo = vi.fn() as never;
-        list.scrollIntoView = vi.fn();
+        body.getBoundingClientRect = () => ({ top: 100 }) as DOMRect;
+        body.scrollTop = 300;
+        body.scrollTo = vi.fn() as never;
+        body.scrollIntoView = vi.fn();
         row.scrollIntoView = vi.fn();
         element.shadowRoot!.querySelector<HTMLButtonElement>(".summary")!.click();
         await element.updateComplete;
+        expect(body.classList.contains("fades")).toBe("max_height" in extra);
         row.querySelector(".expander")!.dispatchEvent(transitionEnd());
-        expect(list.scrollTo).toHaveBeenCalledTimes(1);
-        expect(list.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top: 220 }));
-        expect(list.scrollIntoView).toHaveBeenCalledTimes(1);
-        expect(row.scrollIntoView).not.toHaveBeenCalled();
+        if (top === undefined) {
+            expect(body.scrollTo).not.toHaveBeenCalled();
+            expect(row.scrollIntoView).toHaveBeenCalledTimes(1);
+        } else {
+            expect(body.scrollTo).toHaveBeenCalledTimes(1);
+            expect(body.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top }));
+            expect(body.scrollIntoView).toHaveBeenCalledTimes(1);
+            expect(row.scrollIntoView).not.toHaveBeenCalled();
+        }
     });
 
     it("forgets an opened warning that has gone, so it doesn't come back open by itself", async () => {
@@ -289,9 +309,87 @@ describe("fmi-warnings-card", () => {
         expect(element.shadowRoot!.querySelector(".summary")!.getAttribute("aria-expanded")).toBe("false");
     });
 
-    it("holds the card to a maximum height when one is set", async () => {
-        const element = await card(hass("orange", [WIND]), { entity: ENTITY, max_height: 300 });
-        expect(element.shadowRoot!.querySelector<HTMLElement>("ha-card")!.style.maxHeight).toBe("300px");
+    it.each([
+        ["its content", undefined, {}, ""],
+        ["a fixed height", undefined, { height_mode: "fixed", height: 240, max_height: 300 }, "height: 240px"],
+        ["a maximum height", undefined, { max_height: 300 }, "max-height: 300px"],
+        ["grid rows in a sections view, over its mode", "grid", { height: 240, grid_options: { rows: 6 } }, "height: 100%"],
+        ["its mode when the grid rows are automatic", "grid", { max_height: 300, grid_options: { rows: "auto" } }, "max-height: 300px"],
+    ])("sizes itself by %s", async (_name, layout, extra, style) => {
+        const element = await card(hass("orange", [WIND]), { entity: ENTITY, ...extra }, layout);
+        expect(element.shadowRoot!.querySelector("ha-card")!.getAttribute("style") ?? "").toBe(style);
+    });
+
+    it.each([
+        ["held to a height", undefined, { height: 240 }, ["fade-bottom"]],
+        ["held up to a limit", undefined, { max_height: 300 }, ["fade-bottom"]],
+        ["held by rows in a sections view", "grid", { grid_options: { rows: 4 } }, ["fade-bottom"]],
+        [
+            "held to a height with automatic rows in a sections view",
+            "grid",
+            { height: 240, grid_options: { rows: "auto" } },
+            ["fade-bottom"],
+        ],
+        ["held by the older layout options' rows in a sections view", "grid", { layout_options: { grid_rows: 4 } }, ["fade-bottom"]],
+        ["never in auto", undefined, {}, []],
+        ["never in auto with automatic rows in a sections view", "grid", { grid_options: { rows: "auto" } }, []],
+        ["never by grid rows outside a sections view", undefined, { grid_options: { rows: 4 } }, []],
+    ])("fades the bottom edge of a body that runs past it when %s", async (_name, layout, extra, expected) => {
+        const element = await card(hass("orange", [WIND, PEDESTRIANS]), { entity: ENTITY, ...extra }, layout);
+        const body = element.shadowRoot!.querySelector<HTMLElement>(".body")!;
+        Object.defineProperty(body, "scrollHeight", { value: 600, configurable: true });
+        Object.defineProperty(body, "clientHeight", { value: 200, configurable: true });
+        element.requestUpdate();
+        await element.updateComplete;
+        expect(["fade-top", "fade-bottom"].filter((name) => body.classList.contains(name))).toEqual(expected);
+    });
+
+    it("lets go of the body's fade when the card goes from held to auto, and fades it again when held again", async () => {
+        const element = await card(hass("orange", [WIND, PEDESTRIANS]), { entity: ENTITY, height: 240 });
+        const body = element.shadowRoot!.querySelector<HTMLElement>(".body")!;
+        Object.defineProperty(body, "scrollHeight", { value: 600, configurable: true });
+        Object.defineProperty(body, "clientHeight", { value: 200, configurable: true });
+        element.requestUpdate();
+        await element.updateComplete;
+        expect([...body.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+        element.setConfig({ type: "custom:fmi-warnings-card", entity: ENTITY } as never);
+        await element.updateComplete;
+        expect([...body.classList].filter((name) => name.startsWith("fade"))).toEqual([]);
+        element.setConfig({ type: "custom:fmi-warnings-card", entity: ENTITY, height: 240 } as never);
+        await element.updateComplete;
+        expect([...body.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+    });
+
+    it("is held by its rows once moved into a sections view, even when another entity's change comes with it", async () => {
+        const state = hass("orange", [WIND]);
+        const element = await card(state, { entity: ENTITY, grid_options: { rows: 4 } });
+        expect(element.shadowRoot!.querySelector("ha-card")!.getAttribute("style") ?? "").toBe("");
+        element.layout = "grid";
+        element.hass = { ...state, states: { ...state.states, "sensor.other": { ...state.states["sensor.other"]!, state: "2" } } };
+        await element.updateComplete;
+        expect(element.shadowRoot!.querySelector("ha-card")!.getAttribute("style")).toBe("height: 100%");
+    });
+
+    it.each([
+        ["the default", {}, 3],
+        ["a title", { title: "Varoitukset" }, 4],
+        ["no timeline", { show_timeline: false }, 2],
+        ["a title and no timeline", { title: "Varoitukset", show_timeline: false }, 2],
+    ])("keeps to its minimum height in a sections view with %s", async (_name, extra, rows) => {
+        expect((await card(hass("orange", [WIND]), { entity: ENTITY, ...extra })).getGridOptions().min_rows).toBe(rows);
+    });
+
+    it("raises a fixed height below its minimum to the minimum", async () => {
+        const element = await card(hass("orange", [WIND]), { entity: ENTITY, height: 100 });
+        expect(element.shadowRoot!.querySelector("ha-card")!.getAttribute("style")).toBe("height: 149px");
+    });
+
+    it("puts the title ahead of the body, and the timeline and the rows in it", async () => {
+        const element = await card(hass("orange", [WIND, PEDESTRIANS]), { entity: ENTITY, title: "Varoitukset", height: 200 });
+        const haCard = element.shadowRoot!.querySelector("ha-card")!;
+        expect([...haCard.children].map((child) => child.classList[0])).toEqual(["card-title", "body"]);
+        expect([...haCard.querySelector(".body")!.children].map((child) => child.className)).toEqual(["timeline", "rows"]);
+        expect([...haCard.querySelector(".rows")!.children].map((child) => child.classList.contains("row"))).toEqual([true, true]);
     });
 
     it("keeps a warning open when FMI reissues it under a new id", async () => {
@@ -340,12 +438,18 @@ describe("fmi-warnings-card", () => {
         expect(() => element.setConfig({ type: "custom:fmi-warnings-card" } as never)).toThrow();
     });
 
-    it("refuses a maximum height that isn't a positive number of pixels", () => {
+    it("refuses a height that isn't a positive number of pixels, and an unknown height mode", () => {
         const element = document.createElement("fmi-warnings-card") as FmiWarningsCard;
-        for (const max_height of ["300px", 0, -10]) {
-            expect(() => element.setConfig({ type: "custom:fmi-warnings-card", entity: ENTITY, max_height } as never)).toThrow();
+        const config = (extra: Record<string, unknown>) => ({ type: "custom:fmi-warnings-card", entity: ENTITY, ...extra }) as never;
+        const error = translate(browserLanguage(), "common.invalid_height");
+        for (const value of ["300px", 0, -10]) {
+            expect(() => element.setConfig(config({ max_height: value }))).toThrow(error);
+            expect(() => element.setConfig(config({ height: value }))).toThrow(error);
         }
-        expect(() => element.setConfig({ type: "custom:fmi-warnings-card", entity: ENTITY, max_height: 300 } as never)).not.toThrow();
+        expect(() => element.setConfig(config({ height_mode: "tall" }))).toThrow(error);
+        expect(() => element.setConfig(config({ height_mode: "fixed", height: 240, max_height: 300 }))).not.toThrow();
+        // Left empty in YAML, each is unset.
+        expect(() => element.setConfig(config({ height_mode: null, height: null, max_height: null }))).not.toThrow();
     });
 });
 

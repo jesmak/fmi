@@ -3,7 +3,7 @@
         "name": "FMI-varoitukset",
         "description": "Ilmatieteen laitoksen sää- ja merivaroitukset valitulle paikalle",
         "invalid_configuration": "Virheellinen konfiguraatio. Valitse fmi-integraation varoitusanturi.",
-        "invalid_max_height": "Enimmäiskorkeuden (max_height) on oltava positiivinen luku pikseleinä.",
+        "invalid_height": "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikseleinä, ja korkeustilan (height_mode) auto, fixed tai max.",
         "no_entity": "Entiteettiä {entity} ei löydy",
         "not_warnings": "{entity} ei ole fmi-integraation varoitusanturi",
         "unavailable": "Varoitukset eivät ole juuri nyt saatavilla",
@@ -40,7 +40,14 @@
         "title": "Otsikko",
         "show_timeline": "Näytä aikajana",
         "show_timeline_helper": "Tämä päivä ja kaksi seuraavaa, palkki kullekin varoitukselle",
+        "height_mode": "Korkeus",
+        "height_mode_helper": "Osioihin jaetun näkymän asettelu-välilehdellä asetettu korkeus ohittaa tämän.",
+        "height_mode_auto": "Sisällön mukaan",
+        "height_mode_fixed": "Kiinteä",
+        "height_mode_max": "Kasvaa rajaan asti",
+        "height": "Kiinteä korkeus",
+        "height_helper": "Kortti on aina näin korkea, ja aikajana ja varoitukset vierivät sen sisällä.",
         "max_height": "Enimmäiskorkeus",
-        "max_height_helper": "Pikseleinä. Lista muuttuu vieritettäväksi, mikäli varoituksia on enemmän kuin näkymään mahtuu."
+        "max_height_helper": "Kortti kasvaa sisältönsä mukana tähän korkeuteen asti, ja sen jälkeen aikajana ja varoitukset vierivät."
     }
 }

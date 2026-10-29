@@ -4,6 +4,7 @@ import type { TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 
 import type { HomeAssistant } from "./hass";
+import { heightData, heightSchema, tidyHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
 import type { FmiWarningsCardConfig } from "./types";
 import { warningsSensors } from "./warnings";
@@ -16,12 +17,12 @@ const DEFAULTS: Record<string, unknown> = {
     show_timeline: true,
 };
 
-function schema(hass: HomeAssistant) {
+function schema(hass: HomeAssistant, config: FmiWarningsCardConfig, text: (key: string) => string) {
     return [
         { name: "entity", required: true, selector: { entity: { include_entities: warningsSensors(hass) } } },
         { name: "title", selector: { text: {} } },
         { name: "show_timeline", selector: { boolean: {} } },
-        { name: "max_height", selector: { number: { min: 100, step: 10, mode: "box", unit_of_measurement: "px" } } },
+        ...heightSchema(config, text),
     ];
 }
 
@@ -40,8 +41,8 @@ export class FmiWarningsCardEditor extends LitElement {
         return html`
             <ha-form
                 .hass=${this.hass}
-                .data=${{ ...DEFAULTS, ...this.config }}
-                .schema=${schema(this.hass)}
+                .data=${{ ...DEFAULTS, ...heightData(this.config) }}
+                .schema=${schema(this.hass, this.config, (key) => this.text(key))}
                 .computeLabel=${(entry: SchemaEntry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry: SchemaEntry) => this.helper(entry.name)}
                 @value-changed=${this.valueChanged}
@@ -50,12 +51,9 @@ export class FmiWarningsCardEditor extends LitElement {
     }
 
     private valueChanged(event: CustomEvent<{ value: FmiWarningsCardConfig }>): void {
-        const config: FmiWarningsCardConfig = { ...event.detail.value };
+        const config: FmiWarningsCardConfig = tidyHeight(event.detail.value);
         if (!config.title) {
             delete config.title;
-        }
-        if (!config.max_height) {
-            delete config.max_height;
         }
         // The defaults are shown in the form but left out of the configuration.
         for (const [key, value] of Object.entries(DEFAULTS)) {

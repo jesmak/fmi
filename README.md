@@ -273,13 +273,15 @@ itself, and the log says which line to add, change or remove.
 The card has a visual editor. Add **FMI warnings** from the card picker and choose the place's warning level
 sensor. The options can also be written by hand.
 
-| Name            | Type    | Description                                                            | Default  |
-| --------------- | ------- | ---------------------------------------------------------------------- | -------- |
-| `type`          | string  | `custom:fmi-warnings-card`                                             | required |
-| `entity`        | string  | A place's [warning level](#warning-level) sensor                       | required |
-| `title`         | string  | A title above the warnings                                             |          |
-| `show_timeline` | boolean | The timeline of today and the next two days above the rows             | `true`   |
-| `max_height`    | number  | The card's maximum height in pixels. A longer list of warnings scrolls |          |
+| Name            | Type    | Description                                                                                                                                                                                                                                                     | Default                                                                         |
+| --------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `type`          | string  | `custom:fmi-warnings-card`                                                                                                                                                                                                                                      | required                                                                        |
+| `entity`        | string  | A place's [warning level](#warning-level) sensor                                                                                                                                                                                                                | required                                                                        |
+| `title`         | string  | A title above the warnings                                                                                                                                                                                                                                      |                                                                                 |
+| `show_timeline` | boolean | The timeline of today and the next two days above the rows                                                                                                                                                                                                      | `true`                                                                          |
+| `height_mode`   | string  | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the timeline and the warnings scroll. A height in grid rows, set in the layout tab of a sections view, is used instead | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
+| `height`        | number  | The card's height in pixels, for `fixed`                                                                                                                                                                                                                        |                                                                                 |
+| `max_height`    | number  | The card's greatest height in pixels, for `max`                                                                                                                                                                                                                 |                                                                                 |
 
 ### The rows
 
@@ -330,12 +332,13 @@ for its line is cut short until the row is opened:
 <img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-narrow-dark.png#gh-dark-mode-only" width="250" alt="The three weather warnings on a narrow card, the timeline's bars with icons only, each row's name cut short and its time under it">
 </p>
 
-When the card is held to a height, by `max_height` or by a fixed number of rows in a sections view, the title and the
-timeline stay in place and only the warnings scroll:
+When the card is held to a height, by `height_mode` or by a fixed number of rows in a sections view, the title stays in
+place and the timeline scrolls with the warnings, as its lanes grow with them. It never gets lower than the title, a
+timeline of one lane and one warning need:
 
 <p>
-<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-light.png#gh-light-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the last row cut off at the bottom where the list of warnings scrolls">
-<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-dark.png#gh-dark-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the last row cut off at the bottom where the list of warnings scrolls">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-light.png#gh-light-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the last row fading out at the bottom, where the timeline and the warnings scroll">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-dark.png#gh-dark-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the last row fading out at the bottom, where the timeline and the warnings scroll">
 </p>
 
 ### Colours

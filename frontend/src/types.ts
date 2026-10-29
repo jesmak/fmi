@@ -1,4 +1,5 @@
 import type { LovelaceCardConfig } from "./hass";
+import type { HeightConfig } from "./height";
 
 /** One warning in the `warnings` attribute of the fmi integration's warning level sensor. */
 export interface Warning {
@@ -20,10 +21,8 @@ export interface Warning {
     parameters?: Record<string, unknown>;
 }
 
-export interface FmiWarningsCardConfig extends LovelaceCardConfig {
+export interface FmiWarningsCardConfig extends LovelaceCardConfig, HeightConfig {
     entity: string;
     title?: string;
     show_timeline?: boolean;
-    /** In pixels. A longer list of warnings scrolls. */
-    max_height?: number;
 }

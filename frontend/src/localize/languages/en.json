@@ -3,7 +3,7 @@
         "name": "FMI warnings",
         "description": "The Finnish Meteorological Institute's weather and sea warnings for a chosen place",
         "invalid_configuration": "Invalid configuration. Choose a warnings sensor of the fmi integration.",
-        "invalid_max_height": "max_height must be a positive number of pixels.",
+        "invalid_height": "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
         "no_entity": "Entity {entity} not found",
         "not_warnings": "{entity} is not a warnings sensor of the fmi integration",
         "unavailable": "The warnings are not available right now",
@@ -40,7 +40,14 @@
         "title": "Title",
         "show_timeline": "Show the timeline",
         "show_timeline_helper": "Today and the next two days, a bar for each warning",
+        "height_mode": "Height",
+        "height_mode_helper": "A height set in the layout tab of a sections view is used instead.",
+        "height_mode_auto": "Fits the content",
+        "height_mode_fixed": "Fixed",
+        "height_mode_max": "Grows up to a limit",
+        "height": "Fixed height",
+        "height_helper": "The card is always this tall, and the timeline and the warnings scroll inside it.",
         "max_height": "Maximum height",
-        "max_height_helper": "In pixels. The list becomes scrollable when there are more warnings than fit in the view."
+        "max_height_helper": "The card grows with its content up to this height, and then the timeline and the warnings scroll."
     }
 }
