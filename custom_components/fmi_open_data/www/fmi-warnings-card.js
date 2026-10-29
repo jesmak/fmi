@@ -1262,7 +1262,7 @@ var FmiWarningsCard = class extends i4 {
     if (changed.has("config") || changed.has("layout") || changed.has("opened") || changed.has("tick") || !this.config || !changed.has("hass") || !previous) {
       return true;
     }
-    return previous.states[this.config.entity] !== this.hass?.states[this.config.entity];
+    return previous.locale !== this.hass?.locale || previous.language !== this.hass?.language || previous.states[this.config.entity] !== this.hass?.states[this.config.entity];
   }
   /** Works out the rows, and forgets an opened row whose warning has gone, so it can't come back open by itself. */
   willUpdate() {

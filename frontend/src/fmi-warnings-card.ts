@@ -101,8 +101,13 @@ export class FmiWarningsCard extends LitElement {
         ) {
             return true;
         }
-        // Home Assistant hands the card every state change in the house; only its own sensor matters.
-        return previous.states[this.config.entity] !== this.hass?.states[this.config.entity];
+        // Home Assistant hands the card every state change in the house; only its own sensor, the language and the locale
+        // (the time format and time zone with it) matter.
+        return (
+            previous.locale !== this.hass?.locale ||
+            previous.language !== this.hass?.language ||
+            previous.states[this.config.entity] !== this.hass?.states[this.config.entity]
+        );
     }
 
     /** Works out the rows, and forgets an opened row whose warning has gone, so it can't come back open by itself. */
