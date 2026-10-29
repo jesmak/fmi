@@ -57,8 +57,8 @@ No account or API key is needed. FMI's open data service is used anonymously.
 Adding the integration asks for a language, English or Finnish. FMI's names of queries and parameters, the names
 of the measurements it suggests, and the warning texts are in that language. Change it later with **Reconfigure**.
 
-| Name     | Type | Description                       | Default                         |
-| -------- | ---- | --------------------------------- | ------------------------------- |
+| Name     | Type | Description                           | Default                        |
+| -------- | ---- | ------------------------------------- | ------------------------------ |
 | Language | enum | The language of FMI's names and texts | Home Assistant's, else English |
 
 ### Options
@@ -66,10 +66,10 @@ of the measurements it suggests, and the warning texts are in that language. Cha
 **Configure** on the integration sets when a measurement's data counts as stale. The settings apply to every
 measurement.
 
-| Name                         | Type | Description                                          | Default |
-| ---------------------------- | ---- | ---------------------------------------------------- | ------- |
-| Raise a repair issue         | bool | Tell you with a repair issue when a measurement stops getting data | `true` |
-| Hours without new data       | int  | How old the newest data may be before it counts as stale | 24 |
+| Name                   | Type | Description                                                        | Default |
+| ---------------------- | ---- | ------------------------------------------------------------------ | ------- |
+| Raise a repair issue   | bool | Tell you with a repair issue when a measurement stops getting data | `true`  |
+| Hours without new data | int  | How old the newest data may be before it counts as stale           | 24      |
 
 Daily, monthly and yearly statistics are published only once the day, month or year is over, so for those the
 limit is never shorter than three days, two months or two years. For STUK's air radioactivity it is never shorter than
@@ -105,13 +105,13 @@ measurements to several stations.
 - **Add measurements:** only what the station has reported is offered.
 - **Change a measurement's settings:**
 
-  | Name                | Type   | Description                                                                 | Default            |
-  | ------------------- | ------ | --------------------------------------------------------------------------- | ------------------ |
-  | Unit                | string | The unit to show. Empty uses FMI's own, which FMI does not give for every parameter | FMI's |
-  | Report -1 as 0      | bool   | For parameters that use -1 for no measurable value, such as daily precipitation | `false`        |
-  | Forecast hours      | int    | How many hours ahead a forecast shows                                       | 36                 |
-  | Forecast past hours | int    | How many hours of the forecast already past it keeps                        | 5                  |
-  | Forecast step       | int    | Minutes between two forecast values                                         | 30                 |
+  | Name                | Type   | Description                                                                         | Default |
+  | ------------------- | ------ | ----------------------------------------------------------------------------------- | ------- |
+  | Unit                | string | The unit to show. Empty uses FMI's own, which FMI does not give for every parameter | FMI's   |
+  | Report -1 as 0      | bool   | For parameters that use -1 for no measurable value, such as daily precipitation     | `false` |
+  | Forecast hours      | int    | How many hours ahead a forecast shows                                               | 36      |
+  | Forecast past hours | int    | How many hours of the forecast already past it keeps                                | 5       |
+  | Forecast step       | int    | Minutes between two forecast values                                                 | 30      |
 
   The forecast settings are only for forecasts.
 - **Remove measurements:** a station keeps at least one. To remove it altogether, delete it on the integration page.
@@ -123,12 +123,12 @@ sensor in Home Assistant.
 
 Choose **Add place** on the integration page.
 
-| Name          | Type     | Description                                         | Default                      |
-| ------------- | -------- | --------------------------------------------------- | ---------------------------- |
-| Place         | location | The point, and a radius around it for the warnings  | Home, 1 km                   |
-| Name          | string   | The place's name, shown in front of its entities' names | Home Assistant's location name |
-| Weather forecast | bool  | A weather entity with FMI's forecast for the place  | `true`                       |
-| Warning types | list     | The warnings to follow. Empty follows none          | All                          |
+| Name             | Type     | Description                                             | Default                        |
+| ---------------- | -------- | ------------------------------------------------------- | ------------------------------ |
+| Place            | location | The point, and a radius around it for the warnings      | Home, 1 km                     |
+| Name             | string   | The place's name, shown in front of its entities' names | Home Assistant's location name |
+| Weather forecast | bool     | A weather entity with FMI's forecast for the place      | `true`                         |
+| Warning types    | list     | The warnings to follow. Empty follows none              | All                            |
 
 A place follows the forecast, the warnings or both. A warning is included when one of its areas covers the place or
 comes within the radius. The areas are municipalities for warnings on land and sea areas for warnings at sea, and a
@@ -141,18 +141,18 @@ sea area includes its islands. On the shore, a radius of a kilometre or two brin
 Every measurement is a sensor, named after the station and the measurement. An observation's state is the latest
 value, a forecast's the next one.
 
-| Attribute             | Description                                                                         |
-| --------------------- | ----------------------------------------------------------------------------------- |
-| `latitude`, `longitude` | Where the station is                                                              |
-| `label`               | The measurement's name                                                              |
-| `language`            | The language of FMI's texts                                                         |
-| `query_id`            | FMI's query, such as `fmi::observations::weather::hourly::simple`                  |
-| `parameter`           | FMI's parameter, such as `PRA_PT1H_ACC`                                             |
-| `location_type`, `location_id` | How the station is identified (`fmisid`, `geoid`, `place` or `latlon`), and the value |
-| `no_data_issue`, `no_data_issue_hours` | The stale data settings that apply, the hours after the minimum for the query |
-| `time`, `value`       | An observation's time and value                                                     |
-| `forecast`            | A forecast's values, each with `time` and `value`                                   |
-| `forecast_hours`, `forecast_past_hours`, `forecast_step` | A forecast's settings                          |
+| Attribute                                                | Description                                                                           |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `latitude`, `longitude`                                  | Where the station is                                                                  |
+| `label`                                                  | The measurement's name                                                                |
+| `language`                                               | The language of FMI's texts                                                           |
+| `query_id`                                               | FMI's query, such as `fmi::observations::weather::hourly::simple`                     |
+| `parameter`                                              | FMI's parameter, such as `PRA_PT1H_ACC`                                               |
+| `location_type`, `location_id`                           | How the station is identified (`fmisid`, `geoid`, `place` or `latlon`), and the value |
+| `no_data_issue`, `no_data_issue_hours`                   | The stale data settings that apply, the hours after the minimum for the query         |
+| `time`, `value`                                          | An observation's time and value                                                       |
+| `forecast`                                               | A forecast's values, each with `time` and `value`                                     |
+| `forecast_hours`, `forecast_past_hours`, `forecast_step` | A forecast's settings                                                                 |
 
 ### Stale data
 
@@ -186,32 +186,32 @@ be reached, the last forecast is kept for three hours.
 
 A place with warnings has a sensor for the highest warning level in force now, `none`, `yellow`, `orange` or `red`.
 
-| Attribute         | Description                                                                  |
-| ----------------- | ---------------------------------------------------------------------------- |
-| `label`           | The place's name                                                             |
-| `language`        | The language of the warning texts                                            |
-| `latitude`, `longitude`, `radius` | The place and the radius in metres                           |
-| `warning_types`   | The warning types followed                                                   |
-| `active_warnings` | The number of warnings in force now, the first ones in `warnings`            |
-| `warnings`        | Every warning that concerns the place, in force or coming up, earliest first |
+| Attribute                         | Description                                                                  |
+| --------------------------------- | ---------------------------------------------------------------------------- |
+| `label`                           | The place's name                                                             |
+| `language`                        | The language of the warning texts                                            |
+| `latitude`, `longitude`, `radius` | The place and the radius in metres                                           |
+| `warning_types`                   | The warning types followed                                                   |
+| `active_warnings`                 | The number of warnings in force now, the first ones in `warnings`            |
+| `warnings`                        | Every warning that concerns the place, in force or coming up, earliest first |
 
 Only the level is kept in history, not the `warnings` attribute.
 
 Each warning, in `warnings` and in the events below, has these fields:
 
-| Field         | Description                                                                           |
-| ------------- | ------------------------------------------------------------------------------------- |
-| `id`          | FMI's identifier for this version of the warning                                      |
-| `type`        | The warning type, such as `seaWind` or `seaWaveHeight`                                |
-| `level`       | `yellow`, `orange` or `red`                                                           |
-| `event`       | The warning's name, such as `Tuulivaroitus merelle`                                   |
-| `severity`    | `Moderate`, `Severe` or `Extreme`                                                     |
-| `onset`, `expires` | When the warning comes into force and when it ends                               |
-| `headline`, `description` | FMI's texts                                                               |
-| `impacts`     | The typical impacts, such as `Mahdollisesti vaarallinen huviveneille.`                |
-| `probability` | The probability in percent, when FMI gives one                                        |
-| `areas`       | The warning's areas that concern the place                                            |
-| `parameters`  | The warning type's values, such as `windIntensity: 14`, `windIntensityUom: m/s` and `windDirection: 180` |
+| Field                     | Description                                                                                              |
+| ------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `id`                      | FMI's identifier for this version of the warning                                                         |
+| `type`                    | The warning type, such as `seaWind` or `seaWaveHeight`                                                   |
+| `level`                   | `yellow`, `orange` or `red`                                                                              |
+| `event`                   | The warning's name, such as `Tuulivaroitus merelle`                                                      |
+| `severity`                | `Moderate`, `Severe` or `Extreme`                                                                        |
+| `onset`, `expires`        | When the warning comes into force and when it ends                                                       |
+| `headline`, `description` | FMI's texts                                                                                              |
+| `impacts`                 | The typical impacts, such as `Mahdollisesti vaarallinen huviveneille.`                                   |
+| `probability`             | The probability in percent, when FMI gives one                                                           |
+| `areas`                   | The warning's areas that concern the place                                                               |
+| `parameters`              | The warning type's values, such as `windIntensity: 14`, `windIntensityUom: m/s` and `windDirection: 180` |
 
 The warning types are wind on land and at sea, thunderstorms on land and at sea, heavy rain, traffic weather,
 pedestrian weather, forest fire weather, heat, cold, UV, wave height, sea level and ice accretion.
@@ -237,14 +237,14 @@ warnings already in force when Home Assistant starts fire nothing.
 One station's observations over a time range, straight from FMI, without a sensor for each value. It returns
 the station's name and coordinates and one row per time.
 
-| Field      | Description                                                                   | Default                |
-| ---------- | ----------------------------------------------------------------------------- | ---------------------- |
-| Query      | An FMI observation query, such as `fmi::observations::weather::hourly`        |                        |
-| Station    | The station's FMISID                                                          |                        |
-| Parameters | The query's parameters, such as `TA_PT1H_AVG`                                 |                        |
-| Start      | The start of the time range                                                   | 24 hours before the end |
-| End        | The end of the time range                                                     | Now                    |
-| Step       | Minutes between values                                                        | The query's own        |
+| Field      | Description                                                            | Default                 |
+| ---------- | ---------------------------------------------------------------------- | ----------------------- |
+| Query      | An FMI observation query, such as `fmi::observations::weather::hourly` |                         |
+| Station    | The station's FMISID                                                   |                         |
+| Parameters | The query's parameters, such as `TA_PT1H_AVG`                          |                         |
+| Start      | The start of the time range                                            | 24 hours before the end |
+| End        | The end of the time range                                              | Now                     |
+| Step       | Minutes between values                                                 | The query's own         |
 
 FMI limits how long a range one request may cover, differently for each query. It is a week for the 10-minute
 observations, a month for the hourly ones and a year for the daily ones. A longer range is refused with FMI's own
@@ -521,23 +521,23 @@ npm run check
 to the repository. The card carries the integration's version from `manifest.json`. To have git refuse a commit whose
 built card doesn't match `frontend/`, run `git config core.hooksPath .githooks` once.
 
-| Path                           | What it contains                                                                    |
-| ------------------------------ | ----------------------------------------------------------------------------------- |
-| `__init__.py`                  | Setup                                                                               |
-| `config_flow.py`               | The language, the options, adding and changing stations and places                  |
-| `catalogue.py`                 | What can be measured, and which stations report what                                |
-| `structure.py`                 | Stations and places, their devices, and the move from 3.x's subentries              |
-| `migration.py`                 | The move from the old `fmi` domain                                                  |
-| `session.py`                   | FMI's WFS service                                                                   |
-| `query_coordinator.py`         | Reading a measurement, and noticing stale data                                      |
-| `weather_coordinator.py`       | The point forecast, and its days and halves                                         |
-| `warning_coordinator.py`, `cap.py` | The warning feed and the warnings for a place                                   |
-| `sensor.py`, `binary_sensor.py`, `event.py`, `weather.py` | The entities                             |
-| `services.py`                  | The `get_observations` action                                                       |
-| `diagnostics.py`               | The diagnostics download, with places left out                                      |
-| `card.py`, `www/`              | Serving the warnings card and adding it to the dashboards' resources                |
-| `translations/<language>.json` | Home Assistant UI texts                                                             |
-| `frontend/`                    | The warnings card's source, tests and build                                         |
+| Path                                                      | What it contains                                                       |
+| --------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `__init__.py`                                             | Setup                                                                  |
+| `config_flow.py`                                          | The language, the options, adding and changing stations and places     |
+| `catalogue.py`                                            | What can be measured, and which stations report what                   |
+| `structure.py`                                            | Stations and places, their devices, and the move from 3.x's subentries |
+| `migration.py`                                            | The move from the old `fmi` domain                                     |
+| `session.py`                                              | FMI's WFS service                                                      |
+| `query_coordinator.py`                                    | Reading a measurement, and noticing stale data                         |
+| `weather_coordinator.py`                                  | The point forecast, and its days and halves                            |
+| `warning_coordinator.py`, `cap.py`                        | The warning feed and the warnings for a place                          |
+| `sensor.py`, `binary_sensor.py`, `event.py`, `weather.py` | The entities                                                           |
+| `services.py`                                             | The `get_observations` action                                          |
+| `diagnostics.py`                                          | The diagnostics download, with places left out                         |
+| `card.py`, `www/`                                         | Serving the warnings card and adding it to the dashboards' resources   |
+| `translations/<language>.json`                            | Home Assistant UI texts                                                |
+| `frontend/`                                               | The warnings card's source, tests and build                            |
 
 ## Support
 
