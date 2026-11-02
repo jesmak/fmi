@@ -22,8 +22,8 @@
         "build": "node scripts/build.mjs",
         "typecheck": "tsc",
         "lint": "eslint .",
-        "format": "prettier --write .",
-        "format:check": "prettier --check .",
+        "format": "prettier --write . ../README.md",
+        "format:check": "prettier --check . ../README.md",
         "test": "vitest run",
         "test:watch": "vitest",
         "check": "npm run typecheck && npm run lint && npm run format:check && npm test && npm run build"

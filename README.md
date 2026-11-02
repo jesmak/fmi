@@ -114,6 +114,7 @@ measurements to several stations.
   | Forecast step       | int    | Minutes between two forecast values                                                 | 30      |
 
   The forecast settings are only for forecasts.
+
 - **Remove measurements:** a station keeps at least one. To remove it altogether, delete it on the integration page.
 
 The station itself does not change, because a different station is a different device. To rename a measurement, rename its
