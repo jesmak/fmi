@@ -4,6 +4,7 @@
         "description": "The Finnish Meteorological Institute's weather and sea warnings for a chosen place",
         "invalid_configuration": "Invalid configuration. Choose a warnings sensor of the fmi integration.",
         "invalid_height": "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
+        "invalid_row_step": "Invalid rounding. row_step must be full or half.",
         "no_entity": "Entity {entity} not found",
         "not_warnings": "{entity} is not a warnings sensor of the fmi integration",
         "unavailable": "The warnings are not available right now",
@@ -48,6 +49,10 @@
         "height": "Fixed height",
         "height_helper": "The card is always this tall, and the timeline and the warnings scroll inside it.",
         "max_height": "Maximum height",
-        "max_height_helper": "The card grows with its content up to this height, and then the timeline and the warnings scroll."
+        "max_height_helper": "The card grows with its content up to this height, and then the timeline and the warnings scroll.",
+        "row_step": "Rounding in a sections view",
+        "row_step_helper": "With automatic row height, the card's height is rounded up to whole rows, or to half rows to save space.",
+        "row_step_full": "Whole rows",
+        "row_step_half": "Half rows"
     }
 }

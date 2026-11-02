@@ -274,15 +274,16 @@ itself, and the log says which line to add, change or remove.
 The card has a visual editor. Add **FMI warnings** from the card picker and choose the place's warning level
 sensor. The options can also be written by hand.
 
-| Name            | Type    | Description                                                                                                                                                                                                                                                     | Default                                                                         |
-| --------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `type`          | string  | `custom:fmi-warnings-card`                                                                                                                                                                                                                                      | required                                                                        |
-| `entity`        | string  | A place's [warning level](#warning-level) sensor                                                                                                                                                                                                                | required                                                                        |
-| `title`         | string  | A title above the warnings                                                                                                                                                                                                                                      |                                                                                 |
-| `show_timeline` | boolean | The timeline of today and the next two days above the rows                                                                                                                                                                                                      | `true`                                                                          |
-| `height_mode`   | string  | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the timeline and the warnings scroll. A height in grid rows, set in the layout tab of a sections view, is used instead | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
-| `height`        | number  | The card's height in pixels, for `fixed`                                                                                                                                                                                                                        |                                                                                 |
-| `max_height`    | number  | The card's greatest height in pixels, for `max`                                                                                                                                                                                                                 |                                                                                 |
+| Name            | Type    | Description                                                                                                                                                                                                                                                                                                       | Default                                                                         |
+| --------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `type`          | string  | `custom:fmi-warnings-card`                                                                                                                                                                                                                                                                                        | required                                                                        |
+| `entity`        | string  | A place's [warning level](#warning-level) sensor                                                                                                                                                                                                                                                                  | required                                                                        |
+| `title`         | string  | A title above the warnings                                                                                                                                                                                                                                                                                        |                                                                                 |
+| `show_timeline` | boolean | The timeline of today and the next two days above the rows                                                                                                                                                                                                                                                        | `true`                                                                          |
+| `height_mode`   | string  | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the timeline and the warnings scroll. A height in grid rows, set in the layout tab of a sections view, is used instead                                                   | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
+| `height`        | number  | The card's height in pixels, for `fixed`                                                                                                                                                                                                                                                                          |                                                                                 |
+| `max_height`    | number  | The card's greatest height in pixels, for `max`                                                                                                                                                                                                                                                                   |                                                                                 |
+| `row_step`      | string  | How the card rounds its height on automatic rows in a sections view, with `height_mode` `auto`. `full` rounds it up to whole rows, so the cards under it stay on the rows. `half` rounds it up to half rows, which saves space but can leave the cards under it half a row off the rows of the sections beside it | `full`                                                                          |
 
 ### The rows
 
@@ -324,9 +325,10 @@ To hide the card instead, use the card's visibility settings in Home Assistant (
 
 ### Sizes
 
-The card fills a section by default and can be made as narrow as two thirds of one. On a narrow card the timeline's bars
-show their icons only. A row's time moves under its name whenever the two don't fit side by side, and a name too long
-for its line is cut short until the row is opened:
+The card fills a section by default and can be made as narrow as three quarters of one. On automatic rows in a sections
+view, it ends on whole rows, or on half rows with `row_step: half`. Any room left over goes under the title, or above the
+warnings without one. On a card narrower than 434 px the timeline's bars show their icons only. A row's time moves under
+its name whenever the two don't fit side by side, and a name too long for its line is cut short until the row is opened:
 
 <p>
 <img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-narrow-light.png#gh-light-mode-only" width="250" alt="The three weather warnings on a narrow card, the timeline's bars with icons only, each row's name cut short and its time under it">
@@ -334,8 +336,9 @@ for its line is cut short until the row is opened:
 </p>
 
 When the card is held to a height, by `height_mode` or by a fixed number of rows in a sections view, the title stays in
-place and the timeline scrolls with the warnings, as its lanes grow with them. It never gets lower than the title, a
-timeline of one lane and one warning need:
+place and the timeline scrolls with the warnings, as its lanes grow with them. The title keeps to one line, cut short
+with its whole text as a tooltip. It never gets lower than the title, a timeline of one lane and a
+warning's first line need, with the rest of a warning that takes more lines scrolling:
 
 <p>
 <img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-light.png#gh-light-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the last row fading out at the bottom, where the timeline and the warnings scroll">

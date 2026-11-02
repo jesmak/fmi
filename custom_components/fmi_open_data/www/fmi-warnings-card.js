@@ -804,6 +804,7 @@ var en_default = {
     description: "The Finnish Meteorological Institute's weather and sea warnings for a chosen place",
     invalid_configuration: "Invalid configuration. Choose a warnings sensor of the fmi integration.",
     invalid_height: "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
+    invalid_row_step: "Invalid rounding. row_step must be full or half.",
     no_entity: "Entity {entity} not found",
     not_warnings: "{entity} is not a warnings sensor of the fmi integration",
     unavailable: "The warnings are not available right now",
@@ -848,7 +849,11 @@ var en_default = {
     height: "Fixed height",
     height_helper: "The card is always this tall, and the timeline and the warnings scroll inside it.",
     max_height: "Maximum height",
-    max_height_helper: "The card grows with its content up to this height, and then the timeline and the warnings scroll."
+    max_height_helper: "The card grows with its content up to this height, and then the timeline and the warnings scroll.",
+    row_step: "Rounding in a sections view",
+    row_step_helper: "With automatic row height, the card's height is rounded up to whole rows, or to half rows to save space.",
+    row_step_full: "Whole rows",
+    row_step_half: "Half rows"
   }
 };
 
@@ -859,6 +864,7 @@ var fi_default = {
     description: "Ilmatieteen laitoksen s\xE4\xE4- ja merivaroitukset valitulle paikalle",
     invalid_configuration: "Virheellinen konfiguraatio. Valitse fmi-integraation varoitusanturi.",
     invalid_height: "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikselein\xE4, ja korkeustilan (height_mode) auto, fixed tai max.",
+    invalid_row_step: "Virheellinen py\xF6ristys. Py\xF6ristyksen (row_step) on oltava full tai half.",
     no_entity: "Entiteetti\xE4 {entity} ei l\xF6ydy",
     not_warnings: "{entity} ei ole fmi-integraation varoitusanturi",
     unavailable: "Varoitukset eiv\xE4t ole juuri nyt saatavilla",
@@ -903,7 +909,11 @@ var fi_default = {
     height: "Kiinte\xE4 korkeus",
     height_helper: "Kortti on aina n\xE4in korkea, ja aikajana ja varoitukset vieriv\xE4t sen sis\xE4ll\xE4.",
     max_height: "Enimm\xE4iskorkeus",
-    max_height_helper: "Kortti kasvaa sis\xE4lt\xF6ns\xE4 mukana t\xE4h\xE4n korkeuteen asti, ja sen j\xE4lkeen aikajana ja varoitukset vieriv\xE4t."
+    max_height_helper: "Kortti kasvaa sis\xE4lt\xF6ns\xE4 mukana t\xE4h\xE4n korkeuteen asti, ja sen j\xE4lkeen aikajana ja varoitukset vieriv\xE4t.",
+    row_step: "Py\xF6ristys osioihin jaetussa n\xE4kym\xE4ss\xE4",
+    row_step_helper: "Automaattisella rivikorkeudella kortin korkeus py\xF6ristet\xE4\xE4n yl\xF6sp\xE4in kokonaisiin riveihin, tai tilan s\xE4\xE4st\xE4miseksi puolikkaisiin riveihin.",
+    row_step_full: "Kokonaisiin riveihin",
+    row_step_half: "Puolikkaisiin riveihin"
   }
 };
 
@@ -929,6 +939,41 @@ function read(table, key) {
 }
 function browserLanguage() {
   return document.documentElement.lang || navigator.language || "en";
+}
+
+// src/rows.ts
+var ROW_STEPS = ["full", "half"];
+var ROW_PX = 64;
+var ROW_GAP_PX = 8;
+function validRowStep(config) {
+  return config.row_step === void 0 || config.row_step === null || ROW_STEPS.includes(config.row_step);
+}
+function filledHeight(content, config) {
+  const step = config.row_step === "half" ? ROW_PX / 2 : ROW_PX;
+  return Math.max(1, Math.ceil((content + ROW_GAP_PX) / step)) * step - ROW_GAP_PX;
+}
+function rowStepSchema(config, text) {
+  if (heightMode(config) !== "auto") {
+    return [];
+  }
+  return [
+    {
+      name: "row_step",
+      selector: {
+        select: { mode: "dropdown", options: ROW_STEPS.map((value) => ({ value, label: text(`editor.row_step_${value}`) })) }
+      }
+    }
+  ];
+}
+function rowStepData(config) {
+  return { ...config, row_step: config.row_step ?? "full" };
+}
+function tidyRowStep(config) {
+  const tidied = { ...config };
+  if (tidied.row_step !== "half" || heightMode(tidied) !== "auto") {
+    delete tidied.row_step;
+  }
+  return tidied;
 }
 
 // src/warnings.ts
@@ -1042,7 +1087,8 @@ function schema(hass, config, text) {
     { name: "entity", required: true, selector: { entity: { include_entities: warningsSensors(hass) } } },
     { name: "title", selector: { text: {} } },
     { name: "show_timeline", selector: { boolean: {} } },
-    ...heightSchema(config, text)
+    ...heightSchema(config, text),
+    ...rowStepSchema(config, text)
   ];
 }
 var FmiWarningsCardEditor = class extends i4 {
@@ -1060,7 +1106,7 @@ var FmiWarningsCardEditor = class extends i4 {
     return b2`
             <ha-form
                 .hass=${this.hass}
-                .data=${{ ...DEFAULTS, ...heightData(this.config) }}
+                .data=${{ ...DEFAULTS, ...rowStepData(heightData(this.config)) }}
                 .schema=${schema(this.hass, this.config, (key) => this.text(key))}
                 .computeLabel=${(entry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry) => this.helper(entry.name)}
@@ -1069,7 +1115,7 @@ var FmiWarningsCardEditor = class extends i4 {
         `;
   }
   valueChanged(event) {
-    const config = tidyHeight(event.detail.value);
+    const config = tidyRowStep(tidyHeight(event.detail.value));
     if (!config.title) {
       delete config.title;
     }
@@ -1201,16 +1247,31 @@ var ScrollFade = class {
 };
 
 // src/fmi-warnings-card.ts
+var PADDING = 24;
 var FmiWarningsCard = class extends i4 {
   constructor() {
     super();
     /** The warnings to draw and their rows' keys, worked out once per update. */
     this.list = { now: 0, shown: [], keys: /* @__PURE__ */ new Map() };
     this.tick = 0;
+    this.filled = 0;
+    this.spare = 0;
+    this.sliding = false;
+    this.resizes = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver(() => this.measureSoon());
     /** Once a row a tap opened has slid open, scrolls the body or the page just enough to show it. */
     this.opening = (event) => {
       const row = event.currentTarget.closest(".row");
-      if (event.propertyName !== "grid-template-rows" || event.target !== event.currentTarget || row?.dataset.key !== this.revealing) {
+      if (event.propertyName !== "grid-template-rows" || event.target !== event.currentTarget) {
+        return;
+      }
+      const moving = [...this.renderRoot.querySelectorAll(".expander")].some(
+        (expander) => expander !== event.currentTarget && (expander.getAnimations?.().length ?? 0) > 0
+      );
+      if (!moving) {
+        this.sliding = false;
+        clearTimeout(this.slideTimer);
+      }
+      if (row?.dataset.key !== this.revealing) {
         return;
       }
       this.revealing = void 0;
@@ -1232,6 +1293,9 @@ var FmiWarningsCard = class extends i4 {
     if (!validHeight(config)) {
       throw new Error(translate(browserLanguage(), "common.invalid_height"));
     }
+    if (!validRowStep(config)) {
+      throw new Error(translate(browserLanguage(), "common.invalid_row_step"));
+    }
     this.config = config;
   }
   /** In units of 50 px, for a masonry view: the title, the timeline and a row per warning, or the height it is held to. */
@@ -1243,11 +1307,11 @@ var FmiWarningsCard = class extends i4 {
     return heightCardSize(this.config ?? {}, size, this.minimumHeight());
   }
   /**
-   * In a sections view the card takes a whole section by default and is never narrower than two thirds of one, nor
-   * lower than its minimum height.
+   * In a sections view the card takes a whole section by default. Below 9 columns, 214 px on a 320 px phone, a
+   * row's name and time have too little room to read, so it is never narrower, nor lower than its minimum height.
    */
   getGridOptions() {
-    return { columns: 12, min_columns: 8, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
+    return { columns: 12, min_columns: 9, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
   }
   /** A warning moves from coming up to in force, and one that has expired goes, between the sensor's updates. */
   connectedCallback() {
@@ -1258,10 +1322,14 @@ var FmiWarningsCard = class extends i4 {
   disconnectedCallback() {
     super.disconnectedCallback();
     clearInterval(this.ticker);
+    clearTimeout(this.slideTimer);
+    this.sliding = false;
+    this.resizes?.disconnect();
+    cancelAnimationFrame(this.frame ?? 0);
   }
   shouldUpdate(changed) {
     const previous = changed.get("hass");
-    if (changed.has("config") || changed.has("layout") || changed.has("opened") || changed.has("tick") || !this.config || !changed.has("hass") || !previous) {
+    if (changed.has("config") || changed.has("layout") || changed.has("opened") || changed.has("tick") || changed.has("filled") || changed.has("spare") || changed.has("sliding") || !this.config || !changed.has("hass") || !previous) {
       return true;
     }
     return previous.locale !== this.hass?.locale || previous.language !== this.hass?.language || previous.states[this.config.entity] !== this.hass?.states[this.config.entity];
@@ -1281,31 +1349,42 @@ var FmiWarningsCard = class extends i4 {
     if (!this.hass || !this.config) {
       return A;
     }
+    const title = this.config.title;
+    const classes = [this.heightStyle() ? "held" : "", this.sliding ? "sliding" : ""].filter(Boolean).join(" ");
     return b2`
-            <ha-card style=${this.heightStyle()}>
-                ${this.config.title ? b2`<h1 class="card-title">${this.config.title}</h1>` : A} ${this.content(this.config.entity)}
+            <ha-card class=${classes} style=${this.cardStyle()}>
+                ${title ? b2`<h1 class="card-title spare" title=${title}>${title}</h1>` : A}
+                ${this.content(this.config.entity, title ? "" : "spare-top")}
             </ha-card>
         `;
   }
-  content(entityId) {
+  updated() {
+    const card = this.renderRoot.querySelector("ha-card");
+    if (card && this.isConnected) {
+      this.resizes?.observe(card);
+      this.measureSoon();
+    }
+  }
+  /** `spare` is the class that takes the room a whole row leaves over, on the content when the card has no title. */
+  content(entityId, spare) {
     const entity = this.hass?.states[entityId];
     if (!entity) {
-      return b2`<div class="message">${this.text("common.no_entity", { entity: entityId })}</div>`;
+      return b2`<div class="message ${spare}">${this.text("common.no_entity", { entity: entityId })}</div>`;
     }
     if (entity.state === "unavailable" || entity.state === "unknown") {
-      return b2`<div class="message">${this.text("common.unavailable")}</div>`;
+      return b2`<div class="message ${spare}">${this.text("common.unavailable")}</div>`;
     }
     if (!isWarningsSensor(entity)) {
-      return b2`<div class="message">${this.text("common.not_warnings", { entity: entityId })}</div>`;
+      return b2`<div class="message ${spare}">${this.text("common.not_warnings", { entity: entityId })}</div>`;
     }
     const { now, shown, keys } = this.list;
     if (!shown.length) {
-      return b2`<div class="empty">
+      return b2`<div class="empty ${spare}">
                 <ha-icon icon="mdi:check-circle-outline"></ha-icon><span>${this.text("common.no_warnings")}</span>
             </div>`;
     }
     return b2`
-            <div class="body">
+            <div class="body ${spare}">
                 ${this.config?.show_timeline === false ? A : this.timeline(shown, now, keys)}
                 <div class="rows">
                     ${c4(
@@ -1350,7 +1429,7 @@ var FmiWarningsCard = class extends i4 {
             </div>
         `;
   }
-  /** A warning on one line, its details under it once opened. */
+  /** A warning's row, its details under it once opened. */
   row({ warning, active }, key, now) {
     const open = this.opened === key;
     const color = LEVEL_COLORS[warning.level].background;
@@ -1363,7 +1442,7 @@ var FmiWarningsCard = class extends i4 {
                         <ha-icon icon="${icon(warning)}" style="color:${color}"></ha-icon>
                         <span class="visually-hidden">${level}</span>
                         <span class="text">
-                            <span class="name">${warning.event}</span>
+                            <span class="name" title=${warning.event}>${warning.event}</span>
                             <span class="time">${this.period(warning, active, now)}</span>
                         </span>
                         <ha-icon class="chevron" icon="mdi:chevron-down"></ha-icon>
@@ -1414,6 +1493,9 @@ var FmiWarningsCard = class extends i4 {
   toggle(key) {
     this.opened = this.opened === key ? void 0 : key;
     this.revealing = this.opened;
+    this.sliding = true;
+    clearTimeout(this.slideTimer);
+    this.slideTimer = setTimeout(() => this.sliding = false, 1e3);
   }
   /** A bar tapped on the timeline opens its row, which is then brought into view. One already open has no opening to wait for. */
   show(key) {
@@ -1424,19 +1506,65 @@ var FmiWarningsCard = class extends i4 {
     scrollTo([...this.renderRoot.querySelectorAll(".row")].find((element) => element.dataset.key === key));
   }
   /**
-   * The lowest the card is held to, in pixels: its padding, the title when it has one, a timeline of one lane when it
-   * is shown, and one warning row. The padding (with the card's border), the title and the timeline as measured on a
-   * full section's width, the row estimated from the styles.
+   * The lowest the card is held to, in pixels: its padding and border, the title when it has one, a timeline of one
+   * lane when it is shown, and the first line of a warning's row, each on the half-row step. The rest of a row that
+   * wraps scrolls with the timeline and the other rows.
    */
   minimumHeight() {
-    const padding = 34;
-    const title = 41;
-    const timeline2 = 75;
-    const row = 40;
-    return padding + (this.config?.title ? title : 0) + (this.config?.show_timeline === false ? 0 : timeline2) + row;
+    const step = 32;
+    return PADDING + (this.config?.title ? step : 0) + (this.config?.show_timeline === false ? 0 : 2 * step) + step;
   }
   heightStyle() {
     return heightStyle(this.config ?? {}, this.layout, this.minimumHeight());
+  }
+  measureSoon() {
+    cancelAnimationFrame(this.frame ?? 0);
+    this.frame = requestAnimationFrame(() => this.fillRows());
+  }
+  /**
+   * In a sections view whose rows are left automatic, the card takes the whole rows its content needs, or the half rows
+   * with `row_step: half`, so the cards under it stay on the rows. The room left over goes under the title, or above
+   * the content without one. A row sliding open or shut counts as it will be when the slide ends.
+   */
+  fillRows() {
+    const card = this.renderRoot.querySelector("ha-card");
+    if (!card || !card.clientWidth) {
+      return;
+    }
+    if (this.layout !== "grid" || this.heightStyle()) {
+      this.filled = 0;
+      this.spare = 0;
+      return;
+    }
+    const parts = card.querySelectorAll(
+      ":scope > .card-title, :scope > .message, :scope > .empty, :scope > .body > .timeline, :scope > .body > .rows > .row"
+    );
+    const last = parts[parts.length - 1];
+    if (!last) {
+      return;
+    }
+    const style = getComputedStyle(card);
+    let content = last.getBoundingClientRect().bottom - card.getBoundingClientRect().top + px(style.paddingBottom) + px(style.borderBottomWidth);
+    for (const expander of card.querySelectorAll(".expander")) {
+      const end = expander.classList.contains("open") ? expander.querySelector(".details")?.getBoundingClientRect().height ?? 0 : 0;
+      content += end - expander.getBoundingClientRect().height;
+    }
+    const spare = card.querySelector(".spare, .spare-top");
+    if (spare) {
+      const spareStyle = getComputedStyle(spare);
+      content -= px(spare.classList.contains("spare") ? spareStyle.paddingBottom : spareStyle.paddingTop);
+    }
+    const filled = filledHeight(Math.round(content), this.config ?? {});
+    this.filled = filled;
+    this.spare = Math.max(0, Math.floor(filled - content));
+  }
+  /** The card's inline style: the height it is held to, or the rows it fills, with their spare room. */
+  cardStyle() {
+    const held = this.heightStyle();
+    if (held || !this.filled) {
+      return held;
+    }
+    return `min-height: ${this.filled}px; --spare: ${this.spare}px`;
   }
   timeZone() {
     return this.hass?.locale?.time_zone === "server" ? this.hass.config?.time_zone : void 0;
@@ -1462,6 +1590,10 @@ var FmiWarningsCard = class extends i4 {
                  * timeline scrolls with the rows, as its lanes follow the warnings and could otherwise leave no room for a
                  * row. The card is never lower than its title, a timeline of one lane and a row. Clipped, not hidden,
                  * which would make the card a scroller that bringing a row into view could scroll out of place.
+                 *
+                 * Its parts step in half rows of a sections view, 32 px, so that with its 24 px of padding and border the
+                 * card is 32k − 8 px tall and fills whole or half rows exactly: the title, a line of a row or of a message,
+                 * and the timeline's frame and each of its lanes one step each. Only an opened row's details are free.
                  */
                 ha-card {
                     overflow: clip;
@@ -1470,8 +1602,19 @@ var FmiWarningsCard = class extends i4 {
                     height: 100%;
                     display: flex;
                     flex-direction: column;
-                    padding: 16px;
+                    padding: 11px 16px;
                     font-variant-numeric: tabular-nums;
+                }
+
+                /* The card's height follows a row's slide, instead of moving on Home Assistant's own transition. */
+                ha-card.sliding {
+                    transition: min-height 0.2s ease;
+                }
+
+                /* And so does the room a whole row leaves over, which changes with the slide's end. */
+                ha-card.sliding > .spare,
+                ha-card.sliding > .spare-top {
+                    transition: padding 0.2s ease;
                 }
 
                 ha-card > * {
@@ -1493,14 +1636,32 @@ var FmiWarningsCard = class extends i4 {
                     scrollbar-width: thin;
                 }
 
+                /* Held, the rows keep the scrollbar's room whether they scroll or not, as room that came with the scrolling
+                would make a row's time go under its name, and keep the card scrolling. */
+                ha-card.held > .body {
+                    scrollbar-gutter: stable;
+                }
+
                 .card-title {
-                    margin: 0 0 12px;
+                    margin: 0;
                     font-size: var(--ha-card-header-font-size, 24px);
                     font-weight: var(--ha-font-weight-normal, 400);
-                    line-height: 1.2;
+                    line-height: 32px;
+                    overflow-wrap: anywhere;
+                }
+
+                /* The room a whole row leaves over, under the title, or above the content without one. Padding, not a
+                margin, which would collapse into a neighbour's. */
+                ha-card > .spare {
+                    padding-bottom: var(--spare, 0px);
+                }
+
+                ha-card > .spare-top {
+                    padding-top: var(--spare, 0px);
                 }
 
                 .message {
+                    line-height: 32px;
                     color: var(--secondary-text-color);
                 }
 
@@ -1508,7 +1669,15 @@ var FmiWarningsCard = class extends i4 {
                     display: flex;
                     align-items: center;
                     gap: 10px;
+                    line-height: 32px;
                     color: var(--secondary-text-color);
+                }
+
+                /* Held to a height, the title keeps to one line, cut short with its whole text as a tooltip. */
+                ha-card.held .card-title {
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
 
                 .empty ha-icon {
@@ -1516,9 +1685,9 @@ var FmiWarningsCard = class extends i4 {
                     color: var(--success-color, #43a047);
                 }
 
+                /* The label at now and the days make one step, each lane another. */
                 .timeline {
                     position: relative;
-                    margin-bottom: 8px;
                     padding-top: 16px;
                 }
 
@@ -1533,13 +1702,11 @@ var FmiWarningsCard = class extends i4 {
 
                 .lanes {
                     position: relative;
-                    padding: 2px 0;
                 }
 
                 .lane {
                     position: relative;
-                    height: 22px;
-                    margin: 4px 0;
+                    height: 32px;
                 }
 
                 .midnight,
@@ -1570,7 +1737,7 @@ var FmiWarningsCard = class extends i4 {
                 .bar {
                     position: absolute;
                     cursor: pointer;
-                    top: 0;
+                    top: 5px;
                     box-sizing: border-box;
                     min-width: 22px;
                     height: 22px;
@@ -1600,7 +1767,7 @@ var FmiWarningsCard = class extends i4 {
                     flex: none;
                 }
 
-                /* Below 400 px inside the padding, the bars are too short to name. The rows below say what each is. */
+                /* On a card narrower than 434 px, 400 inside its padding, the bars are too short to name. The rows say what each is. */
                 @container (max-width: 399px) {
                     .bar .label {
                         display: none;
@@ -1609,10 +1776,11 @@ var FmiWarningsCard = class extends i4 {
 
                 .days {
                     position: relative;
+                    box-sizing: border-box;
                     height: 16px;
                     border-top: 1px solid var(--divider-color);
                     font-size: 12px;
-                    line-height: 16px;
+                    line-height: 15px;
                     color: var(--secondary-text-color);
                 }
 
@@ -1624,11 +1792,11 @@ var FmiWarningsCard = class extends i4 {
                 .row {
                     display: flex;
                     gap: 10px;
-                    border-top: 1px solid var(--divider-color);
                 }
 
-                .row:first-child {
-                    border-top: none;
+                /* A line drawn between the rows, not a border, which would take a pixel off the step. */
+                .row + .row {
+                    box-shadow: inset 0 1px var(--divider-color);
                 }
 
                 .stripe {
@@ -1655,7 +1823,7 @@ var FmiWarningsCard = class extends i4 {
                     align-items: center;
                     gap: 10px;
                     width: 100%;
-                    padding: 8px 0;
+                    padding: 4px 0;
                     border: none;
                     background: none;
                     color: inherit;
@@ -1665,13 +1833,19 @@ var FmiWarningsCard = class extends i4 {
                     cursor: pointer;
                 }
 
-                /* The name and the time on one line while both fit whole; the time moves under the name when they don't. */
+                /*
+                 * The name and the time on one line while both fit whole; the time moves under the name when they don't. Each
+                 * line is a step, its first 24 px inside the summary's padding. Centred on the line, not on a shared baseline,
+                 * which for the name's and the time's two sizes would add a pixel to it.
+                 */
                 .text {
                     display: flex;
                     flex-wrap: wrap;
-                    align-items: baseline;
-                    gap: 2px 10px;
+                    align-items: center;
+                    gap: 0 10px;
                     min-width: 0;
+                    margin: -4px 0;
+                    line-height: 32px;
                 }
 
                 /* One line, cut short when even a line of its own is too narrow. An opened row shows it whole. */
@@ -1728,7 +1902,10 @@ var FmiWarningsCard = class extends i4 {
                 /* Over in a moment rather than not at all, so the row is still brought into view when it ends. */
                 @media (prefers-reduced-motion: reduce) {
                     .expander,
-                    .chevron {
+                    .chevron,
+                    ha-card.sliding,
+                    ha-card.sliding > .spare,
+                    ha-card.sliding > .spare-top {
                         transition-duration: 1ms;
                     }
                 }
@@ -1783,6 +1960,15 @@ __decorateClass([
 __decorateClass([
   r5()
 ], FmiWarningsCard.prototype, "tick", 2);
+__decorateClass([
+  r5()
+], FmiWarningsCard.prototype, "filled", 2);
+__decorateClass([
+  r5()
+], FmiWarningsCard.prototype, "spare", 2);
+__decorateClass([
+  r5()
+], FmiWarningsCard.prototype, "sliding", 2);
 function scrollTo(row) {
   if (!row) {
     return;
@@ -1796,6 +1982,9 @@ function scrollTo(row) {
     return;
   }
   row.scrollIntoView({ block: "nearest", behavior });
+}
+function px(value) {
+  return parseFloat(value) || 0;
 }
 function icon(warning) {
   return TYPE_ICONS[warning.type] ?? FALLBACK_ICON;

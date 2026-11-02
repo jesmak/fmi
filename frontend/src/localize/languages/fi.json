@@ -4,6 +4,7 @@
         "description": "Ilmatieteen laitoksen sää- ja merivaroitukset valitulle paikalle",
         "invalid_configuration": "Virheellinen konfiguraatio. Valitse fmi-integraation varoitusanturi.",
         "invalid_height": "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikseleinä, ja korkeustilan (height_mode) auto, fixed tai max.",
+        "invalid_row_step": "Virheellinen pyöristys. Pyöristyksen (row_step) on oltava full tai half.",
         "no_entity": "Entiteettiä {entity} ei löydy",
         "not_warnings": "{entity} ei ole fmi-integraation varoitusanturi",
         "unavailable": "Varoitukset eivät ole juuri nyt saatavilla",
@@ -48,6 +49,10 @@
         "height": "Kiinteä korkeus",
         "height_helper": "Kortti on aina näin korkea, ja aikajana ja varoitukset vierivät sen sisällä.",
         "max_height": "Enimmäiskorkeus",
-        "max_height_helper": "Kortti kasvaa sisältönsä mukana tähän korkeuteen asti, ja sen jälkeen aikajana ja varoitukset vierivät."
+        "max_height_helper": "Kortti kasvaa sisältönsä mukana tähän korkeuteen asti, ja sen jälkeen aikajana ja varoitukset vierivät.",
+        "row_step": "Pyöristys osioihin jaetussa näkymässä",
+        "row_step_helper": "Automaattisella rivikorkeudella kortin korkeus pyöristetään ylöspäin kokonaisiin riveihin, tai tilan säästämiseksi puolikkaisiin riveihin.",
+        "row_step_full": "Kokonaisiin riveihin",
+        "row_step_half": "Puolikkaisiin riveihin"
     }
 }

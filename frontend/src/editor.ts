@@ -1,4 +1,4 @@
-/** The card's visual editor: the warnings sensor, the title, the timeline and the height. */
+/** The card's visual editor: the warnings sensor, the title, the timeline, the height and its rounding. */
 import { LitElement, html, nothing } from "lit";
 import type { TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
@@ -6,6 +6,7 @@ import { property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "./hass";
 import { heightData, heightSchema, tidyHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
+import { rowStepData, rowStepSchema, tidyRowStep } from "./rows";
 import type { FmiWarningsCardConfig } from "./types";
 import { warningsSensors } from "./warnings";
 
@@ -23,6 +24,7 @@ function schema(hass: HomeAssistant, config: FmiWarningsCardConfig, text: (key: 
         { name: "title", selector: { text: {} } },
         { name: "show_timeline", selector: { boolean: {} } },
         ...heightSchema(config, text),
+        ...rowStepSchema(config, text),
     ];
 }
 
@@ -41,7 +43,7 @@ export class FmiWarningsCardEditor extends LitElement {
         return html`
             <ha-form
                 .hass=${this.hass}
-                .data=${{ ...DEFAULTS, ...heightData(this.config) }}
+                .data=${{ ...DEFAULTS, ...rowStepData(heightData(this.config)) }}
                 .schema=${schema(this.hass, this.config, (key) => this.text(key))}
                 .computeLabel=${(entry: SchemaEntry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry: SchemaEntry) => this.helper(entry.name)}
@@ -51,7 +53,7 @@ export class FmiWarningsCardEditor extends LitElement {
     }
 
     private valueChanged(event: CustomEvent<{ value: FmiWarningsCardConfig }>): void {
-        const config: FmiWarningsCardConfig = tidyHeight(event.detail.value);
+        const config: FmiWarningsCardConfig = tidyRowStep(tidyHeight(event.detail.value));
         if (!config.title) {
             delete config.title;
         }

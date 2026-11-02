@@ -206,8 +206,8 @@ describe("fmi-warnings-card", () => {
     it("counts the timeline in its size for a masonry view only when it is drawn", async () => {
         expect((await card(hass("orange", [WIND]))).getCardSize()).toBe(3);
         expect((await card(hass("orange", [WIND]), { entity: ENTITY, max_height: 600 })).getCardSize()).toBe(3);
-        // A limit below the minimum is raised to it.
-        expect((await card(hass("orange", [WIND]), { entity: ENTITY, max_height: 100 })).getCardSize()).toBe(3);
+        // A limit below the minimum, 120 px, is raised to it.
+        expect((await card(hass("orange", [WIND]), { entity: ENTITY, max_height: 100 })).getCardSize()).toBe(2);
         expect((await card(hass("orange", [WIND]), { entity: ENTITY, height: 400 })).getCardSize()).toBe(8);
         expect((await card(hass("orange", [WIND]), { entity: ENTITY, show_timeline: false })).getCardSize()).toBe(1);
         const far = { ...PEDESTRIANS, onset: "2026-10-23T06:00:00+03:00", expires: "2026-10-23T12:00:00+03:00" };
@@ -370,18 +370,20 @@ describe("fmi-warnings-card", () => {
         expect(element.shadowRoot!.querySelector("ha-card")!.getAttribute("style")).toBe("height: 100%");
     });
 
+    // 24 px of padding and border, and on the half-row step a title of 32, a timeline of one lane of 64 and a row of 32.
     it.each([
-        ["the default", {}, 3],
-        ["a title", { title: "Varoitukset" }, 4],
-        ["no timeline", { show_timeline: false }, 2],
+        ["the default", {}, 2],
+        ["a title", { title: "Varoitukset" }, 3],
+        ["no timeline", { show_timeline: false }, 1],
         ["a title and no timeline", { title: "Varoitukset", show_timeline: false }, 2],
     ])("keeps to its minimum height in a sections view with %s", async (_name, extra, rows) => {
-        expect((await card(hass("orange", [WIND]), { entity: ENTITY, ...extra })).getGridOptions().min_rows).toBe(rows);
+        const options = (await card(hass("orange", [WIND]), { entity: ENTITY, ...extra })).getGridOptions();
+        expect(options).toMatchObject({ columns: 12, rows: "auto", min_columns: 9, min_rows: rows });
     });
 
     it("raises a fixed height below its minimum to the minimum", async () => {
         const element = await card(hass("orange", [WIND]), { entity: ENTITY, height: 100 });
-        expect(element.shadowRoot!.querySelector("ha-card")!.getAttribute("style")).toBe("height: 149px");
+        expect(element.shadowRoot!.querySelector("ha-card")!.getAttribute("style")).toBe("height: 120px");
     });
 
     it("puts the title ahead of the body, and the timeline and the rows in it", async () => {
@@ -450,6 +452,174 @@ describe("fmi-warnings-card", () => {
         expect(() => element.setConfig(config({ height_mode: "fixed", height: 240, max_height: 300 }))).not.toThrow();
         // Left empty in YAML, each is unset.
         expect(() => element.setConfig(config({ height_mode: null, height: null, max_height: null }))).not.toThrow();
+    });
+
+    it("refuses a rounding other than whole or half rows", () => {
+        const element = document.createElement("fmi-warnings-card") as FmiWarningsCard;
+        const config = (row_step: unknown) => ({ type: "custom:fmi-warnings-card", entity: ENTITY, row_step }) as never;
+        const error = translate(browserLanguage(), "common.invalid_row_step");
+        expect(() => element.setConfig(config("quarter"))).toThrow(error);
+        for (const row_step of [undefined, null, "full", "half"]) {
+            expect(() => element.setConfig(config(row_step))).not.toThrow();
+        }
+    });
+
+    it("carries the whole title and each warning's name as a tooltip, as either may be cut short", async () => {
+        const element = await card(hass("orange", [WIND, PEDESTRIANS]), { entity: ENTITY, title: "Varoitukset", height: 300 });
+        const root = element.shadowRoot!;
+        expect(root.querySelector("ha-card")!.classList.contains("held")).toBe(true);
+        expect(root.querySelector(".card-title")!.getAttribute("title")).toBe("Varoitukset");
+        expect([...root.querySelectorAll(".name")].map((name) => name.getAttribute("title"))).toEqual([WIND.event, PEDESTRIANS.event]);
+        const free = await card(hass("orange", [WIND]), { entity: ENTITY });
+        expect(free.shadowRoot!.querySelector("ha-card")!.classList.contains("held")).toBe(false);
+    });
+
+    it("follows a row's slide with its height, from the tap to the slide's end", async () => {
+        const element = await card(hass("orange", [WIND]), { entity: ENTITY });
+        const haCard = () => element.shadowRoot!.querySelector("ha-card")!;
+        element.shadowRoot!.querySelector<HTMLButtonElement>(".summary")!.click();
+        await element.updateComplete;
+        expect(haCard().classList.contains("sliding")).toBe(true);
+        element.shadowRoot!.querySelector(".expander")!.dispatchEvent(transitionEnd());
+        await element.updateComplete;
+        expect(haCard().classList.contains("sliding")).toBe(false);
+    });
+
+    it.each<[string, (element: FmiWarningsCard) => Promise<void>, boolean]>([
+        [
+            "the end of another property's transition",
+            async (element) => {
+                const event = new Event("transitionend") as TransitionEvent;
+                Object.defineProperty(event, "propertyName", { value: "opacity" });
+                element.shadowRoot!.querySelector(".expander")!.dispatchEvent(event);
+            },
+            true,
+        ],
+        [
+            "the end of a transition inside the details, bubbling up",
+            async (element) => {
+                const event = new Event("transitionend", { bubbles: true }) as TransitionEvent;
+                Object.defineProperty(event, "propertyName", { value: "grid-template-rows" });
+                element.shadowRoot!.querySelector(".details")!.dispatchEvent(event);
+            },
+            true,
+        ],
+        [
+            "the end of its slide while another row still slides",
+            async (element) => {
+                const other = element.shadowRoot!.querySelectorAll<HTMLElement>(".expander")[1]!;
+                other.getAnimations = () => [{}] as Animation[];
+                element.shadowRoot!.querySelector(".expander")!.dispatchEvent(transitionEnd());
+            },
+            true,
+        ],
+        [
+            "the other row's own end once its slide was waited for",
+            async (element) => {
+                const [first, other] = element.shadowRoot!.querySelectorAll<HTMLElement>(".expander");
+                other!.getAnimations = () => [{}] as Animation[];
+                first!.dispatchEvent(transitionEnd());
+                other!.getAnimations = () => [];
+                other!.dispatchEvent(transitionEnd());
+            },
+            false,
+        ],
+        [
+            "its own end while only its own fold still reports an animation",
+            async (element) => {
+                const first = element.shadowRoot!.querySelector<HTMLElement>(".expander")!;
+                first.getAnimations = () => [{}] as Animation[];
+                first.dispatchEvent(transitionEnd());
+            },
+            false,
+        ],
+        [
+            "a second with no transition to end",
+            async () => {
+                vi.advanceTimersByTime(1000);
+            },
+            false,
+        ],
+        [
+            "a second from the first tap when a second tap restarted the slide halfway",
+            async (element) => {
+                vi.advanceTimersByTime(600);
+                element.shadowRoot!.querySelector<HTMLButtonElement>(".summary")!.click();
+                await element.updateComplete;
+                vi.advanceTimersByTime(600);
+            },
+            true,
+        ],
+        [
+            "a second from the second tap that restarted the slide halfway",
+            async (element) => {
+                vi.advanceTimersByTime(600);
+                element.shadowRoot!.querySelector<HTMLButtonElement>(".summary")!.click();
+                await element.updateComplete;
+                vi.advanceTimersByTime(1000);
+            },
+            false,
+        ],
+        [
+            "a second with no transition to end while another row still reports an animation",
+            async (element) => {
+                element.shadowRoot!.querySelectorAll<HTMLElement>(".expander")[1]!.getAnimations = () => [{}] as Animation[];
+                vi.advanceTimersByTime(1000);
+            },
+            false,
+        ],
+        [
+            "leaving the page mid-slide and coming back",
+            async (element) => {
+                element.remove();
+                document.body.append(element);
+            },
+            false,
+        ],
+    ])("after a tap keeps or lifts its slide on %s", async (_name, then, still) => {
+        // The slide's own timer too, from before the tap that starts it.
+        vi.useFakeTimers({ now: NOW, toFake: ["Date", "setInterval", "clearInterval", "setTimeout", "clearTimeout"] });
+        const element = await card(hass("orange", [WIND, PEDESTRIANS]), { entity: ENTITY });
+        element.shadowRoot!.querySelector<HTMLButtonElement>(".summary")!.click();
+        await element.updateComplete;
+        await then(element);
+        await element.updateComplete;
+        expect(element.shadowRoot!.querySelector("ha-card")!.classList.contains("sliding")).toBe(still);
+    });
+});
+
+describe("the editor's rounding", () => {
+    type Form = HTMLElement & { data: Record<string, unknown>; schema: Array<{ name: string }> };
+
+    async function editor(config: Record<string, unknown>): Promise<{ form: Form; saved: unknown[] }> {
+        const element = document.createElement("fmi-warnings-card-editor");
+        element.hass = hass("orange", [WIND]);
+        element.setConfig({ type: "custom:fmi-warnings-card", entity: ENTITY, ...config } as never);
+        document.body.append(element);
+        await element.updateComplete;
+        const saved: unknown[] = [];
+        element.addEventListener("config-changed", (event) => saved.push((event as CustomEvent<{ config: unknown }>).detail.config));
+        return { form: element.shadowRoot!.querySelector<Form>("ha-form")!, saved };
+    }
+
+    it("is offered after the height while the card fits its content, and only half rows are saved", async () => {
+        const { form, saved } = await editor({});
+        expect(form.schema.map((entry) => entry.name).slice(-2)).toEqual(["height_mode", "row_step"]);
+        expect(form.data).toMatchObject({ height_mode: "auto", row_step: "full" });
+        for (const row_step of ["half", "full"]) {
+            form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, row_step } } }));
+        }
+        expect(saved).toEqual([
+            { type: "custom:fmi-warnings-card", entity: ENTITY, row_step: "half" },
+            { type: "custom:fmi-warnings-card", entity: ENTITY },
+        ]);
+    });
+
+    it("is neither offered nor saved for a card held to a height", async () => {
+        const { form, saved } = await editor({ height: 300 });
+        expect(form.schema.map((entry) => entry.name)).not.toContain("row_step");
+        form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, row_step: "half" } } }));
+        expect(saved).toEqual([{ type: "custom:fmi-warnings-card", entity: ENTITY, height: 300 }]);
     });
 });
 
