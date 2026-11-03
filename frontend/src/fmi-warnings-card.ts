@@ -15,7 +15,7 @@ import { ScrollFade, fadeStyles } from "./fade";
 import type { HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
-import { filledHeight, validRowStep } from "./rows";
+import { fillLimit, filledHeight, filledStyle, validRowStep } from "./rows";
 import type { FmiWarningsCardConfig, Warning } from "./types";
 import { isWarningsSensor, moment, timeline, visibleWarnings, warningsSensors } from "./warnings";
 import type { Shown } from "./warnings";
@@ -368,7 +368,8 @@ export class FmiWarningsCard extends LitElement {
 
     /**
      * In a sections view whose rows are left automatic, the card takes the whole rows its content needs, or the half rows
-     * with `row_step: half`, so the cards under it stay on the rows. The room left over goes under the title, or above
+     * with `row_step: half`, so the cards under it stay on the rows, up to the limit of a card that grows up to one. The
+     * room left over goes under the title, or above
      * the content without one. A row sliding open or shut counts as it will be when the slide ends.
      */
     private fillRows(): void {
@@ -376,7 +377,8 @@ export class FmiWarningsCard extends LitElement {
         if (!card || !card.clientWidth) {
             return;
         }
-        if (this.layout !== "grid" || this.heightStyle()) {
+        const limit = fillLimit(this.config ?? {}, this.layout, this.minimumHeight());
+        if (!limit) {
             this.filled = 0;
             this.spare = 0;
             return;
@@ -406,18 +408,15 @@ export class FmiWarningsCard extends LitElement {
             const spareStyle = getComputedStyle(spare);
             content -= px(spare.classList.contains("spare") ? spareStyle.paddingBottom : spareStyle.paddingTop);
         }
-        const filled = filledHeight(Math.round(content), this.config ?? {});
+        const filled = filledHeight(Math.round(content), this.config ?? {}, limit);
         this.filled = filled;
         this.spare = Math.max(0, Math.floor(filled - content));
     }
 
-    /** The card's inline style: the height it is held to, or the rows it fills, with their spare room. */
+    /** The card's inline style: the height it is held to, or the rows it fills up to any limit, with their spare room. */
     private cardStyle(): string {
-        const held = this.heightStyle();
-        if (held || !this.filled) {
-            return held;
-        }
-        return `min-height: ${this.filled}px; --spare: ${this.spare}px`;
+        const style = filledStyle(this.config ?? {}, this.layout, this.minimumHeight(), this.filled);
+        return this.filled ? `${style}; --spare: ${this.spare}px` : style;
     }
 
     private timeZone(): string | undefined {

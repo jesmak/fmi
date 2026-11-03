@@ -314,7 +314,12 @@ describe("fmi-warnings-card", () => {
         ["a fixed height", undefined, { height_mode: "fixed", height: 240, max_height: 300 }, "height: 240px"],
         ["a maximum height", undefined, { max_height: 300 }, "max-height: 300px"],
         ["grid rows in a sections view, over its mode", "grid", { height: 240, grid_options: { rows: 6 } }, "height: 100%"],
-        ["its mode when the grid rows are automatic", "grid", { max_height: 300, grid_options: { rows: "auto" } }, "max-height: 300px"],
+        [
+            "its mode rounded down to the rows when the grid rows are automatic",
+            "grid",
+            { max_height: 300, grid_options: { rows: "auto" } },
+            "max-height: 248px",
+        ],
     ])("sizes itself by %s", async (_name, layout, extra, style) => {
         const element = await card(hass("orange", [WIND]), { entity: ENTITY, ...extra }, layout);
         expect(element.shadowRoot!.querySelector("ha-card")!.getAttribute("style") ?? "").toBe(style);
@@ -602,10 +607,12 @@ describe("the editor's rounding", () => {
         return { form: element.shadowRoot!.querySelector<Form>("ha-form")!, saved };
     }
 
-    it("is offered after the height while the card fits its content, and only half rows are saved", async () => {
+    it("is offered last while the card fits its content, the height mode being set in YAML only, and only half rows are saved", async () => {
         const { form, saved } = await editor({});
-        expect(form.schema.map((entry) => entry.name).slice(-2)).toEqual(["height_mode", "row_step"]);
-        expect(form.data).toMatchObject({ height_mode: "auto", row_step: "full" });
+        const names = form.schema.map((entry) => entry.name);
+        expect(names.at(-1)).toBe("row_step");
+        expect(names.filter((name) => name.includes("height"))).toEqual([]);
+        expect(form.data).toMatchObject({ row_step: "full" });
         for (const row_step of ["half", "full"]) {
             form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, row_step } } }));
         }
@@ -613,6 +620,13 @@ describe("the editor's rounding", () => {
             { type: "custom:fmi-warnings-card", entity: ENTITY, row_step: "half" },
             { type: "custom:fmi-warnings-card", entity: ENTITY },
         ]);
+    });
+
+    it("is offered for a card that grows up to a limit, which keeps its limit", async () => {
+        const { form, saved } = await editor({ max_height: 400 });
+        expect(form.schema.map((entry) => entry.name)).toContain("row_step");
+        form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, row_step: "half" } } }));
+        expect(saved).toEqual([{ type: "custom:fmi-warnings-card", entity: ENTITY, max_height: 400, row_step: "half" }]);
     });
 
     it("is neither offered nor saved for a card held to a height", async () => {

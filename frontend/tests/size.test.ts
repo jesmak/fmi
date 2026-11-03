@@ -147,10 +147,17 @@ describe("filling the rows of a sections view", () => {
 
     it.each([
         ["outside a sections view", {}, undefined, ""],
-        ["held up to a limit", { max_height: 500 }, "grid", "max-height: 500px"],
         ["on rows set in the layout tab", { grid_options: { rows: 5 } }, "grid", "height: 100%"],
     ])("leaves its rows alone %s", async (_name, config, layout, expected) => {
         expect(await filled(await card(config, layout), 139)).toBe(expected);
+    });
+
+    // 500 px rounded down to the rows is 440.
+    it.each([
+        ["under it, on the rows its content needs", 139, "max-height: 440px; min-height: 184px; --spare: 34px"],
+        ["over it, on the limit rounded down to the rows", 600, "max-height: 440px; min-height: 440px; --spare: 0px"],
+    ])("grows up to a limit on automatic rows %s", async (_name, end, expected) => {
+        expect(await filled(await card({ max_height: 500 }, "grid"), end)).toBe(expected);
     });
 
     it("lets go of the rows it filled once held to a height, and doesn't bring them back before it is measured again", async () => {
