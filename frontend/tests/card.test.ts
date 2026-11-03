@@ -259,44 +259,6 @@ describe("fmi-warnings-card", () => {
         expect(root.querySelectorAll(".row").length).toBe(1);
     });
 
-    // Held, the body fades and keeps min(24, a quarter of its view) clear at each end, so a row is lined up by its top once
-    // it is taller than the view less both paddings. In auto it doesn't fade, so only a row taller than the view is.
-    it.each<[string, Record<string, unknown>, number, number, number | undefined]>([
-        ["taller than its body's view, by its top, under the top fade", { max_height: 300 }, 140, 60, 205],
-        ["taller than the view between the fades, though not the body, by its top too", { max_height: 300 }, 170, 200, 196],
-        ["fitting between the fades, only just into view", { max_height: 300 }, 140, 200, undefined],
-        ["exactly as tall as the view between the fades, only just into view", { max_height: 300 }, 152, 200, undefined],
-        ["a pixel taller than the view between the fades, by its top", { max_height: 300 }, 153, 200, 196],
-        ["taller than a short body's view between its quarter-length fades, by its top", { max_height: 300 }, 40, 60, 205],
-        ["in auto, with no fades to keep clear, only just into view", {}, 170, 200, undefined],
-    ])("brings an opened row into view %s", async (_name, extra, rowHeight, bodyHeight, top) => {
-        const element = await card(hass("orange", [WIND]), { entity: ENTITY, ...extra });
-        const row = element.shadowRoot!.querySelector<HTMLElement>(".row")!;
-        const body = element.shadowRoot!.querySelector<HTMLElement>(".body")!;
-        Object.defineProperty(row, "offsetHeight", { value: rowHeight });
-        Object.defineProperty(body, "clientHeight", { value: bodyHeight });
-        // The row's top 80 px above the body's, with the body scrolled 300 px down: its top is at 220, less the fade length.
-        row.getBoundingClientRect = () => ({ top: 20 }) as DOMRect;
-        body.getBoundingClientRect = () => ({ top: 100 }) as DOMRect;
-        body.scrollTop = 300;
-        body.scrollTo = vi.fn() as never;
-        body.scrollIntoView = vi.fn();
-        row.scrollIntoView = vi.fn();
-        element.shadowRoot!.querySelector<HTMLButtonElement>(".summary")!.click();
-        await element.updateComplete;
-        expect(body.classList.contains("fades")).toBe("max_height" in extra);
-        row.querySelector(".expander")!.dispatchEvent(transitionEnd());
-        if (top === undefined) {
-            expect(body.scrollTo).not.toHaveBeenCalled();
-            expect(row.scrollIntoView).toHaveBeenCalledTimes(1);
-        } else {
-            expect(body.scrollTo).toHaveBeenCalledTimes(1);
-            expect(body.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ top }));
-            expect(body.scrollIntoView).toHaveBeenCalledTimes(1);
-            expect(row.scrollIntoView).not.toHaveBeenCalled();
-        }
-    });
-
     it("forgets an opened warning that has gone, so it doesn't come back open by itself", async () => {
         const yellow = { ...WIND, level: "yellow" as const };
         const element = await card(hass("yellow", [yellow]));
@@ -351,18 +313,24 @@ describe("fmi-warnings-card", () => {
 
     it("lets go of the body's fade when the card goes from held to auto, and fades it again when held again", async () => {
         const element = await card(hass("orange", [WIND, PEDESTRIANS]), { entity: ENTITY, height: 240 });
-        const body = element.shadowRoot!.querySelector<HTMLElement>(".body")!;
-        Object.defineProperty(body, "scrollHeight", { value: 600, configurable: true });
-        Object.defineProperty(body, "clientHeight", { value: 200, configurable: true });
-        element.requestUpdate();
-        await element.updateComplete;
-        expect([...body.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+        // Held and in auto the body is drawn in another place, so each is a body of its own, made to run past its view.
+        async function fades(): Promise<string[]> {
+            const body = element.shadowRoot!.querySelector<HTMLElement>(".body")!;
+            Object.defineProperty(body, "scrollHeight", { value: 600, configurable: true });
+            Object.defineProperty(body, "clientHeight", { value: 200, configurable: true });
+            element.requestUpdate();
+            await element.updateComplete;
+            return [...body.classList].filter((name) => name.startsWith("fade"));
+        }
+        const held = element.shadowRoot!.querySelector<HTMLElement>(".body")!;
+        expect(await fades()).toEqual(["fades", "fade-bottom"]);
         element.setConfig({ type: "custom:fmi-warnings-card", entity: ENTITY } as never);
         await element.updateComplete;
-        expect([...body.classList].filter((name) => name.startsWith("fade"))).toEqual([]);
+        expect(await fades()).toEqual([]);
+        expect([...held.classList].filter((name) => name.startsWith("fade"))).toEqual([]);
         element.setConfig({ type: "custom:fmi-warnings-card", entity: ENTITY, height: 240 } as never);
         await element.updateComplete;
-        expect([...body.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+        expect(await fades()).toEqual(["fades", "fade-bottom"]);
     });
 
     it("is held by its rows once moved into a sections view, even when another entity's change comes with it", async () => {
@@ -391,11 +359,12 @@ describe("fmi-warnings-card", () => {
         expect(element.shadowRoot!.querySelector("ha-card")!.getAttribute("style")).toBe("height: 120px");
     });
 
-    it("puts the title ahead of the body, and the timeline and the rows in it", async () => {
+    it("puts the title and the timeline's band ahead of the body when held, and only the rows in it", async () => {
         const element = await card(hass("orange", [WIND, PEDESTRIANS]), { entity: ENTITY, title: "Varoitukset", height: 200 });
         const haCard = element.shadowRoot!.querySelector("ha-card")!;
-        expect([...haCard.children].map((child) => child.classList[0])).toEqual(["card-title", "body"]);
-        expect([...haCard.querySelector(".body")!.children].map((child) => child.className)).toEqual(["timeline", "rows"]);
+        expect([...haCard.children].map((child) => child.classList[0])).toEqual(["card-title", "band", "body"]);
+        expect([...haCard.querySelector(".band")!.children].map((child) => child.className)).toEqual(["timeline"]);
+        expect([...haCard.querySelector(".body")!.children].map((child) => child.className)).toEqual(["rows"]);
         expect([...haCard.querySelector(".rows")!.children].map((child) => child.classList.contains("row"))).toEqual([true, true]);
     });
 
@@ -673,5 +642,251 @@ describe("redrawing for a new hass", () => {
         element.hass = change(element.hass!);
         await element.updateComplete;
         expect(render).toHaveBeenCalledTimes(renders);
+    });
+});
+
+describe("the warnings that have ended", () => {
+    const EVENT = "event.fmi_example_warning";
+    const DEVICE = "device-example";
+
+    beforeEach(() => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date", "setInterval", "clearInterval"] });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        document.body.innerHTML = "";
+    });
+
+    // The sensor and the event entity on the place's device, and the event entity's history as the recorder gives it.
+    function withHistory(state: HomeAssistant, rows: unknown[]): HomeAssistant {
+        return {
+            ...state,
+            states: {
+                ...state.states,
+                [EVENT]: { entity_id: EVENT, state: "2026-10-17T09:00:00.000+00:00", last_changed: "", attributes: {} },
+            },
+            entities: {
+                [ENTITY]: { entity_id: ENTITY, device_id: DEVICE, platform: "fmi_open_data", translation_key: "warning_level" },
+                [EVENT]: { entity_id: EVENT, device_id: DEVICE, platform: "fmi_open_data", translation_key: "warning" },
+            },
+            callWS: vi.fn(async () => ({ [EVENT]: rows })) as never,
+        };
+    }
+    const ENDED = {
+        s: "2026-10-16T21:00:00+03:00",
+        a: { event_type: "issued", ...PEDESTRIANS, onset: "2026-10-17T06:00:00+03:00", expires: "2026-10-17T12:00:00+03:00" },
+    };
+    const CANCELLED = {
+        s: "2026-10-18T10:00:00+03:00",
+        a: { event_type: "cancelled", ...WIND, onset: "2026-10-21T05:00:00+03:00", expires: "2026-10-21T11:00:00+03:00" },
+    };
+
+    async function settled(element: FmiWarningsCard): Promise<void> {
+        await Promise.resolve();
+        await element.updateComplete;
+    }
+
+    it("lists them under the check when nothing is in force, the cancelled one with its start", async () => {
+        const state = withHistory(hass("none", []), [ENDED, CANCELLED]);
+        const element = await card(state);
+        await settled(element);
+        const root = element.shadowRoot!;
+        expect(state.callWS).toHaveBeenCalledWith(expect.objectContaining({ type: "history/history_during_period", entity_ids: [EVENT] }));
+        expect(text(root.querySelector(".past-label"))).toBe("Päättyneet");
+        expect([...root.querySelectorAll(".past .time")].map(text)).toEqual(["peruttu, ke 5.00", "päättyi la 12.00"]);
+        expect(root.querySelector(".empty")).not.toBeNull();
+    });
+
+    it("lists them after those in force too", async () => {
+        const element = await card(withHistory(hass("orange", [WIND]), [ENDED]));
+        await settled(element);
+        const rows = [...element.shadowRoot!.querySelectorAll(".row")];
+        expect(rows.map((row) => row.closest(".rows")!.classList.contains("past"))).toEqual([false, true]);
+    });
+
+    it("isn't read at all when turned off", async () => {
+        const state = withHistory(hass("none", []), [ENDED]);
+        const element = await card(state, { entity: ENTITY, show_past: false });
+        await settled(element);
+        expect(state.callWS).not.toHaveBeenCalled();
+        expect(element.shadowRoot!.querySelector(".past-label")).toBeNull();
+    });
+
+    it("is read again only after a new event", async () => {
+        const state = withHistory(hass("none", []), [ENDED]);
+        const element = await card(state);
+        await settled(element);
+        element.hass = { ...state, states: { ...state.states, [ENTITY]: { ...state.states[ENTITY]!, state: "none" } } };
+        await settled(element);
+        expect(state.callWS).toHaveBeenCalledTimes(1);
+        element.hass = {
+            ...state,
+            states: { ...state.states, [EVENT]: { ...state.states[EVENT]!, state: "2026-10-19T10:00:00.000+00:00" } },
+        };
+        await settled(element);
+        expect(state.callWS).toHaveBeenCalledTimes(2);
+    });
+
+    // The event entity with a warning just cancelled as its state, which the history read may not have yet.
+    function withLatest(state: HomeAssistant, at: string, data: Record<string, unknown>): HomeAssistant {
+        return { ...state, states: { ...state.states, [EVENT]: { entity_id: EVENT, state: at, last_changed: "", attributes: data } } };
+    }
+
+    it("shows the latest event from the event entity itself, though the history read doesn't have it yet", async () => {
+        const element = await card(withLatest(withHistory(hass("none", []), [ENDED]), CANCELLED.s, CANCELLED.a));
+        await settled(element);
+        expect([...element.shadowRoot!.querySelectorAll(".past .time")].map(text)).toEqual(["peruttu, ke 5.00", "päättyi la 12.00"]);
+    });
+
+    it("ignores a read that comes back after a newer one has started", async () => {
+        const answers: ((value: unknown) => void)[] = [];
+        const state = {
+            ...withHistory(hass("none", []), []),
+            callWS: vi.fn(() => new Promise((resolve) => answers.push(resolve))) as never,
+        };
+        const element = await card(state);
+        element.hass = {
+            ...state,
+            states: { ...state.states, [EVENT]: { ...state.states[EVENT]!, state: "2026-10-19T10:00:00.000+00:00" } },
+        };
+        await element.updateComplete;
+        answers[1]({ [EVENT]: [] });
+        await settled(element);
+        answers[0]({ [EVENT]: [ENDED] });
+        await settled(element);
+        expect(element.shadowRoot!.querySelector(".past-label")).toBeNull();
+    });
+
+    it("shows none when the history can't be read, says so once, and tries again at the next update", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const state = {
+            ...withHistory(hass("none", []), []),
+            callWS: vi.fn(async () => Promise.reject(new Error("Unknown command"))) as never,
+        };
+        const element = await card(state);
+        await settled(element);
+        expect(element.shadowRoot!.querySelector(".past-label")).toBeNull();
+        vi.advanceTimersByTime(60_000);
+        await settled(element);
+        expect(state.callWS).toHaveBeenCalledTimes(2);
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
+    });
+
+    it("lets go of another place's warnings at once when the card moves to a place of its own", async () => {
+        const state = withHistory(hass("none", []), [ENDED]);
+        const element = await card(state);
+        await settled(element);
+        expect(element.shadowRoot!.querySelectorAll(".past .row").length).toBe(1);
+        const OTHER = "event.fmi_other_warning";
+        const moved: HomeAssistant = {
+            ...state,
+            callWS: vi.fn(() => new Promise(() => undefined)) as never,
+            states: {
+                ...state.states,
+                [OTHER]: { entity_id: OTHER, state: "2026-10-18T09:00:00.000+00:00", last_changed: "", attributes: {} },
+            },
+            entities: {
+                ...state.entities,
+                [ENTITY]: { entity_id: ENTITY, device_id: "device-other", platform: "fmi_open_data", translation_key: "warning_level" },
+                [OTHER]: { entity_id: OTHER, device_id: "device-other", platform: "fmi_open_data", translation_key: "warning" },
+            },
+        };
+        element.hass = moved;
+        await element.updateComplete;
+        expect(element.shadowRoot!.querySelector(".past-label")).toBeNull();
+    });
+
+    it("opens one over a held card, saying when it was cancelled, with the rows under it out of reach", async () => {
+        const element = await card(withHistory(hass("orange", [WIND]), [CANCELLED]), { entity: ENTITY, height: 248 });
+        await settled(element);
+        const root = element.shadowRoot!;
+        root.querySelector<HTMLButtonElement>(".past .summary")!.click();
+        await element.updateComplete;
+        expect(text(root.querySelector(".overlay .time"))).toBe("peruttu, ke 5.00");
+        expect(root.querySelector(".body")!.hasAttribute("inert")).toBe(true);
+    });
+
+    it("redraws for a new event, and not for another entity's change", async () => {
+        const state = withHistory(hass("none", []), []);
+        const element = await card(state);
+        await settled(element);
+        const render = vi.spyOn(element as unknown as { render(): unknown }, "render");
+        element.hass = { ...state, states: { ...state.states, "sensor.other": { ...state.states["sensor.other"]!, state: "2" } } };
+        await element.updateComplete;
+        expect(render).toHaveBeenCalledTimes(0);
+        element.hass = withLatest(state, CANCELLED.s, CANCELLED.a);
+        await element.updateComplete;
+        expect(render).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("a held card", () => {
+    beforeEach(() => {
+        vi.useFakeTimers({ now: NOW, toFake: ["Date", "setInterval", "clearInterval"] });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        document.body.innerHTML = "";
+    });
+
+    it("opens a warning over itself, and gives the focus back to its row when Escape closes it", async () => {
+        const element = await card(hass("orange", [WIND, PEDESTRIANS]), { entity: ENTITY, height: 248 });
+        const root = element.shadowRoot!;
+        expect(root.querySelector(".expander")).toBeNull();
+        root.querySelectorAll<HTMLButtonElement>(".summary")[1].click();
+        await element.updateComplete;
+        const overlay = root.querySelector<HTMLElement>(".overlay")!;
+        expect(overlay.getAttribute("role")).toBe("dialog");
+        expect(text(overlay.querySelector(".overlay-title"))).toBe("Jalankulkusäävaroitus ti 6.00 – ti 12.00");
+        expect(text(overlay.querySelector(".details"))).toContain("Jalkakäytävät ovat paikoin erittäin liukkaita.");
+        expect(root.activeElement).toBe(overlay.querySelector(".close"));
+        overlay.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+        await element.updateComplete;
+        await element.updateComplete;
+        expect(root.querySelector(".overlay")).toBeNull();
+        expect(root.activeElement).toBe(root.querySelectorAll(".summary")[1]);
+    });
+
+    it("closes a warning open over it when the warning goes, the rows back in reach", async () => {
+        const element = await card(hass("orange", [WIND, PEDESTRIANS]), { entity: ENTITY, height: 248 });
+        const root = element.shadowRoot!;
+        root.querySelectorAll<HTMLButtonElement>(".summary")[1].click();
+        await element.updateComplete;
+        element.hass = hass("orange", [WIND]);
+        await element.updateComplete;
+        expect(root.querySelector(".overlay")).toBeNull();
+        expect(root.querySelector(".body")!.hasAttribute("inert")).toBe(false);
+    });
+
+    it("opens a warning over itself from its bar too, and closes it from its button", async () => {
+        const element = await card(hass("orange", [WIND, PEDESTRIANS]), { entity: ENTITY, height: 248 });
+        const root = element.shadowRoot!;
+        root.querySelectorAll<HTMLElement>(".bar")[0].click();
+        await element.updateComplete;
+        expect(text(root.querySelector(".overlay .name"))).toBe("Tuulivaroitus maa-alueille");
+        root.querySelector<HTMLButtonElement>(".overlay .close")!.click();
+        await element.updateComplete;
+        expect(root.querySelector(".overlay")).toBeNull();
+    });
+
+    it.each([
+        ["one lane, as in auto", [WIND], ""],
+        ["two lanes, sharing one's step", [WIND, { ...PEDESTRIANS, onset: "2026-10-19T18:00:00+03:00" }], "packed"],
+        [
+            "three lanes, thin",
+            [
+                WIND,
+                { ...PEDESTRIANS, onset: "2026-10-19T18:00:00+03:00" },
+                { ...PEDESTRIANS, id: "3", type: "rain", onset: "2026-10-19T19:00:00+03:00" },
+            ],
+            "packed thin",
+        ],
+    ])("marks the band's lanes packed or thin by their count, with %s", async (_name, warnings, packed) => {
+        const element = await card(hass("orange", warnings), { entity: ENTITY, height: 248 });
+        const lanes = element.shadowRoot!.querySelector(".band .lanes")!;
+        expect([...lanes.classList].filter((name) => name !== "lanes").join(" ")).toBe(packed);
     });
 });

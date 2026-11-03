@@ -1,4 +1,7 @@
-/** The card's visual editor: the warnings sensor, the title, the timeline and the height's rounding. The height mode is set in YAML only. */
+/**
+ * The card's visual editor: the warnings sensor, the title, the timeline, the warnings that have ended and the height's
+ * rounding. The height mode is set in YAML only.
+ */
 import { LitElement, html, nothing } from "lit";
 import type { TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
@@ -15,6 +18,7 @@ interface SchemaEntry {
 
 const DEFAULTS: Record<string, unknown> = {
     show_timeline: true,
+    show_past: true,
 };
 
 function schema(hass: HomeAssistant, config: FmiWarningsCardConfig, text: (key: string) => string) {
@@ -22,6 +26,7 @@ function schema(hass: HomeAssistant, config: FmiWarningsCardConfig, text: (key: 
         { name: "entity", required: true, selector: { entity: { include_entities: warningsSensors(hass) } } },
         { name: "title", selector: { text: {} } },
         { name: "show_timeline", selector: { boolean: {} } },
+        { name: "show_past", selector: { boolean: {} } },
         ...rowStepSchema(config, text),
     ];
 }

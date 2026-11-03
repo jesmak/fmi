@@ -282,7 +282,8 @@ panel view, or a stack or other card the card is inside, even in a sections view
 | `entity`        | string  | A place's [warning level](#warning-level) sensor                                                                                                                                                                                                                                                                           | required                                                                        |
 | `title`         | string  | A title above the warnings                                                                                                                                                                                                                                                                                                 |                                                                                 |
 | `show_timeline` | boolean | The timeline of today and the next two days above the rows                                                                                                                                                                                                                                                                 | `true`                                                                          |
-| `height_mode`   | string  | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the timeline and the warnings scroll. A height in grid rows, set in the layout tab of a sections view, is used instead                                                            | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
+| `show_past`     | boolean | The last three warnings that have [ended or were cancelled](#warnings-that-have-ended) in 30 days, under the rows                                                                                                                                                                                                          | `true`                                                                          |
+| `height_mode`   | string  | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the warnings scroll under the timeline. A height in grid rows, set in the layout tab of a sections view, is used instead                                                          | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
 | `height`        | number  | The card's height in pixels, for `fixed`                                                                                                                                                                                                                                                                                   |                                                                                 |
 | `max_height`    | number  | The card's greatest height in pixels, for `max`                                                                                                                                                                                                                                                                            |                                                                                 |
 | `row_step`      | string  | How the card rounds its height on automatic rows in a sections view, with `height_mode` `auto` or `max`. `full` rounds it up to whole rows, so the cards under it stay on the rows. `half` rounds it up to half rows, which saves space but can leave the cards under it half a row off the rows of the sections beside it | `full`                                                                          |
@@ -294,7 +295,8 @@ when it is in force. The rows go by when each warning starts, the more severe fi
 force come first and say they started `now`. Those coming up follow, slightly dimmed, with the weekday and time they
 start and end. A time a week or more away shows its date instead of its weekday. A warning that ends is dropped within a
 minute, without waiting for the sensor's next update. Tapping a row opens it to show the warning's level and details,
-and the chevron at its end turns. One row is open at a time, and an opened row is scrolled into view.
+and the chevron at its end turns. One row is open at a time, and an opened row is scrolled into view. On a card held to a
+height, the warning opens over the card under its title instead, and closes from its close button or with Escape.
 
 The names and texts are in the language the integration was set up in. The card's own texts, such as `now` and the
 weekdays, follow Home Assistant's language, and the times follow the 12- or 24-hour clock chosen in your profile.
@@ -325,6 +327,15 @@ Most days there are none, and the card says so:
 To hide the card instead, use the card's visibility settings in Home Assistant (see
 [the example](#the-warnings-on-a-dashboard)).
 
+### Warnings that have ended
+
+Under the rows, dimmed and under a heading of their own, the card shows the last three warnings that have ended or were
+cancelled in the last 30 days, with when each ended or, for one that was cancelled, when it would have started. They
+open like the other rows. They come from the history of the place's [warning event](#warning-events) entity, which the
+card finds on the same device as the sensor, so the event entity must be enabled and kept by the recorder, and they
+reach only as far back as the recorder keeps its history. A warning FMI updated several times is shown once, as its last
+version. They can be left out with `show_past: false`.
+
 ### Sizes
 
 The card fills a section by default and can be made as narrow as three quarters of one. On automatic rows in a sections
@@ -338,14 +349,15 @@ its name whenever the two don't fit side by side, and a name too long for its li
 <img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-narrow-dark.png#gh-dark-mode-only" width="250" alt="The three weather warnings on a narrow card, the timeline's bars with icons only, each row's name cut short and its time under it">
 </p>
 
-When the card is held to a height, by `height_mode` or by a fixed number of rows in a sections view, the title stays in
-place and the timeline scrolls with the warnings, as its lanes grow with them. The title keeps to one line, cut short
-with its whole text as a tooltip. It never gets lower than the title, a timeline of one lane and a
-warning's first line need, with the rest of a warning that takes more lines scrolling:
+When the card is held to a height, by `height_mode` or by a fixed number of rows in a sections view, the title and the
+timeline stay in place and only the warnings scroll. The timeline keeps the height of one lane, so overlapping warnings
+share it: two lanes are thinner bars with an icon, more are thin bars without one. The title keeps to one line, cut
+short with its whole text as a tooltip. The card never gets lower than the title, the timeline and a warning's first
+line need, with the rest of a warning that takes more lines scrolling:
 
 <p>
-<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-light.png#gh-light-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the last row fading out at the bottom, where the timeline and the warnings scroll">
-<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-dark.png#gh-dark-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the last row fading out at the bottom, where the timeline and the warnings scroll">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-light.png#gh-light-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the timeline in place above them and the last row fading out at the bottom, where the warnings scroll">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warnings-max-height-dark.png#gh-dark-mode-only" width="510" alt="The three weather warnings on a card held to a lower height, the timeline in place above them and the last row fading out at the bottom, where the warnings scroll">
 </p>
 
 ### Colours

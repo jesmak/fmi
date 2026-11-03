@@ -12,7 +12,12 @@
         "now": "nyt",
         "period": "{start} – {end}",
         "from": "{start} alkaen",
-        "probability": "Todennäköisyys {value} %"
+        "probability": "Todennäköisyys {value} %",
+        "past": "Päättyneet",
+        "ended": "päättyi {time}",
+        "cancelled": "peruttu, {time}",
+        "cancelled_untimed": "peruttu",
+        "close": "Sulje"
     },
     "levels": {
         "yellow": "Keltainen varoitus",
@@ -41,6 +46,8 @@
         "title": "Otsikko",
         "show_timeline": "Näytä aikajana",
         "show_timeline_helper": "Tämä päivä ja kaksi seuraavaa, palkki kullekin varoitukselle",
+        "show_past": "Näytä päättyneet",
+        "show_past_helper": "Kolme viimeisintä päättynyttä tai peruttua varoitusta 30 päivän ajalta",
         "row_step": "Pyöristys osioihin jaetussa näkymässä",
         "row_step_helper": "Automaattisella rivikorkeudella kortin korkeus pyöristetään ylöspäin kokonaisiin riveihin, tai tilan säästämiseksi puolikkaisiin riveihin.",
         "row_step_full": "Kokonaisiin riveihin",

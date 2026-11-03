@@ -9,6 +9,10 @@ export const TICK_MS = 60_000;
 /** The timeline shows today and the two days after it. */
 export const TIMELINE_DAYS = 3;
 
+/** The warnings that have ended or were cancelled: the last few of the days the event entity's history is read for. */
+export const PAST_COUNT = 3;
+export const PAST_DAYS = 30;
+
 /** The levels in rising order, as the fmi integration writes them. */
 export const LEVELS = ["yellow", "orange", "red"] as const;
 

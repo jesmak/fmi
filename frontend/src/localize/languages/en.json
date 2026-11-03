@@ -12,7 +12,12 @@
         "now": "now",
         "period": "{start} – {end}",
         "from": "from {start}",
-        "probability": "Probability {value}%"
+        "probability": "Probability {value}%",
+        "past": "Ended",
+        "ended": "ended {time}",
+        "cancelled": "cancelled, {time}",
+        "cancelled_untimed": "cancelled",
+        "close": "Close"
     },
     "levels": {
         "yellow": "Yellow warning",
@@ -41,6 +46,8 @@
         "title": "Title",
         "show_timeline": "Show the timeline",
         "show_timeline_helper": "Today and the next two days, a bar for each warning",
+        "show_past": "Show ended warnings",
+        "show_past_helper": "The last three warnings that ended or were cancelled in 30 days",
         "row_step": "Rounding in a sections view",
         "row_step_helper": "With automatic row height, the card's height is rounded up to whole rows, or to half rows to save space.",
         "row_step_full": "Whole rows",

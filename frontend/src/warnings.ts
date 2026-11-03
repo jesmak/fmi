@@ -30,6 +30,21 @@ export function isWarningsSensor(entity: HassEntity | undefined): entity is Hass
     return Array.isArray(entity?.attributes?.warnings) && Array.isArray(entity?.attributes?.warning_types);
 }
 
+/** The event entity of the sensor's place, on the same device: the one that fires each warning issued, updated or cancelled. */
+export function eventEntity(hass: HomeAssistant, sensor: string): string | undefined {
+    const device = hass.entities?.[sensor]?.device_id;
+    if (!device) {
+        return undefined;
+    }
+    return Object.values(hass.entities ?? {}).find(
+        (entry) =>
+            entry?.device_id === device &&
+            entry.platform === "fmi_open_data" &&
+            entry.translation_key === "warning" &&
+            entry.entity_id.startsWith("event."),
+    )?.entity_id;
+}
+
 /** The warning level sensors, for the card picker and the editor. */
 export function warningsSensors(hass: HomeAssistant): string[] {
     return Object.keys(hass.states)
@@ -79,13 +94,70 @@ export function moment(time: string, now: number, language: string, timeZone?: s
     const [then, today] = [clock(at, timeZone), clock(now, timeZone)];
     const days = (Date.UTC(then.year, then.month - 1, then.day) - Date.UTC(today.year, today.month - 1, today.day)) / DAY_MS;
     const day = new Intl.DateTimeFormat(language, {
-        ...(days < 7 ? { weekday: "short" } : { day: "numeric", month: "numeric" }),
+        ...(Math.abs(days) < 7 ? { weekday: "short" } : { day: "numeric", month: "numeric" }),
         timeZone,
     }).format(at);
     // hourCycle rather than hour12: false, which some engines turn into a clock that reads 24.00 at midnight.
     const cycle = hour12 === undefined ? {} : hour12 ? { hour12: true } : { hourCycle: "h23" as const };
     const hours = new Intl.DateTimeFormat(language, { hour: "numeric", minute: "2-digit", ...cycle, timeZone }).format(at);
     return `${day} ${hours}`;
+}
+
+/** A warning that has ended or was cancelled, as its last version in the event entity's history. */
+export interface Past {
+    warning: Warning;
+    cancelled: boolean;
+}
+
+/** A row of `history/history_during_period`: the event entity's state, the moment of an event, and its attributes. */
+export interface HistoryRow {
+    s: string;
+    a?: Record<string, unknown>;
+}
+
+/**
+ * The warnings that have ended or were cancelled, newest first, from the history of the place's event entity, which
+ * fires each warning issued, updated or cancelled with the whole warning as its data.
+ *
+ * A warning's versions are told apart from other warnings by their type, level and areas and by overlapping in time, as
+ * FMI changes a warning's id with every reissue and moves its start to the moment of an update made while it is in
+ * force. The history repeats an event whenever the entity's state is written again, and has rows without one from
+ * restarts, which both drop out.
+ */
+export function pastWarnings(rows: HistoryRow[], now: number, count: number): Past[] {
+    const events = rows
+        .map((row) => ({ at: Date.parse(row.s), type: row.a?.event_type, warning: row.a }))
+        .filter((event): event is { at: number; type: string; warning: Warning & Record<string, unknown> } => {
+            return !Number.isNaN(event.at) && typeof event.type === "string" && isWarning(event.warning);
+        })
+        .sort((a, b) => a.at - b.at);
+    const versions: { identity: string; past: Past }[] = [];
+    for (const event of events) {
+        const identity = `${event.warning.type}|${event.warning.level}|${areas(event.warning).join(",")}`;
+        const past = { warning: event.warning, cancelled: event.type === "cancelled" };
+        const earlier = versions.find((version) => version.identity === identity && overlaps(version.past.warning, event.warning));
+        if (earlier) {
+            earlier.past = past;
+        } else {
+            versions.push({ identity, past });
+        }
+    }
+    return versions
+        .map((version) => version.past)
+        .filter(({ warning, cancelled }) => cancelled || (warning.expires !== null && Date.parse(warning.expires) <= now))
+        .sort((a, b) => onset(b.warning) - onset(a.warning))
+        .slice(0, count);
+}
+
+/** Sorted, as FMI may list a warning's areas in either order. */
+function areas(warning: Warning): string[] {
+    return Array.isArray(warning.areas) ? [...warning.areas].sort() : [];
+}
+
+/** Whether two warnings' times overlap or meet, a missing start or end reaching as far as it can. */
+function overlaps(a: Warning, b: Warning): boolean {
+    const end = (warning: Warning) => (warning.expires === null ? Infinity : Date.parse(warning.expires));
+    return onset(a) <= end(b) && onset(b) <= end(a);
 }
 
 /** Today and the days after it, with a bar for each warning, cut to the timeline's ends. */

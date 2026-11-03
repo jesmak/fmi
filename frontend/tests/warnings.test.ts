@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Warning } from "../src/types";
-import { moment, startOfDay, timeline, visibleWarnings } from "../src/warnings";
+import { moment, pastWarnings, startOfDay, timeline, visibleWarnings } from "../src/warnings";
 
 const ZONE = "Europe/Helsinki";
 // Monday 19 October 2026, 14.00 in Finland.
@@ -72,6 +72,70 @@ describe("visibleWarnings", () => {
     });
 });
 
+describe("pastWarnings", () => {
+    // A row of the event entity's history: the moment of an event and the warning it fired, as the recorder keeps it.
+    function row(at: string, type: string, extra: Partial<Warning>) {
+        return { s: at, a: { event_type: type, event_types: ["issued", "updated", "cancelled"], ...warning("x", extra) } };
+    }
+    const TRAFFIC = { type: "trafficWeather", event: "Liikennesää", areas: ["Esimerkkimaa"] };
+
+    it("shows one warning updated while in force, though FMI moved its start, as its last version", () => {
+        const rows = [
+            row("2026-10-14T08:58:00+03:00", "issued", {
+                ...TRAFFIC,
+                onset: "2026-10-15T03:00:00+03:00",
+                expires: "2026-10-15T10:00:00+03:00",
+            }),
+            row("2026-10-15T05:08:00+03:00", "updated", {
+                ...TRAFFIC,
+                onset: "2026-10-15T05:06:00+03:00",
+                expires: "2026-10-15T09:00:00+03:00",
+            }),
+            // Written again with its state, and a restart's row with no event.
+            row("2026-10-15T05:08:00+03:00", "updated", {
+                ...TRAFFIC,
+                onset: "2026-10-15T05:06:00+03:00",
+                expires: "2026-10-15T09:00:00+03:00",
+            }),
+            { s: "unavailable" },
+            row("2026-10-15T08:38:00+03:00", "updated", {
+                ...TRAFFIC,
+                onset: "2026-10-15T08:37:00+03:00",
+                expires: "2026-10-15T09:00:00+03:00",
+            }),
+        ];
+        const past = pastWarnings(rows, NOW, 3);
+        expect(past.map(({ warning, cancelled }) => [warning.onset, warning.expires, cancelled])).toEqual([
+            ["2026-10-15T08:37:00+03:00", "2026-10-15T09:00:00+03:00", false],
+        ]);
+    });
+
+    it("tells apart the same kind of warning on days that don't overlap, the newest first, and keeps to the count", () => {
+        const days = ["2026-10-12", "2026-10-15", "2026-10-16", "2026-10-17"].map((day) =>
+            row(`${day}T00:00:00+03:00`, "issued", { ...TRAFFIC, onset: `${day}T03:00:00+03:00`, expires: `${day}T09:00:00+03:00` }),
+        );
+        expect(pastWarnings(days, NOW, 3).map(({ warning }) => warning.onset?.slice(0, 10))).toEqual([
+            "2026-10-17",
+            "2026-10-16",
+            "2026-10-15",
+        ]);
+    });
+
+    it("shows a cancelled warning as cancelled, even one that would still be coming up", () => {
+        const wind = { onset: "2026-10-21T05:00:00+03:00", expires: "2026-10-22T11:00:00+03:00" };
+        const rows = [row("2026-10-18T10:00:00+03:00", "issued", wind), row("2026-10-19T11:32:00+03:00", "cancelled", wind)];
+        expect(pastWarnings(rows, NOW, 3).map(({ cancelled }) => cancelled)).toEqual([true]);
+    });
+
+    it("leaves out a warning still in force or coming up, and one with no end", () => {
+        const rows = [
+            row("2026-10-19T08:00:00+03:00", "issued", {}),
+            row("2026-10-19T08:00:00+03:00", "issued", { type: "rain", onset: null, expires: null }),
+        ];
+        expect(pastWarnings(rows, NOW, 3)).toEqual([]);
+    });
+});
+
 describe("moment", () => {
     it("gives the weekday and the time", () => {
         expect(moment("2026-10-20T03:00:00+03:00", NOW, "fi", ZONE)).toBe("ti 3.00");
@@ -90,6 +154,11 @@ describe("moment", () => {
         expect(moment("2026-10-26T12:00:00+02:00", NOW, "fi", ZONE)).toBe("26.10. 12.00");
         // Six days away, across the end of daylight saving time, is still a weekday.
         expect(moment("2026-10-25T12:00:00+02:00", NOW, "fi", ZONE)).toBe("su 12.00");
+    });
+
+    it("gives the date for a week or more ago too, as a warning that has ended may be", () => {
+        expect(moment("2026-10-13T09:00:00+03:00", NOW, "fi", ZONE)).toBe("ti 9.00");
+        expect(moment("2026-10-12T09:00:00+03:00", NOW, "fi", ZONE)).toBe("12.10. 9.00");
     });
 
     it("follows the time zone it is given", () => {

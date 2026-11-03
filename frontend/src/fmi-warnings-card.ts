@@ -9,7 +9,7 @@ import type { CSSResultGroup, PropertyValues, TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 
-import { CARD_VERSION, FALLBACK_ICON, LEVEL_COLORS, TICK_MS, TYPE_ICONS } from "./const";
+import { CARD_VERSION, FALLBACK_ICON, LEVEL_COLORS, PAST_COUNT, PAST_DAYS, TICK_MS, TYPE_ICONS } from "./const";
 import "./editor";
 import { ScrollFade, fadeStyles } from "./fade";
 import type { HomeAssistant } from "./hass";
@@ -17,8 +17,8 @@ import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height"
 import { browserLanguage, translate } from "./localize/localize";
 import { fillLimit, filledHeight, filledStyle, validRowStep } from "./rows";
 import type { FmiWarningsCardConfig, Warning } from "./types";
-import { isWarningsSensor, moment, timeline, visibleWarnings, warningsSensors } from "./warnings";
-import type { Shown } from "./warnings";
+import { eventEntity, isWarningsSensor, moment, pastWarnings, timeline, visibleWarnings, warningsSensors } from "./warnings";
+import type { HistoryRow, Past, Shown } from "./warnings";
 
 /** The card's padding and border, top and bottom, so that its parts, each on the half-row step of 32 px, end on the rows. */
 const PADDING = 24;
@@ -31,8 +31,23 @@ export class FmiWarningsCard extends LitElement {
     @state() private opened?: string;
     /** The row just opened by a tap, to be brought into view once it has opened, and only then. */
     private revealing?: string;
-    /** The warnings to draw and their rows' keys, worked out once per update. */
-    private list: { now: number; shown: Shown[]; keys: Map<Warning, string> } = { now: 0, shown: [], keys: new Map() };
+    /** The warnings to draw and their rows' keys, those that have ended with theirs, worked out once per update. */
+    private list: { now: number; shown: Shown[]; keys: Map<Warning, string>; past: Past[]; pastKeys: Map<Warning, string> } = {
+        now: 0,
+        shown: [],
+        keys: new Map(),
+        past: [],
+        pastKeys: new Map(),
+    };
+    /** The place's event entity's history, which the warnings that have ended are worked out from as time goes on. */
+    @state() private history: HistoryRow[] = [];
+    /** The event entity and its state the history was last read for, so it is read again only after a new event. */
+    private historyRead?: string;
+    /** The event entity the history is of. */
+    private historyEvent?: string;
+    private historyFailed = false;
+    /** Set when a tap opens a warning over a held card, so the overlay's close button takes the focus once drawn. */
+    private focusOverlay = false;
     /** Counts the minutes, so the card redraws for the time even when its sensor hasn't changed. */
     @state() private tick = 0;
     private ticker?: ReturnType<typeof setInterval>;
@@ -78,7 +93,8 @@ export class FmiWarningsCard extends LitElement {
         const now = Date.now();
         const shown = visibleWarnings(this.hass?.states[this.config?.entity ?? ""]?.attributes.warnings, now);
         const drawn = this.config?.show_timeline !== false && timeline(shown, now, this.language(), this.timeZone()).bars.length > 0;
-        const size = (this.config?.title ? 1 : 0) + (drawn ? 2 : 0) + Math.max(1, shown.length);
+        const past = this.list.past.length;
+        const size = (this.config?.title ? 1 : 0) + (drawn ? 2 : 0) + Math.max(1, shown.length) + (past ? past + 1 : 0);
         return heightCardSize(this.config ?? {}, size, this.minimumHeight());
     }
 
@@ -102,6 +118,8 @@ export class FmiWarningsCard extends LitElement {
         clearInterval(this.ticker);
         clearTimeout(this.slideTimer);
         this.sliding = false;
+        // Read again when back on the page, as events may have come meanwhile.
+        this.historyRead = undefined;
         this.resizes?.disconnect();
         cancelAnimationFrame(this.frame ?? 0);
     }
@@ -117,18 +135,22 @@ export class FmiWarningsCard extends LitElement {
             changed.has("filled") ||
             changed.has("spare") ||
             changed.has("sliding") ||
+            changed.has("history") ||
             !this.config ||
             !changed.has("hass") ||
             !previous
         ) {
             return true;
         }
-        // Home Assistant hands the card every state change in the house; only its own sensor, the language and the locale
-        // (the time format and time zone with it) matter.
+        // Home Assistant hands the card every state change in the house; only its own sensor and event entity, the
+        // registry that finds the latter, the language and the locale (the time format and time zone with it) matter.
+        const event = this.hass ? eventEntity(this.hass, this.config.entity) : undefined;
         return (
             previous.locale !== this.hass?.locale ||
             previous.language !== this.hass?.language ||
-            previous.states[this.config.entity] !== this.hass?.states[this.config.entity]
+            previous.entities !== this.hass?.entities ||
+            previous.states[this.config.entity] !== this.hass?.states[this.config.entity] ||
+            (event !== undefined && previous.states[event] !== this.hass?.states[event])
         );
     }
 
@@ -138,10 +160,68 @@ export class FmiWarningsCard extends LitElement {
         const now = Date.now();
         const shown = isWarningsSensor(entity) ? visibleWarnings(entity.attributes.warnings, now) : [];
         const keys = rowKeys(shown);
-        if (this.opened !== undefined && ![...keys.values()].includes(this.opened)) {
+        const event = this.readHistory();
+        // The event entity's state is its latest event, which the recorder may not have written yet when it is read.
+        const latest = event ? this.hass?.states[event] : undefined;
+        const rows = latest ? [...this.history, { s: latest.state, a: latest.attributes }] : this.history;
+        const past = event ? pastWarnings(rows, now, PAST_COUNT) : [];
+        // Prefixed, so a row that has ended never shares a key with one in force.
+        const pastKeys = new Map(
+            [...rowKeys(past.map(({ warning }) => ({ warning, active: false })))].map(([warning, key]) => [warning, `past:${key}`]),
+        );
+        if (this.opened !== undefined && ![...keys.values(), ...pastKeys.values()].includes(this.opened)) {
             this.opened = undefined;
         }
-        this.list = { now, shown, keys };
+        this.list = { now, shown, keys, past, pastKeys };
+    }
+
+    /**
+     * Reads the event entity's history of the last days when the card first has it and after each new event, and returns
+     * the event entity, none when the warnings that have ended are turned off or it isn't found. Another place's history
+     * is let go at once. A history that can't be read, such as with the recorder left out, shows none, and is tried again
+     * at the card's next update.
+     */
+    private readHistory(): string | undefined {
+        const hass = this.hass;
+        const event = hass && this.config && this.config.show_past !== false ? eventEntity(hass, this.config.entity) : undefined;
+        const read = event ? `${event}|${hass?.states[event]?.state}` : undefined;
+        if (read === this.historyRead) {
+            return event;
+        }
+        if (event !== this.historyEvent) {
+            this.history = [];
+            this.historyEvent = event;
+        }
+        this.historyRead = read;
+        if (!event || !hass?.callWS) {
+            return event;
+        }
+        const now = Date.now();
+        hass.callWS<Record<string, HistoryRow[]>>({
+            type: "history/history_during_period",
+            start_time: new Date(now - PAST_DAYS * 86_400_000).toISOString(),
+            entity_ids: [event],
+            minimal_response: false,
+            no_attributes: false,
+            significant_changes_only: false,
+        }).then(
+            (result) => {
+                if (this.historyRead === read) {
+                    this.history = result[event] ?? [];
+                }
+            },
+            (error: unknown) => {
+                // Said once, as it is tried again at every update, a minute apart at the most.
+                if (!this.historyFailed) {
+                    console.warn("fmi-warnings-card: couldn't read the warnings that have ended", error);
+                    this.historyFailed = true;
+                }
+                if (this.historyRead === read) {
+                    this.historyRead = undefined;
+                }
+            },
+        );
+        return event;
     }
 
     protected render(): TemplateResult | typeof nothing {
@@ -149,11 +229,12 @@ export class FmiWarningsCard extends LitElement {
             return nothing;
         }
         const title = this.config.title;
-        const classes = [this.heightStyle() ? "held" : "", this.sliding ? "sliding" : ""].filter(Boolean).join(" ");
+        const held = !!this.heightStyle();
+        const classes = [held ? "held" : "", this.sliding ? "sliding" : "", title ? "titled" : ""].filter(Boolean).join(" ");
         return html`
             <ha-card class=${classes} style=${this.cardStyle()}>
                 ${title ? html`<h1 class="card-title spare" title=${title}>${title}</h1>` : nothing}
-                ${this.content(this.config.entity, title ? "" : "spare-top")}
+                ${this.content(this.config.entity, title ? "" : "spare-top", held)} ${held ? this.overlay() : nothing}
             </ha-card>
         `;
     }
@@ -164,10 +245,18 @@ export class FmiWarningsCard extends LitElement {
             this.resizes?.observe(card);
             this.measureSoon();
         }
+        if (this.focusOverlay) {
+            this.focusOverlay = false;
+            this.renderRoot.querySelector<HTMLElement>(".overlay .close")?.focus();
+        }
     }
 
-    /** `spare` is the class that takes the room a whole row leaves over, on the content when the card has no title. */
-    private content(entityId: string, spare: string): TemplateResult {
+    /**
+     * `spare` is the class that takes the room a whole row leaves over, on the content when the card has no title. Held to
+     * a height, the timeline stays in a band of its own above the rows, and only they and the warnings that have ended
+     * scroll.
+     */
+    private content(entityId: string, spare: string, held: boolean): TemplateResult {
         const entity = this.hass?.states[entityId];
         if (!entity) {
             return html`<div class="message ${spare}">${this.text("common.no_entity", { entity: entityId })}</div>`;
@@ -178,37 +267,56 @@ export class FmiWarningsCard extends LitElement {
         if (!isWarningsSensor(entity)) {
             return html`<div class="message ${spare}">${this.text("common.not_warnings", { entity: entityId })}</div>`;
         }
-        const { now, shown, keys } = this.list;
+        const { now, shown, keys, past, pastKeys } = this.list;
+        // Under an open warning, the rows are out of reach of Tab and a screen reader, as of a tap.
+        const covered = held && this.opened !== undefined;
+        // Keyed, so each warning keeps its own row as others come and go, and an open one isn't drawn into a closed one.
+        const ended = past.length
+            ? html`<div class="past-label">${this.text("common.past")}</div>
+                  <div class="rows past">
+                      ${repeat(
+                          past,
+                          ({ warning }) => pastKeys.get(warning)!,
+                          (item) => this.row({ warning: item.warning, active: false }, pastKeys.get(item.warning)!, now, held, item),
+                      )}
+                  </div>`
+            : nothing;
         if (!shown.length) {
             return html`<div class="empty ${spare}">
-                <ha-icon icon="mdi:check-circle-outline"></ha-icon><span>${this.text("common.no_warnings")}</span>
-            </div>`;
-        }
-        // Keyed, so each warning keeps its own row as others come and go, and an open one isn't drawn into a closed one.
-        return html`
-            <div class="body ${spare}">
-                ${this.config?.show_timeline === false ? nothing : this.timeline(shown, now, keys)}
-                <div class="rows">
-                    ${repeat(
-                        shown,
-                        ({ warning }) => keys.get(warning)!,
-                        (item) => this.row(item, keys.get(item.warning)!, now),
-                    )}
+                    <ha-icon icon="mdi:check-circle-outline"></ha-icon><span>${this.text("common.no_warnings")}</span>
                 </div>
-            </div>
-        `;
+                ${past.length ? html`<div class="body" ?inert=${covered}>${ended}</div>` : nothing}`;
+        }
+        const timeline = this.config?.show_timeline === false ? nothing : this.timeline(shown, now, keys, held);
+        const rows = html`<div class="rows">
+            ${repeat(
+                shown,
+                ({ warning }) => keys.get(warning)!,
+                (item) => this.row(item, keys.get(item.warning)!, now, held),
+            )}
+        </div>`;
+        if (held) {
+            return html`<div class="band ${spare}">${timeline}</div>
+                <div class="body" ?inert=${covered}>${rows}${ended}</div>`;
+        }
+        return html`<div class="body ${spare}">${timeline}${rows}${ended}</div>`;
     }
 
-    /** Today and the next two days, a bar per warning in lanes they share when they follow each other, and a line at now. */
-    private timeline(shown: Shown[], now: number, keys: Map<Warning, string>): TemplateResult | typeof nothing {
+    /**
+     * Today and the next two days, a bar per warning in lanes they share when they follow each other, and a line at now.
+     * Held, the lanes share the room of one, so the timeline is the same height whatever the warnings: two lanes are
+     * bars with an icon, more are thin bars alone.
+     */
+    private timeline(shown: Shown[], now: number, keys: Map<Warning, string>, held: boolean): TemplateResult | typeof nothing {
         const { days, now: at, bars, lanes } = timeline(shown, now, this.language(), this.timeZone());
         if (!bars.length) {
             return nothing;
         }
+        const packed = held && lanes > 1 ? `packed ${lanes > 2 ? "thin" : ""}` : "";
         return html`
             <div class="timeline" aria-hidden="true">
                 <div class="now-label" style="left:${at}%">${this.text("common.now")}</div>
-                <div class="lanes">
+                <div class="lanes ${packed}" style="--lane: ${32 / lanes}px">
                     ${days.slice(1).map(({ left }) => html`<span class="midnight" style="left:${left}%"></span>`)}
                     <span class="now" style="left:${at}%"></span>
                     ${Array.from(
@@ -236,43 +344,115 @@ export class FmiWarningsCard extends LitElement {
         `;
     }
 
-    /** A warning's row, its details under it once opened. */
-    private row({ warning, active }: Shown, key: string, now: number): TemplateResult {
+    /**
+     * A warning's row, its details under it once opened, or held to a height, over the card. `past` is the warning that has
+     * ended or was cancelled that the row is for.
+     */
+    private row({ warning, active }: Shown, key: string, now: number, held: boolean, past?: Past): TemplateResult {
         const open = this.opened === key;
         const color = LEVEL_COLORS[warning.level].background;
         const level = this.text(`levels.${warning.level}`);
         return html`
-            <div class="row ${active ? "" : "upcoming"}" data-key=${key}>
+            <div class="row ${active || past ? "" : "upcoming"}" data-key=${key}>
                 <span class="stripe" style="background:${color}"></span>
                 <div class="row-body">
-                    <button class="summary" aria-expanded="${open}" @click=${() => this.toggle(key)}>
+                    <button
+                        class="summary"
+                        aria-expanded="${held ? nothing : open}"
+                        aria-haspopup=${held ? "dialog" : nothing}
+                        @click=${() => this.toggle(key)}
+                    >
                         <ha-icon icon="${icon(warning)}" style="color:${color}"></ha-icon>
                         <span class="visually-hidden">${level}</span>
                         <span class="text">
                             <span class="name" title=${warning.event}>${warning.event}</span>
-                            <span class="time">${this.period(warning, active, now)}</span>
+                            <span class="time">${past ? this.ended(past, now) : this.period(warning, active, now)}</span>
                         </span>
-                        <ha-icon class="chevron" icon="mdi:chevron-down"></ha-icon>
+                        <ha-icon class="chevron" icon=${held ? "mdi:chevron-right" : "mdi:chevron-down"}></ha-icon>
                     </button>
-                    <div class="expander ${open ? "open" : ""}" ?inert=${!open} @transitionend=${this.opening}>
-                        <div class="clip">
-                            <div class="details">
-                                <div class="level">${level}</div>
-                                ${warning.description ? html`<div>${warning.description}</div>` : nothing}
-                                ${warning.impacts ? html`<div class="impacts">${warning.impacts}</div>` : nothing}
-                                ${
-                                    typeof warning.probability === "number"
-                                        ? html`<div class="probability">
-                                              ${this.text("common.probability", { value: String(warning.probability) })}
-                                          </div>`
-                                        : nothing
-                                }
-                            </div>
-                        </div>
-                    </div>
+                    ${
+                        held
+                            ? nothing
+                            : html`<div class="expander ${open ? "open" : ""}" ?inert=${!open} @transitionend=${this.opening}>
+                                  <div class="clip">${this.details(warning, level)}</div>
+                              </div>`
+                    }
                 </div>
             </div>
         `;
+    }
+
+    private details(warning: Warning, level: string): TemplateResult {
+        return html`<div class="details">
+            <div class="level">${level}</div>
+            ${warning.description ? html`<div>${warning.description}</div>` : nothing}
+            ${warning.impacts ? html`<div class="impacts">${warning.impacts}</div>` : nothing}
+            ${
+                typeof warning.probability === "number"
+                    ? html`<div class="probability">${this.text("common.probability", { value: String(warning.probability) })}</div>`
+                    : nothing
+            }
+        </div>`;
+    }
+
+    /** The opened warning over a held card, under its title, its details scrolling inside it when they are long. */
+    private overlay(): TemplateResult | typeof nothing {
+        const { now, shown, keys, past, pastKeys } = this.list;
+        const current = shown.find(({ warning }) => keys.get(warning) === this.opened);
+        const ended = current ? undefined : past.find(({ warning }) => pastKeys.get(warning) === this.opened);
+        const warning = current?.warning ?? ended?.warning;
+        if (!warning) {
+            return nothing;
+        }
+        const color = LEVEL_COLORS[warning.level].background;
+        const level = this.text(`levels.${warning.level}`);
+        const time = ended ? this.ended(ended, now) : this.period(warning, current!.active, now);
+        return html`
+            <div class="overlay" role="dialog" aria-label=${warning.event} tabindex="-1" @keydown=${this.overlayKey}>
+                <div class="overlay-head">
+                    <span class="stripe" style="background:${color}"></span>
+                    <ha-icon icon="${icon(warning)}" style="color:${color}"></ha-icon>
+                    <span class="overlay-title">
+                        <span class="name" title=${warning.event}>${warning.event}</span>
+                        <span class="time">${time}</span>
+                    </span>
+                    <button class="close" aria-label=${this.text("common.close")} @click=${() => this.close()}>
+                        <ha-icon icon="mdi:close"></ha-icon>
+                    </button>
+                </div>
+                <div class="overlay-body">${this.details(warning, level)}</div>
+            </div>
+        `;
+    }
+
+    private overlayKey = (event: KeyboardEvent): void => {
+        if (event.key === "Escape") {
+            event.stopPropagation();
+            this.close();
+        }
+    };
+
+    /** Closes the overlay, and gives the focus back to the row it was opened from. */
+    private close(): void {
+        const key = this.opened;
+        this.opened = undefined;
+        void this.updateComplete.then(() =>
+            [...this.renderRoot.querySelectorAll<HTMLElement>(".row")]
+                .find((row) => row.dataset.key === key)
+                ?.querySelector<HTMLElement>(".summary")
+                ?.focus(),
+        );
+    }
+
+    /** "päättyi ti 9.00" for a warning that has ended, "peruttu, ti 6.00" with its start for one that was cancelled. */
+    private ended({ warning, cancelled }: Past, now: number): string {
+        if (cancelled) {
+            const start = warning.onset ?? warning.expires;
+            return start === null
+                ? this.text("common.cancelled_untimed")
+                : this.text("common.cancelled", { time: this.moment(start, now) });
+        }
+        return this.text("common.ended", { time: this.moment(warning.expires!, now) });
     }
 
     /** "nyt – ti 3.00" for a warning in force, "ti 6.00 – ti 12.00" for one coming up, "from …" for one with no end. */
@@ -309,6 +489,12 @@ export class FmiWarningsCard extends LitElement {
     }
 
     private toggle(key: string): void {
+        // Held, a warning opens over the card, which doesn't slide or move.
+        if (this.heightStyle()) {
+            this.opened = key;
+            this.focusOverlay = true;
+            return;
+        }
         this.opened = this.opened === key ? undefined : key;
         this.revealing = this.opened;
         // Lifted when the slide ends, or after a second in case no transition comes to say so.
@@ -319,7 +505,7 @@ export class FmiWarningsCard extends LitElement {
 
     /** A bar tapped on the timeline opens its row, which is then brought into view. One already open has no opening to wait for. */
     private show(key: string): void {
-        if (this.opened !== key) {
+        if (this.opened !== key || this.heightStyle()) {
             this.toggle(key);
             return;
         }
@@ -348,9 +534,9 @@ export class FmiWarningsCard extends LitElement {
     };
 
     /**
-     * The lowest the card is held to, in pixels: its padding and border, the title when it has one, a timeline of one
-     * lane when it is shown, and the first line of a warning's row, each on the half-row step. The rest of a row that
-     * wraps scrolls with the timeline and the other rows.
+     * The lowest the card is held to, in pixels: its padding and border, the title when it has one, the timeline's band
+     * when it is shown, and the first line of a warning's row, each on the half-row step. The rest of a row that wraps
+     * scrolls with the other rows.
      */
     private minimumHeight(): number {
         const step = 32;
@@ -386,7 +572,8 @@ export class FmiWarningsCard extends LitElement {
         // From the card's top to the end of its own last part, never its own height, which is the min-height set here, and
         // never an element a theme adds to it.
         const parts = card.querySelectorAll<HTMLElement>(
-            ":scope > .card-title, :scope > .message, :scope > .empty, :scope > .body > .timeline, :scope > .body > .rows > .row",
+            ":scope > .card-title, :scope > .message, :scope > .empty, :scope > .band > .timeline, :scope > .body > .timeline, " +
+                ":scope > .body > .rows > .row, :scope > .body > .past-label",
         );
         const last = parts[parts.length - 1];
         if (!last) {
@@ -442,16 +629,17 @@ export class FmiWarningsCard extends LitElement {
 
                 /*
                  * The card is the container its layout measures, so it follows its own width, in a sections view or not.
-                 * Held to a height, fixed or at most, or by a fixed number of rows in a sections view, the title stays and the
-                 * timeline scrolls with the rows, as its lanes follow the warnings and could otherwise leave no room for a
-                 * row. The card is never lower than its title, a timeline of one lane and a row. Clipped, not hidden,
-                 * which would make the card a scroller that bringing a row into view could scroll out of place.
+                 * Held to a height, fixed or at most, or by a fixed number of rows in a sections view, the title and the
+                 * timeline's band stay and only the rows scroll, and an opened warning covers the card under its title. The
+                 * card is never lower than its title, the band and a row. Clipped, not hidden, which would make the card a
+                 * scroller that bringing a row into view could scroll out of place. Positioned, for the overlay.
                  *
                  * Its parts step in half rows of a sections view, 32 px, so that with its 24 px of padding and border the
                  * card is 32k − 8 px tall and fills whole or half rows exactly: the title, a line of a row or of a message,
                  * and the timeline's frame and each of its lanes one step each. Only an opened row's details are free.
                  */
                 ha-card {
+                    position: relative;
                     overflow: clip;
                     container-type: inline-size;
                     box-sizing: border-box;
@@ -630,6 +818,32 @@ export class FmiWarningsCard extends LitElement {
                     }
                 }
 
+                /* Held, the lanes share one lane's step: two are bars with a small icon, more are thin bars alone. */
+                .lanes.packed .lane {
+                    height: var(--lane);
+                }
+
+                .lanes.packed .bar {
+                    top: 1px;
+                    height: calc(var(--lane) - 2px);
+                    border-radius: 4px;
+                    line-height: normal;
+                }
+
+                .lanes.packed .bar .label {
+                    display: none;
+                }
+
+                .lanes.packed .bar ha-icon {
+                    --mdc-icon-size: 12px;
+                    width: 12px;
+                    height: 14px;
+                }
+
+                .lanes.packed.thin .bar ha-icon {
+                    display: none;
+                }
+
                 .days {
                     position: relative;
                     box-sizing: border-box;
@@ -739,6 +953,118 @@ export class FmiWarningsCard extends LitElement {
                     opacity: 0.75;
                 }
 
+                /* The warnings that have ended, under a label of half a row, dimmed, a line above the first of them. */
+                .past-label {
+                    box-shadow: inset 0 1px var(--divider-color);
+                    color: var(--secondary-text-color);
+                    font-size: 12px;
+                    font-weight: var(--ha-font-weight-medium, 500);
+                    line-height: 32px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.04em;
+                }
+
+                .past .stripe,
+                .past .summary > ha-icon,
+                .past .name,
+                .past .time {
+                    opacity: 0.55;
+                }
+
+                /* Under the title, or over the whole card without one, its details scrolling when they are long. */
+                /* Focusable only so a click on its text keeps the focus, and Escape, inside it: no ring of its own. */
+                .overlay {
+                    outline: none;
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    flex-direction: column;
+                    padding: 11px 0 11px 16px;
+                    background: var(--ha-card-background, var(--card-background-color, #fff));
+                    animation: overlay-in 0.15s ease-out;
+                }
+
+                ha-card.titled .overlay {
+                    top: calc(43px + var(--spare, 0px));
+                    padding-top: 0;
+                    box-shadow: inset 0 1px var(--divider-color);
+                }
+
+                @keyframes overlay-in {
+                    from {
+                        opacity: 0;
+                        transform: translateY(8px);
+                    }
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .overlay {
+                        animation: none;
+                    }
+                }
+
+                .overlay-head {
+                    flex: none;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    min-height: 48px;
+                    padding-right: 4px;
+                }
+
+                .overlay-head .stripe {
+                    align-self: stretch;
+                    margin: 10px 0;
+                }
+
+                .overlay-title {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    min-width: 0;
+                }
+
+                .overlay-title .name {
+                    font-weight: var(--ha-font-weight-medium, 500);
+                    line-height: 20px;
+                }
+
+                .overlay-title .time {
+                    line-height: 18px;
+                }
+
+                .close {
+                    flex: none;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 40px;
+                    height: 40px;
+                    padding: 0;
+                    border: none;
+                    border-radius: 50%;
+                    background: none;
+                    color: var(--primary-text-color);
+                    cursor: pointer;
+                }
+
+                .close:hover {
+                    background: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.08);
+                }
+
+                .close:focus-visible {
+                    outline: 2px solid var(--primary-color);
+                    outline-offset: -2px;
+                }
+
+                .overlay-body {
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow-y: auto;
+                    scrollbar-width: thin;
+                    padding-right: 16px;
+                }
+
                 /* The details are always there, folded to nothing and inert while the row is closed, so opening can slide. */
                 .expander {
                     display: grid;
@@ -802,23 +1128,13 @@ export class FmiWarningsCard extends LitElement {
     }
 }
 
-/** Scrolls the body or the page just enough to show a row, its top first if it is taller than the body shows between its fades. */
+/**
+ * Scrolls the page just enough to show a row opened in an auto card. A held card, whose body scrolls, opens a warning over
+ * itself instead.
+ */
 function scrollTo(row: HTMLElement | null | undefined): void {
-    if (!row) {
-        return;
-    }
     const behavior = (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false) ? "auto" : "smooth";
-    const body = row.closest<HTMLElement>(".body");
-    // A body that fades keeps its fade length clear at each end as scroll padding, as fadeStyles sets it.
-    const padding = body?.classList.contains("fades") ? Math.min(24, body.clientHeight / 4) : 0;
-    // Taller than the view between the paddings and starting above it, a row would be lined up by its bottom, its name
-    // out of sight, so it is lined up by its top instead, under the top fade.
-    if (body && row.offsetHeight > body.clientHeight - 2 * padding) {
-        body.scrollTo({ top: body.scrollTop + row.getBoundingClientRect().top - body.getBoundingClientRect().top - padding, behavior });
-        body.scrollIntoView({ block: "nearest", behavior });
-        return;
-    }
-    row.scrollIntoView({ block: "nearest", behavior });
+    row?.scrollIntoView({ block: "nearest", behavior });
 }
 
 function px(value: string): number {

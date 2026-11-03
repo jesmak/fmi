@@ -25,4 +25,6 @@ export interface FmiWarningsCardConfig extends LovelaceCardConfig, RowStepConfig
     entity: string;
     title?: string;
     show_timeline?: boolean;
+    /** The last few warnings that have ended or were cancelled, under those in force. On unless false. */
+    show_past?: boolean;
 }
