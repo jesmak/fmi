@@ -1,8 +1,9 @@
 import logging
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
@@ -185,6 +186,39 @@ class FMIWarningLevelSensor(CoordinatorEntity[FMIWarningsCoordinator], SensorEnt
         self._attr_unique_id = coordinator.unique_id
         self._attr_device_info = coordinator.config_entry.runtime_data.devices[coordinator.subentry.subentry_id]
         self._config_attributes = get_warnings_config_attributes(coordinator)
+        self._unsub_change: CALLBACK_TYPE | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(self._cancel_change)
+        self._schedule_change()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        self._schedule_change()
+        super()._handle_coordinator_update()
+
+    @callback
+    def _schedule_change(self) -> None:
+        """Write the state again when a warning comes into force or runs out, as the feed is read only every few minutes."""
+        self._cancel_change()
+        now = dt_util.utcnow()
+        warnings = self.coordinator.data.warnings.values() if self.coordinator.data else ()
+        moments = [moment for warning in warnings for moment in (warning.onset, warning.expires) if moment is not None and moment > now]
+        if moments:
+            self._unsub_change = async_track_point_in_utc_time(self.hass, self._async_change, min(moments))
+
+    @callback
+    def _async_change(self, _now) -> None:
+        self._unsub_change = None
+        self._schedule_change()
+        self.async_write_ha_state()
+
+    @callback
+    def _cancel_change(self) -> None:
+        if self._unsub_change is not None:
+            self._unsub_change()
+            self._unsub_change = None
 
     @property
     def native_value(self) -> str | None:

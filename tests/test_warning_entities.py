@@ -8,7 +8,7 @@ import pytest
 from conftest import place
 from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.fmi_open_data.const import (
     API_WARNINGS_FEED_URL,
@@ -23,8 +23,6 @@ from custom_components.fmi_open_data.const import (
     WARNING_TYPES,
 )
 from custom_components.fmi_open_data.session import FMIException
-
-pytestmark = pytest.mark.asyncio
 
 FIXTURES = Path(__file__).parent / "fixtures"
 SEVERAL_AREAS = "https://alerts.fmi.fi/cap/test/several-areas.xml"
@@ -241,6 +239,26 @@ async def test_a_warning_kept_through_an_outage_still_ends_on_time(hass: HomeAss
     assert state.state == "none"
     assert state.attributes["active_warnings"] == 0
     assert hass.states.get(EVENT).state != "unavailable"
+
+
+async def test_the_level_changes_when_a_warning_runs_out_between_reads_of_the_feed(hass: HomeAssistant, monkeypatch, freezer):
+    freezer.move_to("2026-09-16T12:00:00+03:00")
+    api = FakeApi([SEVERAL_AREAS])
+    entry = await _setup(hass, monkeypatch, api)
+    expires = datetime.fromisoformat(hass.states.get(SENSOR).attributes["warnings"][0]["expires"])
+    freezer.move_to(expires - timedelta(minutes=2))
+    await _refresh(hass, entry, freezer)
+    assert hass.states.get(SENSOR).state != "none"
+    requests = api.feed_requests
+
+    freezer.move_to(expires)
+    async_fire_time_changed(hass, expires)
+    await hass.async_block_till_done()
+
+    assert api.feed_requests == requests
+    state = hass.states.get(SENSOR)
+    assert state.state == "none"
+    assert state.attributes["active_warnings"] == 0
 
 
 async def test_an_outage_of_an_hour_makes_the_place_unavailable(hass: HomeAssistant, monkeypatch, freezer):

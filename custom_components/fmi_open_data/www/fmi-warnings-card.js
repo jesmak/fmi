@@ -1013,15 +1013,19 @@ function pastWarnings(rows, now, count) {
   const versions = [];
   for (const event of events) {
     const identity = `${event.warning.type}|${event.warning.level}|${areas(event.warning).join(",")}`;
-    const past = { warning: event.warning, cancelled: event.type === "cancelled" };
+    const cancelled = event.type === "cancelled";
+    const past = { warning: event.warning, cancelled };
+    const ended = cancelled ? event.at : event.warning.expires === null ? NaN : Date.parse(event.warning.expires);
     const earlier = versions.find((version) => version.identity === identity && overlaps(version.past.warning, event.warning));
     if (earlier) {
       earlier.past = past;
+      earlier.ended = ended;
     } else {
-      versions.push({ identity, past });
+      versions.push({ identity, past, ended });
     }
   }
-  return versions.map((version) => version.past).filter(({ warning, cancelled }) => cancelled || warning.expires !== null && Date.parse(warning.expires) <= now).sort((a3, b3) => onset(b3.warning) - onset(a3.warning)).slice(0, count);
+  const since = now - PAST_DAYS * DAY_MS;
+  return versions.filter(({ ended }) => ended <= now && ended >= since).map((version) => version.past).sort((a3, b3) => onset(b3.warning) - onset(a3.warning)).slice(0, count);
 }
 function areas(warning) {
   return Array.isArray(warning.areas) ? [...warning.areas].sort() : [];

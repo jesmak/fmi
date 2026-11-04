@@ -1,5 +1,5 @@
 /** Reading the fmi integration's warning level sensor, and the order, times and timeline the card shows for it. */
-import { LEVELS, TIMELINE_DAYS } from "./const";
+import { LEVELS, PAST_DAYS, TIMELINE_DAYS } from "./const";
 import type { HassEntity, HomeAssistant } from "./hass";
 import type { Warning } from "./types";
 
@@ -116,8 +116,8 @@ export interface HistoryRow {
 }
 
 /**
- * The warnings that have ended or were cancelled, newest first, from the history of the place's event entity, which
- * fires each warning issued, updated or cancelled with the whole warning as its data.
+ * The warnings that have ended or were cancelled in the last `PAST_DAYS` days, newest first, from the history of the
+ * place's event entity, which fires each warning issued, updated or cancelled with the whole warning as its data.
  *
  * A warning's versions are told apart from other warnings by their type, level and areas and by overlapping in time, as
  * FMI changes a warning's id with every reissue and moves its start to the moment of an update made while it is in
@@ -131,20 +131,25 @@ export function pastWarnings(rows: HistoryRow[], now: number, count: number): Pa
             return !Number.isNaN(event.at) && typeof event.type === "string" && isWarning(event.warning);
         })
         .sort((a, b) => a.at - b.at);
-    const versions: { identity: string; past: Past }[] = [];
+    const versions: { identity: string; past: Past; ended: number }[] = [];
     for (const event of events) {
         const identity = `${event.warning.type}|${event.warning.level}|${areas(event.warning).join(",")}`;
-        const past = { warning: event.warning, cancelled: event.type === "cancelled" };
+        const cancelled = event.type === "cancelled";
+        const past = { warning: event.warning, cancelled };
+        const ended = cancelled ? event.at : event.warning.expires === null ? NaN : Date.parse(event.warning.expires);
         const earlier = versions.find((version) => version.identity === identity && overlaps(version.past.warning, event.warning));
         if (earlier) {
             earlier.past = past;
+            earlier.ended = ended;
         } else {
-            versions.push({ identity, past });
+            versions.push({ identity, past, ended });
         }
     }
+    // The history starts with the state before its window, an event of any age, so the window is applied here too.
+    const since = now - PAST_DAYS * DAY_MS;
     return versions
+        .filter(({ ended }) => ended <= now && ended >= since)
         .map((version) => version.past)
-        .filter(({ warning, cancelled }) => cancelled || (warning.expires !== null && Date.parse(warning.expires) <= now))
         .sort((a, b) => onset(b.warning) - onset(a.warning))
         .slice(0, count);
 }

@@ -127,6 +127,21 @@ describe("pastWarnings", () => {
         expect(pastWarnings(rows, NOW, 3).map(({ cancelled }) => cancelled)).toEqual([true]);
     });
 
+    it("leaves out a warning that ended or was cancelled more than 30 days ago, as the history's first row can be", () => {
+        const rows = [
+            // Ended 31 days ago, and 29 days ago.
+            row("2026-09-17T00:00:00+03:00", "issued", { onset: "2026-09-18T03:00:00+03:00", expires: "2026-09-18T14:00:00+03:00" }),
+            row("2026-09-19T00:00:00+03:00", "issued", { onset: "2026-09-20T03:00:00+03:00", expires: "2026-09-20T14:00:00+03:00" }),
+            // Cancelled 31 days ago, though it would have run until 29 days ago.
+            row("2026-09-18T13:00:00+03:00", "cancelled", {
+                type: "rain",
+                onset: "2026-09-19T03:00:00+03:00",
+                expires: "2026-09-20T14:00:00+03:00",
+            }),
+        ];
+        expect(pastWarnings(rows, NOW, 3).map(({ warning }) => warning.expires)).toEqual(["2026-09-20T14:00:00+03:00"]);
+    });
+
     it("leaves out a warning still in force or coming up, and one with no end", () => {
         const rows = [
             row("2026-10-19T08:00:00+03:00", "issued", {}),
