@@ -3,7 +3,7 @@
 A Home Assistant integration for the Finnish Meteorological Institute's open data. Observations and forecasts from
 FMI's stations, a weather forecast for any place, and FMI's weather warnings.
 
-[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![HACS][hacs-shield]][hacs] [![License][license-shield]](LICENSE)
+[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![Marketplace][marketplace-shield]][marketplace] [![License][license-shield]](LICENSE)
 
 <img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-light.png#gh-light-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and a traffic warning on a timeline and the rain in Tampere, the air quality with a month of particles and the dose rate, the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights, and a low UV index under the sinking daily peaks of September">
 <img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and a traffic warning on a timeline and the rain in Tampere, the air quality with a month of particles and the dose rate, the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights, and a low UV index under the sinking daily peaks of September">
@@ -36,12 +36,13 @@ No account or API key is needed. FMI's open data service is used anonymously.
 
 ## Installation
 
-### With HACS
+### With the Marketplace
 
-1. Search for FMI Open Data in HACS and download it
-2. Restart Home Assistant
-3. Add FMI Open Data in Settings › Devices & services
-4. Refresh your browser, so that the [warnings card](#warnings-card) shows up in the card picker
+1. Open Settings › Marketplace and search for FMI Open Data
+2. Open it and choose Install
+3. Restart Home Assistant
+4. Add FMI Open Data in Settings › Devices & services
+5. Refresh your browser, so that the [warnings card](#warnings-card) shows up in the card picker
 
 ### Manual
 
@@ -458,8 +459,8 @@ response_variable: rain
 ## Upgrading from the separate warnings card
 
 The warnings card used to be a repository of its own, FMI warnings card. It now comes with the integration, and the
-separate repository has been removed. If you installed it, remove it in HACS,
-and check that its resource (`/hacsfiles/fmi-warnings-card/…`) is gone from Settings › Dashboards › Resources. Until
+separate repository has been removed. If you installed it, remove it in the Marketplace,
+and check that its resource (`/local/community/fmi-warnings-card/…`) is gone from Settings › Dashboards › Resources. Until
 it is, the log warns about it at every start. Your dashboards need no changes, as the card's type stays
 `custom:fmi-warnings-card`.
 
@@ -470,7 +471,7 @@ Version 4.0.0 is a big change, and the names of all the entities change with it.
 **The domain is now `fmi_open_data`** instead of `fmi`, which another integration also uses. After updating, add
 **FMI Open Data** once in Settings › Devices & services and choose to move the existing setup. Its sensors and
 warnings places move to the new integration, and Home Assistant then asks you to delete the old
-`custom_components/fmi` folder, which HACS leaves behind.
+`custom_components/fmi` folder, which the update leaves behind.
 
 **Sensors become stations and places.** On the first start, the sensors are merged into stations by the station
 they read, and the warnings places into places by their coordinates. Two warnings places at the same point are
@@ -571,6 +572,6 @@ MIT. The data is FMI's, under CC BY 4.0.
 [releases-shield]: https://img.shields.io/github/release/jesmak/fmi.svg?style=for-the-badge
 [release-date-shield]: https://img.shields.io/github/release-date/jesmak/fmi?style=for-the-badge
 [releases]: https://github.com/jesmak/fmi/releases
-[hacs-shield]: https://img.shields.io/badge/HACS-Default-green.svg?style=for-the-badge
-[hacs]: https://my.home-assistant.io/redirect/hacs_repository/?owner=jesmak&repository=fmi&category=integration
+[marketplace-shield]: https://img.shields.io/badge/Marketplace-Default-green.svg?style=for-the-badge
+[marketplace]: https://my.home-assistant.io/redirect/marketplace_repository/?owner=jesmak&repository=fmi&category=integration
 [license-shield]: https://img.shields.io/github/license/jesmak/fmi.svg?style=for-the-badge
