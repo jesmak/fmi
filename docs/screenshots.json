@@ -52038,7 +52038,7 @@
                 "type": "custom:fmi-warnings-card",
                 "entity": "sensor.lahti_warning_level",
                 "title": "Weather warnings",
-                "max_height": 216
+                "max_height": 200
             }
         },
         {
