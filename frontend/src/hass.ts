@@ -8,7 +8,7 @@ export interface HassEntity {
 }
 
 /** An entity's entry in the frontend's registry, which leaves out a disabled one. */
-export interface EntityRegistryEntry {
+interface EntityRegistryEntry {
     entity_id: string;
     device_id?: string | null;
     platform: string;

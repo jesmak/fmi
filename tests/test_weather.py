@@ -1,4 +1,4 @@
-"""A weather place: the forecast parser, the periods made from it, the weather entity and its subentry flow."""
+"""A weather place: the forecast parser, the periods made from it, and the weather entity."""
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -114,7 +114,9 @@ def test_conditions_by_day_and_night():
     assert condition_for(None) is None
 
 
-def test_an_unknown_symbol_leaves_the_condition_empty(caplog):
+def test_an_unknown_symbol_leaves_the_condition_empty(caplog, monkeypatch):
+    # Each unknown symbol is logged once per process, so start from none logged.
+    monkeypatch.setattr("custom_components.fmi_open_data.weather_coordinator._unknown_symbols", set())
     assert condition_for(3) is None
     assert condition_for(103) is None
     assert condition_for(3) is None

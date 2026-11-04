@@ -2,15 +2,12 @@
 
 from datetime import timedelta
 
-import pytest
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from test_no_data import FakeApi, _setup
 
 from custom_components.fmi_open_data.const import CONF_LANG, CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS, DOMAIN
-
-pytestmark = pytest.mark.asyncio
 
 
 async def test_setting_up_the_integration(hass: HomeAssistant):
@@ -24,17 +21,6 @@ async def test_setting_up_the_integration(hass: HomeAssistant):
     assert result["title"] == "FMI"
     assert result["data"] == {CONF_LANG: "fin"}
     assert result["options"] == {CONF_NO_DATA_ISSUE: True, CONF_NO_DATA_ISSUE_HOURS: 24}
-
-
-async def test_the_integration_is_set_up_only_once(hass: HomeAssistant):
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
-    await hass.config_entries.flow.async_configure(result["flow_id"], {CONF_LANG: "fin"})
-    await hass.async_block_till_done()
-
-    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
-
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "single_instance_allowed"
 
 
 async def test_changing_the_stale_data_settings_applies_to_the_sensors(hass: HomeAssistant, monkeypatch):

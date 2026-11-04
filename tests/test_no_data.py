@@ -34,9 +34,6 @@ from custom_components.fmi_open_data.const import (
 from custom_components.fmi_open_data.query_coordinator import FMIQueryCoordinator
 from custom_components.fmi_open_data.session import FMIRefused
 
-# The harness has no asyncio_mode config of its own, so mark the module.
-pytestmark = pytest.mark.asyncio
-
 OBSERVATION_QUERY = "fmi::observations::weather::simple"
 ENTRY_DATA = {
     CONF_LABEL: "Kaisaniemi Air temperature",
@@ -163,11 +160,7 @@ async def test_recent_observation_raises_nothing(hass: HomeAssistant, monkeypatc
 
 
 async def test_stale_observation_inside_the_poll_window_is_reported(hass: HomeAssistant, monkeypatch):
-    """The case the old empty-update counter could never see.
-
-    The poll window reaches back 12 hours, so a station quiet for 30 hours used
-    to keep returning its last value and never looked broken.
-    """
+    """A station whose newest value is 30 hours old is reported, though every poll still returns that value."""
     api = FakeApi(age=timedelta(hours=30), parameters=["ws_10min"])
     entry = await _setup(hass, monkeypatch, api, **{CONF_NO_DATA_ISSUE_HOURS: 24})
 

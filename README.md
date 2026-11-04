@@ -196,7 +196,7 @@ A place with warnings has a sensor for the highest warning level in force now, `
 | `active_warnings`                 | The number of warnings in force now, the first ones in `warnings`            |
 | `warnings`                        | Every warning that concerns the place, in force or coming up, earliest first |
 
-Only the level is kept in history, not the `warnings` attribute.
+The `warnings` attribute is not kept in history.
 
 Each warning, in `warnings` and in the events below, has these fields:
 
@@ -502,8 +502,8 @@ entity credits FMI in its attribution.
 - **The warnings** are FMI's [CAP warning feed](https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml), read every ten
   minutes and shared by every place. When the feed can't be read, the last warnings are kept for up to an hour before
   the place's entities become unavailable.
-- **Adding measurements** reads every station query once over Finland to see which stations report what, about 40
-  requests, kept for an hour.
+- **Adding measurements** reads every station query once over Finland to see which stations report what, a small
+  request per query, kept for an hour.
 
 ## Translating
 

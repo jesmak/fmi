@@ -44,8 +44,6 @@ from custom_components.fmi_open_data.migration import OLD_DOMAIN, OLD_FOLDER_ISS
 from custom_components.fmi_open_data.query_coordinator import build_unique_id
 from custom_components.fmi_open_data.structure import place_unique_id
 
-pytestmark = pytest.mark.asyncio
-
 KAISANIEMI = {**ENTRY_DATA, CONF_LANG: "fin", CONF_NO_DATA_ISSUE: True, CONF_NO_DATA_ISSUE_HOURS: 120}
 MANNERHEIMINTIE = {**KAISANIEMI, CONF_LABEL: "Mannerheimintie Air temperature", CONF_TARGET: "100742"}
 # Set up before the stale data settings existed.

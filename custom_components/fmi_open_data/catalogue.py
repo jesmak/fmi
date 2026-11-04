@@ -2,8 +2,8 @@
 
 The flow for adding measurements starts from what to measure, so it needs every parameter at once, and then offers
 for each one only the stations that have it. Both come from FMI's own data: one coverage request per query over
-Finland, where a station that does not measure a parameter reports only NaN for it. About 35 requests, all small
-when the 10-minute observations are read for the last hour only, so the result is kept for an hour.
+Finland, where a station that does not measure a parameter reports only NaN for it. The requests are small when
+the 10-minute observations are read for the last hour only, and the result is kept for an hour.
 
 A forecast is not tied to stations, so its parameters are read at Home Assistant's own location and it asks for a
 point instead. An observation query with parameters but no stations, such as STUK's air radionuclides, asks for a

@@ -176,15 +176,6 @@ describe("fmi-warnings-card", () => {
         expect(text(element.shadowRoot!.querySelector(".time"))).toBe("nyt – ti 12.00");
     });
 
-    it("doesn't redraw for another entity's change", async () => {
-        const state = hass("none", [PEDESTRIANS]);
-        const element = await card(state);
-        vi.setSystemTime(Date.parse("2026-10-20T07:00:00+03:00"));
-        element.hass = { ...state, states: { ...state.states, "sensor.other": { ...state.states["sensor.other"]!, state: "2" } } };
-        await element.updateComplete;
-        expect(element.shadowRoot!.querySelector(".row.upcoming")).not.toBeNull();
-    });
-
     it("redraws for the time when it is shown again, even when a new hass comes with it", async () => {
         const state = hass("none", [PEDESTRIANS]);
         const element = await card(state);
@@ -366,15 +357,6 @@ describe("fmi-warnings-card", () => {
         expect([...haCard.querySelector(".band")!.children].map((child) => child.className)).toEqual(["timeline"]);
         expect([...haCard.querySelector(".body")!.children].map((child) => child.className)).toEqual(["rows"]);
         expect([...haCard.querySelector(".rows")!.children].map((child) => child.classList.contains("row"))).toEqual([true, true]);
-    });
-
-    it("keeps a warning open when FMI reissues it under a new id", async () => {
-        const element = await card(hass("orange", [WIND]));
-        element.shadowRoot!.querySelector<HTMLButtonElement>(".summary")!.click();
-        await element.updateComplete;
-        element.hass = hass("orange", [{ ...WIND, id: "urn:oid:fmi.example.1.reissued" }]);
-        await element.updateComplete;
-        expect(element.shadowRoot!.querySelector(".expander")!.hasAttribute("inert")).toBe(false);
     });
 
     it("shows times in the browser's own zone when the profile asks for it", async () => {

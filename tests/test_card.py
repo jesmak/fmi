@@ -12,8 +12,6 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.fmi_open_data.const import CONF_LANG, CONF_STRUCTURE, DOMAIN, STRUCTURE_VERSION
 
-pytestmark = pytest.mark.asyncio
-
 CARD = "/fmi_open_data/fmi-warnings-card.js"
 OLD = f"{CARD}?v=4.0.0"
 OLDER = f"{CARD}?v=3.9.0"
