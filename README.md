@@ -3,7 +3,7 @@
 A Home Assistant integration for the Finnish Meteorological Institute's open data. Observations and forecasts from
 FMI's stations, a weather forecast for any place, and FMI's weather warnings.
 
-[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![Marketplace][marketplace-shield]][marketplace] [![License][license-shield]](LICENSE)
+[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![Downloads][downloads-shield]][releases] [![Marketplace][marketplace-shield]][marketplace] [![License][license-shield]](LICENSE)
 
 <img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-light.png#gh-light-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and a traffic warning on a timeline and the rain in Tampere, the air quality with a month of particles and the dose rate, the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights, and a low UV index under the sinking daily peaks of September">
 <img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and a traffic warning on a timeline and the rain in Tampere, the air quality with a month of particles and the dose rate, the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights, and a low UV index under the sinking daily peaks of September">
@@ -572,6 +572,7 @@ MIT. The data is FMI's, under CC BY 4.0.
 [releases-shield]: https://img.shields.io/github/release/jesmak/fmi.svg?style=for-the-badge
 [release-date-shield]: https://img.shields.io/github/release-date/jesmak/fmi?style=for-the-badge
 [releases]: https://github.com/jesmak/fmi/releases
+[downloads-shield]: https://img.shields.io/github/downloads/jesmak/fmi/total.svg?style=for-the-badge
 [marketplace-shield]: https://img.shields.io/badge/Marketplace-Default-green.svg?style=for-the-badge
 [marketplace]: https://my.home-assistant.io/redirect/marketplace_repository/?owner=jesmak&repository=fmi&category=integration
 [license-shield]: https://img.shields.io/github/license/jesmak/fmi.svg?style=for-the-badge

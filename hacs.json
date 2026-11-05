@@ -1,6 +1,8 @@
 {
   "name": "FMI Open Data",
   "render_readme": true,
+  "zip_release": true,
+  "filename": "fmi_open_data.zip",
   "country": "FI",
   "homeassistant": "2026.10.0"
 }
