@@ -914,8 +914,17 @@ function validRowStep(config) {
   return config.row_step === void 0 || config.row_step === null || ROW_STEPS.includes(config.row_step);
 }
 var step = (config) => config.row_step === "half" ? ROW_PX / 2 : ROW_PX;
+var SLACK_PX = 0.01;
+function drawnScale(card) {
+  const layout = Number.parseFloat(getComputedStyle(card).width) || 0;
+  const drawn = card.getBoundingClientRect().width;
+  return layout > 0 && drawn > 0 ? drawn / layout : 1;
+}
 function filledHeight(content, config, limit = Infinity) {
-  return Math.min(Math.max(1, Math.ceil((content + ROW_GAP_PX) / step(config))) * step(config) - ROW_GAP_PX, limit);
+  return Math.min(Math.max(1, Math.ceil((content - SLACK_PX + ROW_GAP_PX) / step(config))) * step(config) - ROW_GAP_PX, limit);
+}
+function spareRoom(filled, content) {
+  return Math.max(0, Math.floor(filled - content + SLACK_PX));
 }
 function fillLimit(config, layout, minimum = 0) {
   const rows = config.grid_options ? config.grid_options.rows : config.layout_options?.grid_rows;
@@ -1725,20 +1734,21 @@ var FmiWarningsCard = class extends i4 {
     if (!last) {
       return;
     }
+    const scale = drawnScale(card);
     const style = getComputedStyle(card);
-    let content = last.getBoundingClientRect().bottom - card.getBoundingClientRect().top + px(style.paddingBottom) + px(style.borderBottomWidth);
+    let content = (last.getBoundingClientRect().bottom - card.getBoundingClientRect().top) / scale + px(style.paddingBottom) + px(style.borderBottomWidth);
     for (const expander of card.querySelectorAll(".expander")) {
       const end = expander.classList.contains("open") ? expander.querySelector(".details")?.getBoundingClientRect().height ?? 0 : 0;
-      content += end - expander.getBoundingClientRect().height;
+      content += (end - expander.getBoundingClientRect().height) / scale;
     }
     const spare = card.querySelector(".spare, .spare-top");
     if (spare) {
       const spareStyle = getComputedStyle(spare);
       content -= px(spare.classList.contains("spare") ? spareStyle.paddingBottom : spareStyle.paddingTop);
     }
-    const filled = filledHeight(Math.round(content), this.config ?? {}, limit);
+    const filled = filledHeight(content, this.config ?? {}, limit);
     this.filled = filled;
-    this.spare = Math.max(0, Math.floor(filled - content));
+    this.spare = spareRoom(filled, content);
   }
   /** The card's inline style: the height it is held to, or the rows it fills up to any limit, with their spare room. */
   cardStyle() {

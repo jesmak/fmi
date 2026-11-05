@@ -15,7 +15,7 @@ import { ScrollFade, fadeStyles } from "./fade";
 import type { HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
-import { fillLimit, filledHeight, filledStyle, validRowStep } from "./rows";
+import { drawnScale, fillLimit, filledHeight, filledStyle, spareRoom, validRowStep } from "./rows";
 import type { FmiWarningsCardConfig, Warning } from "./types";
 import { eventEntity, isWarningsSensor, moment, pastWarnings, timeline, visibleWarnings, warningsSensors } from "./warnings";
 import type { HistoryRow, Past, Shown } from "./warnings";
@@ -579,15 +579,19 @@ export class FmiWarningsCard extends LitElement {
         if (!last) {
             return;
         }
+        // Drawn sizes are unscaled, as the padding and border added to them are the layout's.
+        const scale = drawnScale(card);
         const style = getComputedStyle(card);
         let content =
-            last.getBoundingClientRect().bottom - card.getBoundingClientRect().top + px(style.paddingBottom) + px(style.borderBottomWidth);
+            (last.getBoundingClientRect().bottom - card.getBoundingClientRect().top) / scale +
+            px(style.paddingBottom) +
+            px(style.borderBottomWidth);
         // A slide's box is clipped while it moves, so each fold counts at its end: an open one at its details, a shut one at nothing.
         for (const expander of card.querySelectorAll<HTMLElement>(".expander")) {
             const end = expander.classList.contains("open")
                 ? (expander.querySelector<HTMLElement>(".details")?.getBoundingClientRect().height ?? 0)
                 : 0;
-            content += end - expander.getBoundingClientRect().height;
+            content += (end - expander.getBoundingClientRect().height) / scale;
         }
         // The spare room as drawn now.
         const spare = card.querySelector<HTMLElement>(".spare, .spare-top");
@@ -595,9 +599,9 @@ export class FmiWarningsCard extends LitElement {
             const spareStyle = getComputedStyle(spare);
             content -= px(spare.classList.contains("spare") ? spareStyle.paddingBottom : spareStyle.paddingTop);
         }
-        const filled = filledHeight(Math.round(content), this.config ?? {}, limit);
+        const filled = filledHeight(content, this.config ?? {}, limit);
         this.filled = filled;
-        this.spare = Math.max(0, Math.floor(filled - content));
+        this.spare = spareRoom(filled, content);
     }
 
     /** The card's inline style: the height it is held to, or the rows it fills up to any limit, with their spare room. */
