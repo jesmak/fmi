@@ -1,4 +1,4 @@
-/*! fmi-warnings-card 4.2.0 | MIT License */
+/*! fmi-warnings-card 4.2.1 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -704,7 +704,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "4.2.0";
+var CARD_VERSION = "4.2.1";
 var TICK_MS = 6e4;
 var TIMELINE_DAYS = 3;
 var PAST_COUNT = 3;
@@ -1775,6 +1775,8 @@ var FmiWarningsCard = class extends i4 {
                  * and the timeline's frame and each of its lanes one step each. Only an opened row's details are free.
                  */
                 ha-card {
+                    /* ha-card's own transition covers every property, so a change in the rows filled would animate. Only a slide does. */
+                    transition: none;
                     position: relative;
                     overflow: clip;
                     container-type: inline-size;

@@ -639,6 +639,8 @@ export class FmiWarningsCard extends LitElement {
                  * and the timeline's frame and each of its lanes one step each. Only an opened row's details are free.
                  */
                 ha-card {
+                    /* ha-card's own transition covers every property, so a change in the rows filled would animate. Only a slide does. */
+                    transition: none;
                     position: relative;
                     overflow: clip;
                     container-type: inline-size;
