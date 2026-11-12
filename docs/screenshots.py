@@ -400,6 +400,125 @@ def card_shot(name: str, width: int, place: str, **options) -> dict:
     }
 
 
+# The warning map: FMI's outlines of thirteen regions and sea areas (docs/warning_areas.json, simplified as the
+# integration does), with made-up warnings that agree with the places' above.
+MAP_COLORS = {"yellow": "#f2c200", "orange": "#ef6c00", "red": "#d32f2f"}
+THU, FRI, SAT = "2026-09-24T", "2026-09-25T", "2026-09-26T"
+WIND = ("Wind warning for land areas", THU + "12:00", FRI + "03:00")
+TRAFFIC = ("Traffic weather warning", FRI + "06:00", FRI + "12:00", "Heavy rain and standing water make driving conditions poor.")
+SEA_WIND = ("Wind warning for sea areas", THU + "06:00", FRI + "15:00")
+YELLOW_WIND = ("yellow", *WIND, "South-westerly gusts of up to 20 m/s.")
+ORANGE_WIND = ("orange", *WIND, "South-westerly gusts of 20–25 m/s.")
+YELLOW_SEA_WIND = ("yellow", *SEA_WIND, "Gale warning: south-westerly wind 18 m/s.")
+MAP_WARNINGS = {
+    "FI-11": [YELLOW_WIND, ("yellow", *TRAFFIC)],
+    "FI-16": [
+        (
+            "yellow",
+            "Traffic weather warning",
+            THU + "09:00",
+            THU + "21:00",
+            "Driving conditions are poor because of heavy rain and strong wind.",
+        ),
+        ORANGE_WIND,
+        ("yellow", "Pedestrian weather warning", FRI + "06:00", FRI + "12:00", "Wet leaves make pavements very slippery in places."),
+    ],
+    "FI-06": [ORANGE_WIND],
+    "FI-17": [YELLOW_WIND],
+    "FI-08": [YELLOW_WIND],
+    "FI-04": [YELLOW_WIND],
+    "FI-02": [YELLOW_WIND],
+    "FI-03": [("yellow", *TRAFFIC)],
+    "FI-12": [("yellow", *TRAFFIC)],
+    "B3S": [
+        ("orange", *SEA_WIND, "Storm warning: south-westerly wind 25 m/s."),
+        ("yellow", "Wave height warning", THU + "09:00", FRI + "18:00", "Significant wave height up to 5 metres."),
+    ],
+    "B3N": [YELLOW_SEA_WIND],
+    "B4E": [YELLOW_SEA_WIND],
+    "B5W": [YELLOW_SEA_WIND],
+}
+
+
+def map_moment(time: str) -> str:
+    return datetime.fromisoformat(time).strftime("%a %H:%M")
+
+
+def map_area(code: str, area: dict) -> dict:
+    """An area as the integration writes it: coloured by its highest level in force, or coming when none is."""
+    levels = ["yellow", "orange", "red"]
+    clock = CLOCK.strftime("%Y-%m-%dT%H:%M")
+    warnings = sorted(MAP_WARNINGS[code], key=lambda w: w[2])
+    in_force = [w for w in warnings if w[2] <= clock]
+    top = max(in_force or warnings, key=lambda w: levels.index(w[0]))
+    level, event, onset, expires, _ = top
+    status = f"in force until {map_moment(expires)}" if in_force else f"starts {map_moment(onset)}"
+    properties = {
+        "name": area["name"],
+        "kind": "weather.warning",
+        "subtitle": ", ".join(dict.fromkeys(w[1] for w in [top, *warnings])),
+        "color": MAP_COLORS[level],
+        "list": {"text": f"{event} · {status}", "value": level.capitalize()},
+        "details": [
+            {
+                "label": w[1],
+                "value": f"{map_moment(w[2])}–{map_moment(w[3])[4:]}"
+                if w[2][:10] == w[3][:10]
+                else f"{map_moment(w[2])} – {map_moment(w[3])}",
+                "tag": {"text": w[0].capitalize(), "tone": "item" if w is top else "neutral"},
+            }
+            for w in warnings
+        ],
+        "notices": [f"{w[1]}: {w[4]}" for w in warnings],
+        "level": level,
+        "level_rank": levels.index(level) + 1,
+        "active": bool(in_force),
+        "link": {"url": "https://en.ilmatieteenlaitos.fi/warnings", "label": "Warnings on ilmatieteenlaitos.fi"},
+    }
+    if not in_force:
+        properties["opacity"] = 0.45
+    return {
+        "type": "Feature",
+        "id": f"area:{code}",
+        "geometry": {"type": "MultiPolygon", "coordinates": [[ring] for ring in area["rings"]]},
+        "properties": properties,
+    }
+
+
+def warning_map() -> dict:
+    areas = json.loads(Path(__file__).with_name("warning_areas.json").read_text(encoding="utf-8"))
+
+    def extent(area: dict) -> float:
+        points = [point for ring in area["rings"] for point in ring]
+        return (max(p[0] for p in points) - min(p[0] for p in points)) * (max(p[1] for p in points) - min(p[1] for p in points))
+
+    largest_first = sorted(areas.items(), key=lambda item: -extent(item[1]))
+    return {
+        "state": str(len(areas)),
+        "attributes": {
+            "friendly_name": "Warning map Warning areas",
+            "icon": "mdi:map-marker-alert",
+            "attribution": f"{ATTR}, CC BY 4.0",
+            "map_feed_version": 1,
+            "feed_type": "weather",
+            "updated": CLOCK.isoformat(),
+            "legend": [{"color": color, "label": level.capitalize()} for level, color in MAP_COLORS.items()],
+            "list": {
+                "sort": [
+                    {"key": "level", "label": "Warning level", "property": "level_rank", "order": "desc"},
+                    {"key": "name", "label": "Area", "property": "name"},
+                ],
+                "default": "level",
+                "count": "areas",
+                "count_one": "area",
+            },
+            "geojson": {"type": "FeatureCollection", "features": [map_area(code, area) for code, area in largest_first]},
+        },
+    }
+
+
+WARNING_MAP = "sensor.warning_map_warning_areas"
+
 AIR_LINES = {
     "pm25": [(11, "Satisfactory", "#ffdd3a"), (26, "Fair", "#ffa600")],
     "pm10": [(21, "Satisfactory", "#ffdd3a"), (51, "Fair", "#ffa600")],
@@ -634,6 +753,7 @@ def main():
                     "show_daily_chart": True,
                     "grid_options": {"columns": 12, "rows": "auto"},
                 },
+                {"type": "custom:map-feed-card", "title": "Warnings in Finland", "entities": [WARNING_MAP]},
             ],
         },
         {
@@ -731,12 +851,14 @@ def main():
         },
     ]
     states |= {f"sensor.{label.lower()}_warning_level": card_place(label) for label in CARD_WARNINGS}
+    states[WARNING_MAP] = warning_map()
     plan = {
         "resources": [
             "https://github.com/RomRider/apexcharts-card/releases/download/v2.2.3/apexcharts-card.js",
             "https://github.com/benjamin-dcs/gauge-card-pro/releases/download/v2.5.0/gauge-card-pro.js",
             "../../hass-cards/compact-rain-gauge-card/dist/compact-rain-gauge-card.js",
             "../../hass-cards/compact-uv-index-card/dist/compact-uv-index-card.js",
+            "../../hass-cards/map-feed-card/dist/map-feed-card.js",
             "custom_components/fmi_open_data/www/fmi-warnings-card.js",
         ],
         "clock": CLOCK.isoformat(),
@@ -779,6 +901,18 @@ def main():
             card_shot("no-timeline", 500, "Lahti", show_timeline=False),
             card_shot("max-height", 500, "Lahti", title="Weather warnings", max_height=280),
             card_shot("narrow", 240, "Lahti"),
+            {
+                "name": "warning-map",
+                "width": 1000,
+                "row": "Päijät-Häme",
+                "card": {
+                    "type": "custom:map-feed-card",
+                    "title": "Warnings in Finland",
+                    "list": True,
+                    "map_height": 480,
+                    "entities": [WARNING_MAP],
+                },
+            },
         ],
     }
     Path(__file__).with_name("screenshots.json").write_text(json.dumps(plan, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")

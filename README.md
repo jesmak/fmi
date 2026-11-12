@@ -5,8 +5,8 @@ FMI's stations, a weather forecast for any place, and FMI's weather warnings.
 
 [![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![Downloads][downloads-shield]][releases] [![Marketplace][marketplace-shield]][marketplace] [![License][license-shield]](LICENSE)
 
-<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-light.png#gh-light-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and a traffic warning on a timeline and the rain in Tampere, the air quality with a month of particles and the dose rate, the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights, and a low UV index under the sinking daily peaks of September">
-<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and a traffic warning on a timeline and the rain in Tampere, the air quality with a month of particles and the dose rate, the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights, and a low UV index under the sinking daily peaks of September">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-light.png#gh-light-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and a traffic warning on a timeline, the rain in Tampere and a map of the regions and sea areas with a warning, the air quality with a month of particles and the dose rate, the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights, and a low UV index under the sinking daily peaks of September">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/dashboard-dark.png#gh-dark-mode-only" width="1280" alt="A dashboard with the weather, a wind warning and a traffic warning on a timeline, the rain in Tampere and a map of the regions and sea areas with a warning, the air quality with a month of particles and the dose rate, the sea level in Hanko with its forecast, the water temperatures of the summer and the wave heights, and a low UV index under the sinking daily peaks of September">
 
 The data in the picture is made up.
 
@@ -255,6 +255,11 @@ A warning map has one sensor, whose state is the number of areas with a warning.
 [map feed](https://github.com/jesmak/map-feed-card/blob/main/docs/map-feed-format.md), which
 [Map Feed card](https://github.com/jesmak/map-feed-card) draws on Home Assistant's map. The card is installed
 separately, and needs version 1.7.0 or newer to know the feed as weather warnings.
+
+<p>
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warning-map-light.png#gh-light-mode-only" width="1010" alt="A map of southern Finland with five regions and three sea areas outlined in yellow, two regions and a sea area in orange and two regions fainter, and beside it the selected region's three warnings with their periods, levels and descriptions">
+<img src="https://raw.githubusercontent.com/jesmak/fmi/main/docs/images/warning-map-dark.png#gh-dark-mode-only" width="1010" alt="A map of southern Finland with five regions and three sea areas outlined in yellow, two regions and a sea area in orange and two regions fainter, and beside it the selected region's three warnings with their periods, levels and descriptions">
+</p>
 
 ```yaml
 type: custom:map-feed-card
