@@ -1,8 +1,8 @@
 """FMI data and weather warnings for Home Assistant.
 
 One config entry holds the language and the stale data settings. Every station, with the measurements read there,
-and every place, with its weather forecast and warnings, is a config subentry and a device. Each measurement, and
-each place's forecast and warnings, has its own coordinator.
+every place, with its weather forecast and warnings, and every warning map is a config subentry and a device. Each
+measurement, each place's forecast and warnings, and each warning map has its own coordinator.
 """
 
 import asyncio
@@ -27,12 +27,14 @@ from .const import (
     STRUCTURE_VERSION,
     SUBENTRY_PLACE,
     SUBENTRY_STATION,
+    SUBENTRY_WARNING_MAP,
 )
 from .migration import CONF_MOVE_FROM, async_check_old_folder, async_move_old_entries
 from .query_coordinator import FMIQueryCoordinator
 from .services import async_setup_services
 from .structure import async_restructure, device_info
 from .warning_coordinator import FMIWarningsCoordinator, WarningFeed
+from .warning_map import FMIWarningMapCoordinator
 from .weather_coordinator import FMIWeatherCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,13 +47,16 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 ENTITY_DOMAINS = {
     FMIQueryCoordinator: ("sensor", "binary_sensor"),
     FMIWarningsCoordinator: ("sensor", "event"),
+    FMIWarningMapCoordinator: ("sensor",),
     FMIWeatherCoordinator: ("weather",),
 }
+
+type FMICoordinator = FMIQueryCoordinator | FMIWarningsCoordinator | FMIWarningMapCoordinator | FMIWeatherCoordinator
 
 
 @dataclass
 class FMIRuntimeData:
-    coordinators: list[FMIQueryCoordinator | FMIWarningsCoordinator | FMIWeatherCoordinator]
+    coordinators: list[FMICoordinator]
     warning_feed: WarningFeed
     # By subentry id.
     devices: dict[str, DeviceInfo]
@@ -78,7 +83,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> bool:
     await async_add_card_resource(hass)
 
     feed = WarningFeed(hass)
-    coordinators: list[FMIQueryCoordinator | FMIWarningsCoordinator | FMIWeatherCoordinator] = []
+    coordinators: list[FMICoordinator] = []
 
     for subentry in entry.subentries.values():
         if subentry.subentry_type == SUBENTRY_STATION:
@@ -88,6 +93,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: FMIConfigEntry) -> bool:
                 coordinators.append(FMIWarningsCoordinator(hass, entry, subentry, feed))
             if subentry.data.get(CONF_WEATHER):
                 coordinators.append(FMIWeatherCoordinator(hass, entry, subentry))
+        elif subentry.subentry_type == SUBENTRY_WARNING_MAP:
+            coordinators.append(FMIWarningMapCoordinator(hass, entry, subentry, feed))
 
     entry.runtime_data = FMIRuntimeData(
         coordinators, feed, {subentry_id: device_info(subentry) for subentry_id, subentry in entry.subentries.items()}

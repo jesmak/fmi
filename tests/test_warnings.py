@@ -8,6 +8,7 @@ Bothnia and the Quark.
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from xml.etree import ElementTree
 
 from custom_components.fmi_open_data.cap import (
     WarningsFilter,
@@ -25,8 +26,8 @@ from custom_components.fmi_open_data.const import WARNING_TYPES
 FIXTURES = Path(__file__).parent / "fixtures"
 FINNISH_TIME = timezone(timedelta(hours=3))
 
-SEVERAL_AREAS = parse_alert((FIXTURES / "cap_sea_wind_several_areas.xml").read_bytes())
-BOTHNIA = parse_alert((FIXTURES / "cap_sea_wind_bothnia.xml").read_bytes())
+SEVERAL_AREAS = parse_alert(ElementTree.fromstring((FIXTURES / "cap_sea_wind_several_areas.xml").read_bytes()))
+BOTHNIA = parse_alert(ElementTree.fromstring((FIXTURES / "cap_sea_wind_bothnia.xml").read_bytes()))
 
 BEFORE = datetime(2026, 9, 15, 12, 0, tzinfo=FINNISH_TIME)
 DURING = datetime(2026, 9, 16, 12, 0, tzinfo=FINNISH_TIME)
@@ -41,11 +42,11 @@ def place(position, radius=0, types=WARNING_TYPES, language="fin") -> WarningsFi
     return WarningsFilter(position[0], position[1], radius, frozenset(types), language)
 
 
-def test_feed_lists_the_cap_documents():
-    urls = parse_warning_feed((FIXTURES / "warnings_feed.xml").read_bytes())
+def test_the_feed_holds_its_messages():
+    alerts = parse_warning_feed((FIXTURES / "warnings_feed.xml").read_bytes())
 
-    assert len(urls) == 4
-    assert all(url.startswith("https://alerts.fmi.fi/cap/") and url.endswith(".xml") for url in urls)
+    assert len(alerts) == 4
+    assert all(alert.identifier.startswith("urn:oid:") and alert.infos for alert in alerts)
 
 
 def test_alert_is_parsed_in_every_language():

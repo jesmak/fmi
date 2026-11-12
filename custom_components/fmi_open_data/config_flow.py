@@ -26,6 +26,9 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.selector import (
     LocationSelector,
     LocationSelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
@@ -38,6 +41,7 @@ from .const import (
     CONF_FORECAST_HOURS,
     CONF_FORECAST_PAST_HOURS,
     CONF_FORECAST_STEP,
+    CONF_HOURS_AHEAD,
     CONF_LABEL,
     CONF_LANG,
     CONF_LOCATION,
@@ -52,6 +56,7 @@ from .const import (
     CONF_UNIT,
     CONF_WARNING_TYPES,
     CONF_WEATHER,
+    DEFAULT_HOURS_AHEAD,
     DEFAULT_NO_DATA_ISSUE,
     DEFAULT_NO_DATA_ISSUE_HOURS,
     DEFAULT_WARNINGS_RADIUS,
@@ -59,6 +64,7 @@ from .const import (
     LANGUAGES,
     SUBENTRY_PLACE,
     SUBENTRY_STATION,
+    SUBENTRY_WARNING_MAP,
     WARNING_TYPE_KEYS,
 )
 from .migration import TITLE, VERSION, moved_entry, old_entries
@@ -87,18 +93,33 @@ STALE_DATA_SCHEMA = vol.Schema(
     }
 )
 
+WARNING_TYPES_SELECTOR = SelectSelector(
+    SelectSelectorConfig(
+        options=list(WARNING_TYPE_KEYS.values()), multiple=True, translation_key=CONF_WARNING_TYPES, mode=SelectSelectorMode.LIST
+    )
+)
+
 PLACE_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_LOCATION): LocationSelector(LocationSelectorConfig(radius=True, icon="mdi:map-marker")),
         vol.Required(CONF_LABEL): cv.string,
         vol.Required(CONF_WEATHER): cv.boolean,
-        vol.Optional(CONF_WARNING_TYPES): SelectSelector(
-            SelectSelectorConfig(
-                options=list(WARNING_TYPE_KEYS.values()), multiple=True, translation_key=CONF_WARNING_TYPES, mode=SelectSelectorMode.LIST
-            )
+        vol.Optional(CONF_WARNING_TYPES): WARNING_TYPES_SELECTOR,
+    }
+)
+
+WARNING_MAP_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_LABEL): cv.string,
+        vol.Optional(CONF_WARNING_TYPES): WARNING_TYPES_SELECTOR,
+        # FMI's warnings reach five days ahead.
+        vol.Required(CONF_HOURS_AHEAD): NumberSelector(
+            NumberSelectorConfig(min=0, max=120, step=1, unit_of_measurement="h", mode=NumberSelectorMode.BOX)
         ),
     }
 )
+# The map's name until the user gives one, in the entry's language. It names the device.
+WARNING_MAP_NAMES = {"fin": "Varoituskartta", "eng": "Warning map"}
 
 
 def language_schema(default: str) -> vol.Schema:
@@ -183,7 +204,7 @@ class FMIConfigFlow(ConfigFlow, domain=DOMAIN):
     @classmethod
     @callback
     def async_get_supported_subentry_types(cls, config_entry: ConfigEntry) -> dict[str, type[ConfigSubentryFlow]]:
-        return {SUBENTRY_STATION: StationSubentryFlow, SUBENTRY_PLACE: PlaceSubentryFlow}
+        return {SUBENTRY_STATION: StationSubentryFlow, SUBENTRY_PLACE: PlaceSubentryFlow, SUBENTRY_WARNING_MAP: WarningMapSubentryFlow}
 
 
 class StaleDataOptionsFlow(OptionsFlow):
@@ -522,19 +543,23 @@ class StationSubentryFlow(ConfigSubentryFlow):
         return self.async_show_form(step_id="remove_measurements", data_schema=schema, errors=errors, last_step=True)
 
 
-def place_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
+def warning_types_from_form(user_input: dict[str, Any]) -> list[str]:
     """The form's lower-case warning type keys as FMI's warning types, which subentries store."""
     types_by_key = {key: warning_type for warning_type, key in WARNING_TYPE_KEYS.items()}
+    return [types_by_key.get(key, key) for key in user_input.get(CONF_WARNING_TYPES) or []]
+
+
+def place_from_form(user_input: dict[str, Any]) -> dict[str, Any]:
     location = user_input[CONF_LOCATION]
     return {
         CONF_LOCATION: {"latitude": location["latitude"], "longitude": location["longitude"], "radius": location.get("radius") or 0},
         CONF_LABEL: user_input[CONF_LABEL].strip(),
         CONF_WEATHER: user_input[CONF_WEATHER],
-        CONF_WARNING_TYPES: [types_by_key.get(key, key) for key in user_input.get(CONF_WARNING_TYPES) or []],
+        CONF_WARNING_TYPES: warning_types_from_form(user_input),
     }
 
 
-def place_for_form(data: dict[str, Any]) -> dict[str, Any]:
+def subentry_for_form(data: dict[str, Any]) -> dict[str, Any]:
     return {**data, CONF_WARNING_TYPES: [WARNING_TYPE_KEYS.get(warning_type, warning_type) for warning_type in data[CONF_WARNING_TYPES]]}
 
 
@@ -597,7 +622,50 @@ class PlaceSubentryFlow(ConfigSubentryFlow):
                     entry, subentry, title=data[CONF_LABEL], data=data, unique_id=unique_id, reason="reconfigure_successful"
                 )
 
-        values = user_input or place_for_form(dict(subentry.data))
+        values = user_input or subentry_for_form(dict(subentry.data))
         return self.async_show_form(
             step_id="reconfigure", data_schema=self.add_suggested_values_to_schema(PLACE_SCHEMA, values), errors=errors
+        )
+
+
+class WarningMapSubentryFlow(ConfigSubentryFlow):
+    """The areas with a warning in the whole country, as a map feed."""
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        return self._form("user", user_input)
+
+    async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
+        return self._form("reconfigure", user_input)
+
+    def _form(self, step_id: str, user_input: dict[str, Any] | None) -> SubentryFlowResult:
+        entry = self._get_entry()
+        errors = {}
+
+        if user_input is not None:
+            data = {
+                CONF_LABEL: user_input[CONF_LABEL].strip(),
+                CONF_WARNING_TYPES: warning_types_from_form(user_input),
+                CONF_HOURS_AHEAD: int(user_input[CONF_HOURS_AHEAD]),
+            }
+            if not data[CONF_WARNING_TYPES]:
+                errors = {"base": "no_warning_types"}
+            elif step_id == "user":
+                return self.async_create_entry(title=data[CONF_LABEL], data=data)
+            else:
+                return self.async_update_and_abort(
+                    entry, self._get_reconfigure_subentry(), title=data[CONF_LABEL], data=data, reason="reconfigure_successful"
+                )
+
+        if user_input is not None:
+            values = user_input
+        elif step_id == "reconfigure":
+            values = subentry_for_form(dict(self._get_reconfigure_subentry().data))
+        else:
+            values = {
+                CONF_LABEL: WARNING_MAP_NAMES[entry.data[CONF_LANG]],
+                CONF_WARNING_TYPES: list(WARNING_TYPE_KEYS.values()),
+                CONF_HOURS_AHEAD: DEFAULT_HOURS_AHEAD,
+            }
+        return self.async_show_form(
+            step_id=step_id, data_schema=self.add_suggested_values_to_schema(WARNING_MAP_SCHEMA, values), errors=errors
         )

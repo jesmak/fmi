@@ -131,10 +131,18 @@ class FMISession:
         self._timeout = timeout
 
     def get_document(self, url: str) -> bytes:
-        """Download a document as it is, such as the warning feed or one warning in it."""
+        """Download a document as it is."""
+        return self._get(url, {}).content
+
+    def get_changed_document(self, url: str, etag: str | None) -> tuple[bytes, str | None] | None:
+        """Download a document with its ETag, or None when it is still the one that had the given ETag."""
+        response = self._get(url, {"If-None-Match": etag} if etag else {})
+        return None if response.status_code == 304 else (response.content, response.headers.get("ETag"))
+
+    def _get(self, url: str, headers: dict[str, str]) -> requests.Response:
         _LOGGER.debug(f"Downloading from FMI (url={url})")
         try:
-            response = requests.get(url=url, headers={"User-Agent": USER_AGENT}, timeout=self._timeout)
+            response = requests.get(url=url, headers={"User-Agent": USER_AGENT, **headers}, timeout=self._timeout)
         except RequestException as exception:
             raise FMIException(f"Communication error {exception}") from exception
         status = f"{response.status_code} {response.reason or ''}".strip()
@@ -145,9 +153,9 @@ class FMISession:
             reasons = [html.unescape(text).strip() for text in texts]
             message = " ".join(reason for reason in reasons if reason and not reason.startswith("URI:")) or status
             raise (FMINoData if message.startswith("No data available") else FMIRefused)(message)
-        if response.status_code != 200:
+        if response.status_code not in (200, 304):
             raise FMIException(f"FMI answered {status}")
-        return response.content
+        return response
 
     def _xml(self, url: str) -> ElementTree.Element:
         try:

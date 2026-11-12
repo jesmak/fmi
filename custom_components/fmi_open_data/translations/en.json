@@ -192,6 +192,47 @@
           }
         }
       }
+    },
+    "warning_map": {
+      "entry_type": "Warning map",
+      "initiate_flow": {
+        "user": "Add warning map",
+        "reconfigure": "Change warning map"
+      },
+      "error": {
+        "no_warning_types": "Choose at least one warning type."
+      },
+      "abort": {
+        "reconfigure_successful": "Warning map updated."
+      },
+      "step": {
+        "user": {
+          "title": "Warning map",
+          "description": "Every area in Finland and its sea areas with a warning. The sensor's data can be drawn on a map with map-feed-card.",
+          "data": {
+            "label": "Name",
+            "warning_types": "Warning types",
+            "hours_ahead": "Warnings ahead"
+          },
+          "data_description": {
+            "label": "The map's name. Home Assistant shows it in front of the sensor's name.",
+            "hours_ahead": "How soon a warning has to start to be included in the sensor's data. An area whose warnings come into force only later is drawn fainter. With 0, the sensor includes only the warnings in force."
+          }
+        },
+        "reconfigure": {
+          "title": "Warning map",
+          "description": "Every area in Finland and its sea areas with a warning. The sensor's data can be drawn on a map with map-feed-card.",
+          "data": {
+            "label": "Name",
+            "warning_types": "Warning types",
+            "hours_ahead": "Warnings ahead"
+          },
+          "data_description": {
+            "label": "The map's name. Home Assistant shows it in front of the sensor's name.",
+            "hours_ahead": "How soon a warning has to start to be included in the sensor's data. An area whose warnings come into force only later is drawn fainter. With 0, the sensor includes only the warnings in force."
+          }
+        }
+      }
     }
   },
   "selector": {
@@ -224,6 +265,9 @@
           "red": "Red"
         },
         "name": "Warning level"
+      },
+      "warning_areas": {
+        "name": "Warning areas"
       }
     },
     "event": {

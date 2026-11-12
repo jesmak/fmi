@@ -192,6 +192,47 @@
           }
         }
       }
+    },
+    "warning_map": {
+      "entry_type": "Varoituskartta",
+      "initiate_flow": {
+        "user": "Lisää varoituskartta",
+        "reconfigure": "Muuta varoituskarttaa"
+      },
+      "error": {
+        "no_warning_types": "Valitse vähintään yksi varoitustyyppi."
+      },
+      "abort": {
+        "reconfigure_successful": "Varoituskartta päivitetty."
+      },
+      "step": {
+        "user": {
+          "title": "Varoituskartta",
+          "description": "Kaikki Suomen ja sen merialueiden alueet, joilla on varoitus. Sensorin tiedot voidaan piirtää esim. map-feed-card-kortille.",
+          "data": {
+            "label": "Nimi",
+            "warning_types": "Varoitustyypit",
+            "hours_ahead": "Tulevat varoitukset"
+          },
+          "data_description": {
+            "label": "Kartan nimi. Home Assistant näyttää sen sensorin nimen edessä.",
+            "hours_ahead": "Kuinka pian varoituksen tulee alkaa, jotta se sisällytetään sensorin tietoihin. Alue, jonka varoitukset ovat voimassa vasta myöhemmin, piirretään haaleampana. Arvolla 0 sensoriin sisällytetään vain voimassa olevat varoitukset."
+          }
+        },
+        "reconfigure": {
+          "title": "Varoituskartta",
+          "description": "Kaikki Suomen ja sen merialueiden alueet, joilla on varoitus. Sensorin tiedot voidaan piirtää esim. map-feed-card-kortille.",
+          "data": {
+            "label": "Nimi",
+            "warning_types": "Varoitustyypit",
+            "hours_ahead": "Tulevat varoitukset"
+          },
+          "data_description": {
+            "label": "Kartan nimi. Home Assistant näyttää sen sensorin nimen edessä.",
+            "hours_ahead": "Kuinka pian varoituksen tulee alkaa, jotta se sisällytetään sensorin tietoihin. Alue, jonka varoitukset ovat voimassa vasta myöhemmin, piirretään haaleampana. Arvolla 0 sensoriin sisällytetään vain voimassa olevat varoitukset."
+          }
+        }
+      }
     }
   },
   "selector": {
@@ -224,6 +265,9 @@
           "red": "Punainen"
         },
         "name": "Varoitustaso"
+      },
+      "warning_areas": {
+        "name": "Varoitusalueet"
       }
     },
     "event": {

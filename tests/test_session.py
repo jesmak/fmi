@@ -130,3 +130,22 @@ def test_a_forecasts_fixed_points_are_read_as_stations(monkeypatch):
     assert by_name["Hamina"]["id"] == "659169"
     assert by_name["Kemi"]["id"] == "-10017238"
     assert by_name["Hamina"]["measured"] == {"SeaLevel", "SeaLevelN2000"}
+
+
+def test_a_document_is_downloaded_only_when_it_has_changed(monkeypatch):
+    from types import SimpleNamespace
+
+    sent = []
+
+    def get(url, headers, timeout):
+        sent.append(headers.get("If-None-Match"))
+        if headers.get("If-None-Match") == 'W/"abc"':
+            return SimpleNamespace(status_code=304, reason="Not Modified", content=b"", headers={})
+        return SimpleNamespace(status_code=200, reason="OK", content=b"<feed />", headers={"ETag": 'W/"abc"'})
+
+    monkeypatch.setattr("custom_components.fmi_open_data.session.requests.get", get)
+
+    assert FMISession().get_changed_document("feed", None) == (b"<feed />", 'W/"abc"')
+    assert FMISession().get_changed_document("feed", 'W/"abc"') is None
+    assert FMISession().get_changed_document("feed", 'W/"old"') == (b"<feed />", 'W/"abc"')
+    assert sent == [None, 'W/"abc"', 'W/"old"']

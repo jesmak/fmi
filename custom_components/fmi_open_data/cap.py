@@ -1,7 +1,7 @@
 """FMI weather warnings: reading the CAP feed and deciding which warnings concern a place.
 
 FMI publishes every warning in force, 0-5 days ahead, as a Common Alerting
-Protocol (CAP) document listed in an Atom feed. The profile is documented at
+Protocol (CAP) message in an Atom feed. The profile is documented at
 https://alerts.fmi.fi/cap/profile/v1.1.0.
 
 A warning's areas always carry polygons but only sometimes codes (sea area,
@@ -19,6 +19,7 @@ from typing import Any
 from xml.etree import ElementTree
 
 from .const import CONF_LANG, CONF_LOCATION, CONF_WARNING_TYPES, WARNING_LEVELS
+from .session import FMIException
 
 ATOM_NAMESPACES = {"atom": "http://www.w3.org/2005/Atom"}
 CAP_NAMESPACES = {"cap": "urn:oasis:names:tc:emergency:cap:1.2"}
@@ -46,15 +47,15 @@ LatLon = tuple[float, float]
 # ---------------- the feed and the documents ----------------
 
 
-def parse_warning_feed(content: bytes) -> list[str]:
-    """The CAP document addresses listed in FMI's Atom feed."""
-    root = ElementTree.fromstring(content)
-    return [
-        link.get("href")
-        for entry in root.findall("atom:entry", ATOM_NAMESPACES)
-        for link in entry.findall("atom:link", ATOM_NAMESPACES)
-        if link.get("type") == "application/cap+xml" and link.get("href")
-    ]
+def parse_warning_feed(content: bytes) -> list["CapAlert"]:
+    """The CAP messages in FMI's Atom feed. Each entry holds its whole message, the same one its link leads to."""
+    alerts = []
+    for entry in ElementTree.fromstring(content).findall("atom:entry", ATOM_NAMESPACES):
+        alert = entry.find("atom:content/cap:alert", ATOM_NAMESPACES | CAP_NAMESPACES)
+        if alert is None:
+            raise FMIException("An entry in FMI's warning feed has no CAP message")
+        alerts.append(parse_alert(alert))
+    return alerts
 
 
 @dataclass(frozen=True)
@@ -74,6 +75,7 @@ class CapInfo:
     expires: datetime | None
     headline: str
     description: str
+    web: str
     parameters: dict[str, str]
     areas: list[CapArea]
 
@@ -95,8 +97,7 @@ class CapAlert:
         return self.infos[0] if self.infos else None
 
 
-def parse_alert(content: bytes) -> CapAlert:
-    root = ElementTree.fromstring(content)
+def parse_alert(root: ElementTree.Element) -> CapAlert:
     return CapAlert(
         identifier=_text(root, "identifier"),
         msg_type=_text(root, "msgType"),
@@ -132,6 +133,7 @@ def _parse_info(info: ElementTree.Element) -> CapInfo:
         expires=_time(_text(info, "expires")),
         headline=_text(info, "headline"),
         description=_text(info, "description"),
+        web=_text(info, "web"),
         parameters={
             _text(parameter, "valueName"): _text(parameter, "value") for parameter in info.findall("cap:parameter", CAP_NAMESPACES)
         },
@@ -285,19 +287,8 @@ class FMIWarning:
 
 def warnings_for(alerts: Iterable[CapAlert], warnings_filter: WarningsFilter, now: datetime) -> dict[str, FMIWarning]:
     """The warnings in force or coming up that concern the place, by identifier."""
-    alerts = list(alerts)
-    # If a replaced message is still listed next to its replacement, only the replacement counts.
-    replaced = {reference for alert in alerts for reference in alert.references}
     result = {}
-
-    for alert in alerts:
-        if alert.msg_type == "Cancel" or alert.identifier in replaced:
-            continue
-        info = alert.info(warnings_filter.language)
-        if info is None or info.event_code not in warnings_filter.types:
-            continue
-        if info.expires is not None and info.expires <= now:
-            continue
+    for alert, info in current_infos(alerts, warnings_filter.language, warnings_filter.types, now):
         areas = [
             area.name
             for area in info.areas
@@ -310,13 +301,35 @@ def warnings_for(alerts: Iterable[CapAlert], warnings_filter: WarningsFilter, no
     return result
 
 
+def current_infos(alerts: Iterable[CapAlert], language: str, types: frozenset[str], now: datetime) -> list[tuple[CapAlert, CapInfo]]:
+    """The messages of the given warning types in force or coming up, each with its texts in the language."""
+    alerts = list(alerts)
+    # If a replaced message is still listed next to its replacement, only the replacement counts.
+    replaced = {reference for alert in alerts for reference in alert.references}
+    result = []
+    for alert in alerts:
+        if alert.msg_type == "Cancel" or alert.identifier in replaced:
+            continue
+        info = alert.info(language)
+        if info is None or info.event_code not in types:
+            continue
+        if info.expires is not None and info.expires <= now:
+            continue
+        result.append((alert, info))
+    return result
+
+
+def info_level(info: CapInfo) -> str:
+    return info.parameters.get("color") or SEVERITY_LEVELS.get(info.severity, "yellow")
+
+
 def _warning(alert: CapAlert, info: CapInfo, areas: list[str]) -> FMIWarning:
     parameters = info.parameters
     return FMIWarning(
         identifier=alert.identifier,
         references=tuple(alert.references),
         type=info.event_code or "",
-        level=parameters.get("color") or SEVERITY_LEVELS.get(info.severity, "yellow"),
+        level=info_level(info),
         event=info.event,
         severity=info.severity,
         onset=info.onset,

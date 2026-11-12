@@ -1,6 +1,7 @@
 import logging
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.const import MATCH_ALL
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_point_in_utc_time
@@ -27,6 +28,7 @@ from .const import (
 )
 from .query_coordinator import FMIQueryCoordinator
 from .warning_coordinator import FMIWarningsCoordinator
+from .warning_map import FMIWarningMapCoordinator, feed_attributes
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -90,6 +92,8 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddC
     for coordinator in entry.runtime_data.coordinators:
         if isinstance(coordinator, FMIWarningsCoordinator):
             sensor = FMIWarningLevelSensor(coordinator)
+        elif isinstance(coordinator, FMIWarningMapCoordinator):
+            sensor = FMIWarningMapSensor(coordinator)
         elif not isinstance(coordinator, FMIQueryCoordinator):
             continue
         elif "::forecast" in str(coordinator.measurement[CONF_QUERY_ID]):
@@ -236,4 +240,35 @@ class FMIWarningLevelSensor(CoordinatorEntity[FMIWarningsCoordinator], SensorEnt
             **self._config_attributes,
             ATTR_ACTIVE_WARNINGS: sum(1 for warning in warnings if warning.is_active(now)),
             ATTR_WARNINGS: [warning.as_dict() for warning in warnings],
+        }
+
+
+class FMIWarningMapSensor(CoordinatorEntity[FMIWarningMapCoordinator], SensorEntity):
+    """The areas with a warning, as a map feed. The state is their number."""
+
+    # The outlines are tens of kilobytes: only the count goes to the database.
+    _unrecorded_attributes = frozenset({MATCH_ALL})
+    _attr_attribution = f"{ATTRIBUTION}, CC BY 4.0"
+    _attr_icon = "mdi:map-marker-alert"
+    _attr_has_entity_name = True
+    _attr_translation_key = "warning_areas"
+
+    def __init__(self, coordinator: FMIWarningMapCoordinator):
+        super().__init__(coordinator)
+        self._attr_unique_id = coordinator.unique_id
+        self._attr_device_info = coordinator.config_entry.runtime_data.devices[coordinator.subentry.subentry_id]
+        self._feed_attributes = feed_attributes(coordinator.language)
+
+    @property
+    def native_value(self) -> int:
+        return len(self.coordinator.data.features)
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "map_feed_version": 1,
+            "feed_type": "weather",
+            "updated": self.coordinator.data.updated.isoformat(),
+            **self._feed_attributes,
+            "geojson": {"type": "FeatureCollection", "features": self.coordinator.data.features},
         }

@@ -69,3 +69,21 @@ def place(label: str, latitude: float, longitude: float, radius: float = 0, weat
         title=label,
         unique_id=place_unique_id(location),
     )
+
+
+def warning_map(label: str = "Varoituskartta", hours_ahead: int = 24, warning_types=None):
+    """A warning map subentry. It has every warning type unless told otherwise."""
+    from homeassistant.config_entries import ConfigSubentryData
+
+    from custom_components.fmi_open_data.const import CONF_HOURS_AHEAD, CONF_LABEL, CONF_WARNING_TYPES, SUBENTRY_WARNING_MAP, WARNING_TYPES
+
+    return ConfigSubentryData(
+        data={
+            CONF_LABEL: label,
+            CONF_WARNING_TYPES: WARNING_TYPES if warning_types is None else warning_types,
+            CONF_HOURS_AHEAD: hours_ahead,
+        },
+        subentry_type=SUBENTRY_WARNING_MAP,
+        title=label,
+        unique_id=None,
+    )

@@ -24,6 +24,9 @@ warnings in force there, or both. Each station and place is a device in Home Ass
 
 For a one-off chart or a script, an action reads any station's observations over a time range without a sensor.
 
+A **warning map** is every area in the country with a warning, as one sensor that
+[Map Feed card](https://github.com/jesmak/map-feed-card) draws on a map.
+
 The integration comes with a [card for its warnings](#warnings-card), which shows a place's warnings on a timeline.
 
 Two other cards suit its measurements, such as those in the picture above. They are cards of their own, installed
@@ -138,6 +141,20 @@ sea area includes its islands. On the shore, a radius of a kilometre or two brin
 
 **Reconfigure** on a place changes any of these. Switching the forecast or the warnings off removes their entities.
 
+### Adding a warning map
+
+Choose **Add warning map** on the integration page.
+
+| Name           | Type   | Description                                                             | Default   |
+| -------------- | ------ | ----------------------------------------------------------------------- | --------- |
+| Name           | string | The map's name, shown in front of its sensor's name                     | See below |
+| Warning types  | list   | The warnings on the map                                                 | All       |
+| Warnings ahead | int    | How many hours ahead a warning may start and still be on the map, 0–120 | 24        |
+
+The name starts as `Warning map`, or `Varoituskartta` when the integration's language is Finnish. With 0 hours,
+the map has only the warnings in force. **Reconfigure** on a map changes any of these. Several maps
+can be added, such as one for the land and one for the sea.
+
 ## Sensors
 
 Every measurement is a sensor, named after the station and the measurement. An observation's state is the latest
@@ -231,6 +248,29 @@ The place's event entity fires when something happens to a warning that concerns
 The event data is the warning, with the fields above. FMI republishes its warnings regularly, and one republished
 without changes fires nothing. A warning coming into force or running out changes the level instead, and the
 warnings already in force when Home Assistant starts fire nothing.
+
+### Warning map
+
+A warning map has one sensor, whose state is the number of areas with a warning. Its attributes are a
+[map feed](https://github.com/jesmak/map-feed-card/blob/main/docs/map-feed-format.md), which
+[Map Feed card](https://github.com/jesmak/map-feed-card) draws on Home Assistant's map. The card is installed
+separately, and needs version 1.7.0 or newer to know the feed as weather warnings.
+
+```yaml
+type: custom:map-feed-card
+title: Warnings
+entities:
+  - sensor.warning_map_warning_areas
+```
+
+An item on the map is an area, a municipality, a region or a sea area, and not a warning. FMI warns the same area of
+several things over several days, so each area is drawn once, in the colour of the highest level in force there. An
+area whose warnings are all still ahead is drawn fainter, in the colour of the highest level coming. Selecting an
+area shows its warnings with their periods, levels and FMI's descriptions. The card's list, when it is on, has the
+areas by level or by name.
+
+The outlines are simplified to about a kilometre, which is plenty for a map of the country and shows as small gaps
+between neighbouring areas when zoomed in close. None of the attributes are kept in history.
 
 ## Actions
 
@@ -500,9 +540,10 @@ entity credits FMI in its attribution.
 
 - **Measurements** are read from FMI's WFS service every five minutes each, STUK's air radioactivity once an hour.
 - **The weather forecast** is FMI's edited point forecast, read every 30 minutes a place.
-- **The warnings** are FMI's [CAP warning feed](https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml), read every ten
-  minutes and shared by every place. When the feed can't be read, the last warnings are kept for up to an hour before
-  the place's entities become unavailable.
+- **The warnings** are FMI's [CAP warning feed](https://alerts.fmi.fi/cap/feed/atom_fi-FI.xml), asked for every ten
+  minutes, downloaded only when it has changed, and shared by every place and warning map. When the feed can't be
+  read, a place's last warnings are kept for up to an hour before its entities become unavailable. A warning map
+  becomes unavailable at once.
 - **Adding measurements** reads every station query once over Finland to see which stations report what, a small
   request per query, kept for an hour.
 
@@ -544,7 +585,7 @@ built card doesn't match `frontend/`, run `git config core.hooksPath .githooks` 
 | Path                                                      | What it contains                                                       |
 | --------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `__init__.py`                                             | Setup                                                                  |
-| `config_flow.py`                                          | The language, the options, adding and changing stations and places     |
+| `config_flow.py`                                          | The language, the options, adding and changing stations, places, maps  |
 | `catalogue.py`                                            | What can be measured, and which stations report what                   |
 | `structure.py`                                            | Stations and places, their devices, and the move from 3.x's subentries |
 | `migration.py`                                            | The move from the old `fmi` domain                                     |
@@ -552,6 +593,7 @@ built card doesn't match `frontend/`, run `git config core.hooksPath .githooks` 
 | `query_coordinator.py`                                    | Reading a measurement, and noticing stale data                         |
 | `weather_coordinator.py`                                  | The point forecast, and its days and halves                            |
 | `warning_coordinator.py`, `cap.py`                        | The warning feed and the warnings for a place                          |
+| `warning_map.py`                                          | The warning areas of the country as a map feed                         |
 | `sensor.py`, `binary_sensor.py`, `event.py`, `weather.py` | The entities                                                           |
 | `services.py`                                             | The `get_observations` action                                          |
 | `diagnostics.py`                                          | The diagnostics download, with places left out                         |

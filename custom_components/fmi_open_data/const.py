@@ -65,6 +65,9 @@ CONF_WARNING_TYPES = "warning_types"
 # A unit the user gave for a sensor, which wins over FMI's own; FMI has none for some parameters.
 CONF_UNIT = "unit"
 CONF_MEASUREMENTS = "measurements"
+# How far ahead a warning map shows warnings that have not started yet.
+CONF_HOURS_AHEAD = "hours_ahead"
+DEFAULT_HOURS_AHEAD = 24
 # Whether a place has the weather forecast.
 CONF_WEATHER = "weather"
 # In the entry's data once its subentries are stations and places, with measurements named by the rules of 4.0.0.
@@ -84,6 +87,8 @@ PERIODS = {
 # Each is a device.
 SUBENTRY_STATION = "station"
 SUBENTRY_PLACE = "place"
+# The areas with a warning in the whole country, as a map feed. A device too.
+SUBENTRY_WARNING_MAP = "warning_map"
 # The subentry types before 4.0.0, one per sensor, warnings place and weather place. Merged into stations and places
 # at the first setup of 4.0.0.
 SUBENTRY_SENSOR = "sensor"

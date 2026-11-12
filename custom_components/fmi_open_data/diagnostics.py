@@ -15,6 +15,7 @@ from . import FMIConfigEntry
 from .const import CONF_TARGET, CONF_TARGET_TYPE
 from .query_coordinator import FMIQueryCoordinator, measurement_key
 from .warning_coordinator import FMIWarningsCoordinator
+from .warning_map import FMIWarningMapCoordinator
 from .weather_coordinator import FMIWeatherCoordinator
 
 TO_REDACT = {"latitude", "longitude", "label"}
@@ -50,11 +51,19 @@ def _query_data(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _coordinator(coordinator: FMIQueryCoordinator | FMIWarningsCoordinator | FMIWeatherCoordinator) -> dict[str, Any]:
+KINDS = {
+    FMIQueryCoordinator: "measurement",
+    FMIWarningsCoordinator: "warnings",
+    FMIWarningMapCoordinator: "warning_map",
+    FMIWeatherCoordinator: "weather",
+}
+
+
+def _coordinator(
+    coordinator: FMIQueryCoordinator | FMIWarningsCoordinator | FMIWarningMapCoordinator | FMIWeatherCoordinator,
+) -> dict[str, Any]:
     result: dict[str, Any] = {
-        "kind": {FMIQueryCoordinator: "measurement", FMIWarningsCoordinator: "warnings", FMIWeatherCoordinator: "weather"}[
-            type(coordinator)
-        ],
+        "kind": KINDS[type(coordinator)],
         "measurement": measurement_key(coordinator.measurement) if isinstance(coordinator, FMIQueryCoordinator) else None,
         "last_update_success": coordinator.last_update_success,
         # FMI's message can repeat the place it was asked about.
@@ -82,6 +91,8 @@ def _coordinator(coordinator: FMIQueryCoordinator | FMIWarningsCoordinator | FMI
                 for warning in data.warnings.values()
             ],
         }
+    elif isinstance(coordinator, FMIWarningMapCoordinator):
+        result["data"] = {"updated": data.updated.isoformat(), "areas": len(data.features)}
     else:
         result["data"] = {
             "hours": len(data),
