@@ -94,7 +94,8 @@ class FMIWarningsCoordinator(DataUpdateCoordinator[WarningsData]):
             raise UpdateFailed(f"Could not read FMI's warning feed: {exception}") from exception
         self._down_since = None
 
-        current = warnings_for(alerts, self.warnings_filter, now)
+        # Matching every warning's areas against the place is CPU work over tens of thousands of points.
+        current = await self.hass.async_add_executor_job(warnings_for, alerts, self.warnings_filter, now)
         # The first refresh only learns what is already in force: announcing
         # it as new would repeat on every restart of Home Assistant.
         changes = [] if self._previous is None else warning_changes(self._previous, current, now)
