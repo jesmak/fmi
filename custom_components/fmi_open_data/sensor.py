@@ -153,6 +153,8 @@ class FMISensor(FMIQuerySensor):
 class FMIForecastSensor(FMIQuerySensor):
     """The next forecast value, with the whole forecast in the attributes."""
 
+    # The whole forecast repeats on every refresh; history only needs the next value.
+    _unrecorded_attributes = frozenset({ATTR_FORECAST})
     _attr_icon = "mdi:weather-cloudy-clock"
 
     @property

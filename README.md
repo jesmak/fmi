@@ -173,6 +173,8 @@ value, a forecast's the next one.
 | `forecast`                                               | A forecast's values, each with `time` and `value`                                     |
 | `forecast_hours`, `forecast_past_hours`, `forecast_step` | A forecast's settings                                                                 |
 
+The `forecast` attribute is not kept in history.
+
 ### Stale data
 
 Every measurement also has a diagnostic binary sensor, such as
