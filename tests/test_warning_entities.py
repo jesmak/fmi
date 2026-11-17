@@ -8,7 +8,7 @@ import pytest
 from conftest import place
 from homeassistant.config_entries import ConfigSubentryData
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
+from pytest_homeassistant.common import MockConfigEntry, async_fire_time_changed
 
 from custom_components.fmi_open_data.const import (
     API_WARNINGS_FEED_URL,

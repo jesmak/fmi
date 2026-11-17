@@ -1,6 +1,6 @@
 import pytest
 
-pytest_plugins = "pytest_homeassistant_custom_component"
+pytest_plugins = "pytest_homeassistant"
 
 # What setup reads from FMI to name the devices and, once, the sensors. Made up, but shaped like FMI's answers.
 STATIONS = [{"id": "100971", "name": "Helsinki Kaisaniemi", "region": "Helsinki", "latitude": 60.17523, "longitude": 24.94459}]
@@ -15,12 +15,6 @@ class FakeMetadata:
 
     def get_parameter_descriptions(self, lang, query_id):
         return DESCRIPTIONS
-
-
-@pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
-    """Let Home Assistant load custom_components/fmi_open_data during tests."""
-    yield
 
 
 @pytest.fixture(autouse=True)

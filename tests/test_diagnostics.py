@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from conftest import place, station
 from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 from test_no_data import FakeApi
 from test_warning_entities import SEVERAL_AREAS
 from test_warning_entities import FakeApi as FakeFeed

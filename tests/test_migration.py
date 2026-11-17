@@ -14,7 +14,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity import Entity
-from pytest_homeassistant_custom_component.common import (
+from pytest_homeassistant.common import (
     MockConfigEntry,
     MockModule,
     MockPlatform,
@@ -278,7 +278,7 @@ async def test_the_move_works_while_the_old_folder_still_runs_the_old_entry(hass
     class OldFlow(ConfigFlow):
         VERSION = 3
 
-    mock_integration(hass, MockModule(OLD_DOMAIN, async_setup_entry=forward, async_unload_entry=unload))
+    mock_integration(hass, MockModule(OLD_DOMAIN, async_setup_entry=forward, async_unload_entry=unload), built_in=False)
     mock_platform(hass, f"{OLD_DOMAIN}.config_flow")
     mock_platform(hass, f"{OLD_DOMAIN}.sensor", MockPlatform(async_setup_entry=setup_entry))
     old = _current_entry(hass)

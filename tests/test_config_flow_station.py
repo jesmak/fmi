@@ -8,7 +8,7 @@ from homeassistant.config_entries import SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 from test_no_data import FakeApi
 
 from custom_components.fmi_open_data.catalogue import KIND_PLACE, KIND_POINT, KIND_STATIONS, Catalogue, Parameter

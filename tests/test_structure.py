@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigEntryState, ConfigSubentryData
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry
 from test_no_data import ENTRY_DATA, FakeApi
 from test_warning_entities import SEVERAL_AREAS, warnings_place
 from test_warning_entities import FakeApi as FakeFeed
