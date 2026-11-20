@@ -114,9 +114,8 @@ def query_params(
 def stale_after_hours(query_id: str, configured_hours: int) -> int:
     """The age in hours at which a sensor's data counts as stale.
 
-    The setting is shared by every sensor, so it is raised for the queries whose
-    newest value can legitimately be older: to a whole reporting period for the
-    aggregate ones, and to six weeks for STUK's air samples.
+    It is raised for the queries whose newest value can legitimately be older: to a
+    whole reporting period for the aggregate ones, and to six weeks for STUK's air samples.
     """
     minimum = max((hours for marker, hours in MINIMUM_STALE_HOURS.items() if marker in query_id), default=0)
     return max(configured_hours, minimum)
@@ -158,8 +157,16 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @property
     def stale_after_hours(self) -> int:
-        configured = self.config_entry.options.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS)
+        """The measurement's own limit, or the entry's when it has none."""
+        configured = self.measurement.get(
+            CONF_NO_DATA_ISSUE_HOURS, self.config_entry.options.get(CONF_NO_DATA_ISSUE_HOURS, DEFAULT_NO_DATA_ISSUE_HOURS)
+        )
         return stale_after_hours(str(self.measurement[CONF_QUERY_ID]), configured)
+
+    @property
+    def issue_enabled(self) -> bool:
+        """The entry's setting turns the repair issues off for every measurement, and a measurement's for itself."""
+        return self.config_entry.options.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE) and self.measurement.get(CONF_NO_DATA_ISSUE, True)
 
     def _params(self, now: datetime, filter_parameter: bool, start_time: datetime | None = None) -> dict[str, Any]:
         return query_params(self.measurement, now, filter_parameter, start_time)
@@ -192,7 +199,7 @@ class FMIQueryCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # reports it; the repair issue is the part that can be switched off.
         stale = await self._async_is_stale(now, timedelta(hours=self.stale_after_hours), is_forecast, result)
 
-        issue_enabled = self.config_entry.options.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE)
+        issue_enabled = self.issue_enabled
         if not stale:
             self._reported = False
         elif not self._reported:

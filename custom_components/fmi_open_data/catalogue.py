@@ -10,6 +10,9 @@ point instead. An observation query with parameters but no stations, such as STU
 place name. A few queries, such as the sea surface temperature, FMI publishes only in the ::simple form, which says
 where a value is from by its coordinates alone. They are read for a short while and their stations recognised in
 FMI's station list. A position that is not a station there is left out, and so is a query with no station left.
+
+A query FMI publishes only in the ::timevaluepair form, such as the manual sea ice observations, is offered in that
+form. Its stations observe by hand and by season, so it is read for a year to find who measures what.
 """
 
 import asyncio
@@ -24,7 +27,7 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.location import distance
 
 from .const import API_FINLAND_BBOX, API_TIME_FORMAT, DOMAIN
-from .session import FMIException, FMIRefused, FMISession
+from .session import TIMEVALUEPAIR, FMIException, FMIRefused, FMISession
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,6 +39,17 @@ KEEP = timedelta(hours=1)
 # Queries of periods report over their own default window, and the latest values take no time at all. The others report
 # every few minutes, and an hour is enough to see who measures what.
 OWN_WINDOW = ("::hourly", "::daily", "::monthly", "::yearly", "::30year", "::latest")
+SERIES_WINDOW = timedelta(days=365)
+
+
+def offered_queries(queries: list[list[str]]) -> list[list[str]]:
+    """The ::simple queries, and the ::timevaluepair ones FMI publishes in no other form."""
+    other = {query_id.rsplit("::", 1)[0] for query_id, _ in queries if not query_id.endswith(TIMEVALUEPAIR)}
+    return [
+        [query_id, title]
+        for query_id, title in queries
+        if query_id.endswith("::simple") or (query_id.endswith(TIMEVALUEPAIR) and query_id.removesuffix(TIMEVALUEPAIR) not in other)
+    ]
 
 
 @dataclass
@@ -82,9 +96,12 @@ async def async_catalogue(hass: HomeAssistant, lang: str) -> Catalogue:
     if lang in cache and now - cache[lang][0] < KEEP:
         return cache[lang][1]
 
-    queries = await hass.async_add_executor_job(FMISession().list_stored_queries, lang, "::simple")
+    queries = offered_queries(await hass.async_add_executor_job(FMISession().list_stored_queries, lang))
     results = await asyncio.gather(*(_async_read(hass, lang, query_id, now) for query_id, _ in queries), return_exceptions=True)
-    simple_only = [index for index, result in enumerate(results) if isinstance(result, FMIRefused)]
+    # A refused ::timevaluepair query has no ::simple form to fall back on.
+    simple_only = [
+        index for index, result in enumerate(results) if isinstance(result, FMIRefused) and not queries[index][0].endswith(TIMEVALUEPAIR)
+    ]
     if simple_only:
         try:
             known = await hass.async_add_executor_job(FMISession().list_stations, lang)
@@ -168,6 +185,9 @@ async def _async_read_simple(
 
 
 async def _async_read(hass: HomeAssistant, lang: str, query_id: str, now: datetime) -> tuple[list[str], list[dict[str, Any]]]:
+    if query_id.endswith(TIMEVALUEPAIR):
+        params = {"storedquery_id": query_id, "bbox": API_FINLAND_BBOX, "starttime": (now - SERIES_WINDOW).strftime(API_TIME_FORMAT)}
+        return await hass.async_add_executor_job(FMISession().get_series_coverage, lang, params)
     params: dict[str, Any] = {"storedquery_id": query_id.replace("::simple", "::multipointcoverage"), "bbox": API_FINLAND_BBOX}
     if "::forecast" not in query_id:
         if not any(window in query_id for window in OWN_WINDOW):

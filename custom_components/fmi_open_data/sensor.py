@@ -17,13 +17,11 @@ from .const import (
     CONF_LABEL,
     CONF_LANG,
     CONF_LOCATION,
-    CONF_NO_DATA_ISSUE,
     CONF_PARAMETER,
     CONF_QUERY_ID,
     CONF_TARGET,
     CONF_TARGET_TYPE,
     CONF_WARNING_TYPES,
-    DEFAULT_NO_DATA_ISSUE,
     WARNING_LEVELS,
 )
 from .query_coordinator import FMIQueryCoordinator
@@ -63,7 +61,7 @@ def get_config_attributes(coordinator: FMIQueryCoordinator) -> dict:
         ATTR_PARAMETER: data.get(CONF_PARAMETER),
         ATTR_LOCATION_TYPE: data.get(CONF_TARGET_TYPE),
         ATTR_LOCATION_ID: data.get(CONF_TARGET),
-        ATTR_NO_DATA_ISSUE: coordinator.config_entry.options.get(CONF_NO_DATA_ISSUE, DEFAULT_NO_DATA_ISSUE),
+        ATTR_NO_DATA_ISSUE: coordinator.issue_enabled,
         ATTR_NO_DATA_ISSUE_HOURS: coordinator.stale_after_hours,
     }
 

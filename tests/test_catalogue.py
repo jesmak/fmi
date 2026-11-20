@@ -2,6 +2,7 @@
 
 import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 
 from custom_components.fmi_open_data.catalogue import KIND_PLACE, KIND_POINT, KIND_STATIONS, async_catalogue
 from custom_components.fmi_open_data.session import FMIException, FMIRefused
@@ -16,6 +17,12 @@ QUERIES = [
     ["stuk::observations::air::radionuclide-activity-concentration::latest::simple", "Radioaktiivisuus"],
     ["fmi::observations::magnetometer::simple", "Magnetometri"],
     ["fmi::observations::surfacetemperature::simple", "Pintalämpötila"],
+    ["fmi::observations::weather::multipointcoverage", "Säähavainnot"],
+    ["fmi::observations::weather::timevaluepair", "Säähavainnot"],
+    # Published in no other form, and with a form of its own besides the series.
+    ["fmi::observations::seaice::manual::timevaluepair", "Merijää"],
+    ["fmi::observations::ctd::multipointcoverage", "CTD"],
+    ["fmi::observations::ctd::timevaluepair", "CTD"],
 ]
 # Stations by position, as the ::simple form gives them: the sea buoy is in FMI's station list, the observatory is not.
 BUOY = {"id": "134221", "name": "Suomenlahti aaltopoiju", "latitude": 59.96503, "longitude": 25.23542}
@@ -48,6 +55,10 @@ class FakeSession:
     def list_stations(self, lang):
         return [KAISANIEMI, HARMAJA, BUOY]
 
+    def get_series_coverage(self, lang, params):
+        FakeSession.requests.append(params)
+        return ["ICE_PT1S_INSTANT"], [{**HARMAJA, "measured": {"ICE_PT1S_INSTANT"}}, {**KAISANIEMI, "measured": set()}]
+
     def get_simple_coverage(self, lang, params):
         FakeSession.requests.append(params)
         if "surfacetemperature" in params["storedquery_id"]:
@@ -70,7 +81,17 @@ async def test_every_parameter_with_the_stations_that_reported_it(hass: HomeAssi
     catalogue = await _catalogue(hass, monkeypatch)
 
     parameters = {parameter.name: parameter for parameter in catalogue.parameters.values()}
-    assert set(parameters) == {"t2m", "r_1h", "TA_PT1H_AVG", "TA_PT1H_MAX", "Temperature", "SeaLevelN2000", "Be-7", "TWATER"}
+    assert set(parameters) == {
+        "t2m",
+        "r_1h",
+        "TA_PT1H_AVG",
+        "TA_PT1H_MAX",
+        "Temperature",
+        "SeaLevelN2000",
+        "Be-7",
+        "TWATER",
+        "ICE_PT1S_INSTANT",
+    }
     assert [station["name"] for station in parameters["t2m"].stations] == ["Helsinki Kaisaniemi", "Helsinki Harmaja"]
     assert [station["name"] for station in parameters["r_1h"].stations] == ["Helsinki Kaisaniemi"]
     assert (parameters["t2m"].kind, parameters["Temperature"].kind, parameters["Be-7"].kind) == (KIND_STATIONS, KIND_POINT, KIND_PLACE)
@@ -158,3 +179,32 @@ async def test_a_catalogue_with_a_failed_query_is_not_kept(hass: HomeAssistant, 
     monkeypatch.setattr("custom_components.fmi_open_data.catalogue.FMISession", FakeSession)
     second = await async_catalogue(hass, "fin")
     assert any(parameter.name == "TA_PT1H_AVG" for parameter in second.parameters.values())
+
+
+async def test_a_query_only_in_the_series_form_is_read_for_a_year(hass: HomeAssistant, monkeypatch):
+    catalogue = await _catalogue(hass, monkeypatch)
+
+    [ice] = [parameter for parameter in catalogue.parameters.values() if parameter.name == "ICE_PT1S_INSTANT"]
+    assert ice.query_id == "fmi::observations::seaice::manual::timevaluepair"
+    assert [station["name"] for station in ice.stations] == ["Helsinki Harmaja"]
+    [request] = [params for params in FakeSession.requests if params["storedquery_id"] == ice.query_id]
+    assert request["starttime"].startswith(f"{dt_util.utcnow().year - 1}-")
+    # A query with another form besides the series, or a ::simple one, is not offered as a series.
+    asked = {params["storedquery_id"] for params in FakeSession.requests}
+    assert not any(query_id.endswith("::timevaluepair") and query_id != ice.query_id for query_id in asked)
+
+
+async def test_a_refused_series_is_not_asked_again_as_simple(hass: HomeAssistant, monkeypatch):
+    class Refusing(FakeSession):
+        def get_series_coverage(self, lang, params):
+            FakeSession.requests.append(params)
+            raise FMIRefused("No handler found!")
+
+    FakeSession.requests = []
+    hass.config.latitude, hass.config.longitude = 60.17, 24.94
+    monkeypatch.setattr("custom_components.fmi_open_data.catalogue.FMISession", Refusing)
+    catalogue = await async_catalogue(hass, "fin")
+
+    assert not any(parameter.name == "ICE_PT1S_INSTANT" for parameter in catalogue.parameters.values())
+    asked = [params["storedquery_id"] for params in FakeSession.requests]
+    assert asked.count("fmi::observations::seaice::manual::timevaluepair") == 1

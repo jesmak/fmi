@@ -20,6 +20,7 @@ from custom_components.fmi_open_data.const import (
     CONF_FORECAST_STEP,
     CONF_LABEL,
     CONF_LANG,
+    CONF_MEASUREMENTS,
     CONF_NEGATIVE_AS_ZERO,
     CONF_NO_DATA_ISSUE,
     CONF_NO_DATA_ISSUE_HOURS,
@@ -121,13 +122,15 @@ def _parse(stamp: str):
 STALE_DATA_SETTINGS = (CONF_NO_DATA_ISSUE, CONF_NO_DATA_ISSUE_HOURS)
 
 
-async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, **overrides) -> MockConfigEntry:
+async def _setup(hass: HomeAssistant, monkeypatch, api: FakeApi, measurement_settings: dict | None = None, **overrides) -> MockConfigEntry:
+    """overrides go to the entry's options when they are stale data settings, measurement_settings to the measurement."""
     monkeypatch.setattr("custom_components.fmi_open_data.query_coordinator.FMISession", lambda *a, **kw: api)
     options = {key: value for key, value in overrides.items() if key in STALE_DATA_SETTINGS}
     data = {
         **ENTRY_DATA,
         CONF_LABEL: "Air temperature",
         **{key: value for key, value in overrides.items() if key not in STALE_DATA_SETTINGS},
+        **(measurement_settings or {}),
     }
     measurement = {key: value for key, value in data.items() if key not in (CONF_LANG, CONF_TARGET_TYPE, CONF_TARGET)}
     entry = MockConfigEntry(
@@ -202,6 +205,56 @@ async def test_short_grace_period_reports_sooner(hass: HomeAssistant, monkeypatc
 async def test_disabled_reports_nothing(hass: HomeAssistant, monkeypatch):
     api = FakeApi(age=None, parameters=[])
     entry = await _setup(hass, monkeypatch, api, **{CONF_NO_DATA_ISSUE: False})
+
+    assert _issue(hass, entry) is None
+
+
+async def test_a_measurements_own_limit_keeps_its_value(hass: HomeAssistant, monkeypatch):
+    """A weekly observation ten days old is still shown and not stale with a limit of five weeks."""
+    api = FakeApi(age=timedelta(days=10))
+    entry = await _setup(hass, monkeypatch, api, {CONF_NO_DATA_ISSUE_HOURS: 35 * 24}, **{CONF_NO_DATA_ISSUE_HOURS: 24})
+
+    assert _issue(hass, entry) is None
+    state = hass.states.get("sensor.helsinki_kaisaniemi_air_temperature")
+    assert state.state == "1.5"
+    assert state.attributes["no_data_issue_hours"] == 35 * 24
+
+
+async def test_a_measurements_issue_can_be_turned_off(hass: HomeAssistant, monkeypatch):
+    api = FakeApi(age=None, parameters=[])
+    entry = await _setup(hass, monkeypatch, api, {CONF_NO_DATA_ISSUE: False})
+
+    assert _issue(hass, entry) is None
+    assert hass.states.get("sensor.helsinki_kaisaniemi_air_temperature").attributes["no_data_issue"] is False
+    assert hass.states.get("binary_sensor.helsinki_kaisaniemi_air_temperature_stale_data").state == "on"
+
+
+async def test_switching_a_measurements_issue_off_clears_one_already_raised(hass: HomeAssistant, monkeypatch):
+    api = FakeApi(age=None, parameters=[])
+    entry = await _setup(hass, monkeypatch, api)
+    assert _issue(hass, entry) is not None
+    issue_id = _coordinator(entry).issue_id
+
+    [subentry] = entry.subentries.values()
+    [measurement] = subentry.data[CONF_MEASUREMENTS]
+    data = {**subentry.data, CONF_MEASUREMENTS: [{**measurement, CONF_NO_DATA_ISSUE: False}]}
+    hass.config_entries.async_update_subentry(entry, subentry, data=data)
+    await hass.async_block_till_done()
+
+    assert ir.async_get(hass).async_get_issue(DOMAIN, issue_id) is None
+
+
+async def test_a_measurements_own_limit_is_not_below_the_querys_minimum(hass: HomeAssistant, monkeypatch):
+    """Daily statistics come only once the day is over, so an hour's limit would call every one of them stale."""
+    api = FakeApi(age=timedelta(hours=1))
+    entry = await _setup(hass, monkeypatch, api, {CONF_QUERY_ID: "fmi::observations::weather::daily::simple", CONF_NO_DATA_ISSUE_HOURS: 1})
+
+    assert _coordinator(entry).stale_after_hours == 72
+
+
+async def test_the_entrys_switch_wins_over_a_measurements(hass: HomeAssistant, monkeypatch):
+    api = FakeApi(age=None, parameters=[])
+    entry = await _setup(hass, monkeypatch, api, {CONF_NO_DATA_ISSUE: True}, **{CONF_NO_DATA_ISSUE: False})
 
     assert _issue(hass, entry) is None
 

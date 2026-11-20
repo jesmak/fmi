@@ -31,7 +31,12 @@ NAMESPACES = {
     "gmlcov": "http://www.opengis.net/gmlcov/1.0",
     "swe": "http://www.opengis.net/swe/2.0",
     "om": "http://www.opengis.net/om/2.0",
+    "omso": "http://inspire.ec.europa.eu/schemas/omso/3.0",
+    "sams": "http://www.opengis.net/samplingSpatial/2.0",
+    "wml2": "http://www.opengis.net/waterml/2.0",
+    "xlink": "http://www.w3.org/1999/xlink",
 }
+TIMEVALUEPAIR = "::timevaluepair"
 
 
 class FMIException(Exception):
@@ -118,6 +123,37 @@ def _air_samples(root: ElementTree.Element) -> list[dict[str, Any]]:
     return samples
 
 
+def _series(root: ElementTree.Element) -> list[dict[str, Any]]:
+    """A ::timevaluepair response's series, one per station and parameter, with the values FMI has, NaN left out.
+
+    The parameter is named only in the observed property's link, and the station by its fmisid in its location.
+    """
+    series = []
+    for member in root.findall("./wfs:member/omso:PointTimeSeriesObservation", NAMESPACES):
+        observed = member.find("./om:observedProperty", NAMESPACES)
+        found = re.search(r"[?&]param=([^&]+)", observed.attrib.get(f"{{{NAMESPACES['xlink']}}}href", "") if observed is not None else "")
+        if found is None:
+            raise FMIException("FMI's response names no parameter for a series")
+        latitude, longitude = _coords(member.find(".//sams:shape/gml:Point/gml:pos", NAMESPACES))
+        values = []
+        for pair in member.findall(".//wml2:MeasurementTVP", NAMESPACES):
+            value = _text(pair, "./wml2:value")
+            if value != "NaN":
+                values.append((datetime.fromisoformat(_text(pair, "./wml2:time")), value))
+        name = member.find(".//target:Location/gml:name", NAMESPACES)
+        series.append(
+            {
+                "id": _text(member, ".//target:Location/gml:identifier"),
+                "name": name.text if name is not None and name.text else None,
+                "parameter": found.group(1),
+                "latitude": latitude,
+                "longitude": longitude,
+                "values": values,
+            }
+        )
+    return series
+
+
 def feature_url(lang: str, params: dict[str, Any]) -> str:
     url = API_GET_FEATURE_URL.replace("${lang}", lang)
     for key, value in params.items():
@@ -184,6 +220,16 @@ class FMISession:
                 sample, value = max(found, key=lambda pair: pair[0]["time"])
                 result.update(latitude=sample["latitude"], longitude=sample["longitude"])
                 result["data"] = [{"time": sample["time"], "value": normalize_value(value, negative_as_zero)}]
+            return result
+
+        if params["storedquery_id"].endswith(TIMEVALUEPAIR):
+            for series in _series(root):
+                if series["parameter"].lower() != target_param.lower():
+                    continue
+                result.update(latitude=series["latitude"], longitude=series["longitude"])
+                values = sorted(series["values"])
+                for time, value in values[-1:] if get_latest else values:
+                    result["data"].append({"time": time, "value": normalize_value(value, negative_as_zero)})
             return result
 
         for item in root.findall("./wfs:member/BsWfs:BsWfsElement", NAMESPACES):
@@ -294,6 +340,28 @@ class FMISession:
                 reported.add(name)
         return fields, measured
 
+    def get_series_coverage(self, lang: str, params: dict[str, Any]) -> tuple[list[str], list[dict[str, Any]]]:
+        """Return a ::timevaluepair query's parameters, and its stations with the parameters each one reported, as
+        get_station_coverage does."""
+        fields: list[str] = []
+        stations: dict[str, dict[str, Any]] = {}
+        for series in _series(self._xml(feature_url(lang, params))):
+            if series["parameter"] not in fields:
+                fields.append(series["parameter"])
+            station = stations.setdefault(
+                series["id"],
+                {
+                    "id": series["id"],
+                    "name": series["name"] or series["id"],
+                    "latitude": series["latitude"],
+                    "longitude": series["longitude"],
+                    "measured": set(),
+                },
+            )
+            if series["values"]:
+                station["measured"].add(series["parameter"])
+        return fields, list(stations.values())
+
     def list_stored_queries(self, lang: str, suffix: str | None = None) -> list[list[str]]:
         """Return [id, title] of the queries that take a station (fmisid), sorted by title."""
         root = self._xml(API_DESCRIBE_STORED_QUERIES_URL.replace("${lang}", lang))
@@ -316,6 +384,8 @@ class FMISession:
         if params["storedquery_id"] == STUK_AIR_SAMPLES_QUERY_ID:
             names = {name for sample in _air_samples(root) for name in sample["values"]}
             return sorted(names, key=str.lower)
+        if params["storedquery_id"].endswith(TIMEVALUEPAIR):
+            return sorted({series["parameter"] for series in _series(root)}, key=str.lower)
         names = {item.text for item in root.findall("./wfs:member/BsWfs:BsWfsElement/BsWfs:ParameterName", NAMESPACES) if item.text}
         return sorted(names, key=str.lower)
 

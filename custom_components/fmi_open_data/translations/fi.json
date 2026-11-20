@@ -33,7 +33,7 @@
     "step": {
       "init": {
         "title": "Vanhentunut data",
-        "description": "Kun anturin uusin data on tätä vanhempaa, käännetään vanhentuneesta datasta kertova binäärianturi päälle, ja korjausilmoitus voi kertoa mikä on vialla.\n\nAsetus koskee kaikkia antureita. Vuorokausi-, kuukausi- ja vuositilastot julkaistaan vasta jakson päätyttyä, joten niille raja ei ole koskaan lyhyempi kuin kolme vuorokautta, kaksi kuukautta tai kaksi vuotta, ja STUKin ilman radioaktiivisuudelle kuusi viikkoa. FMI antaa kunkin kyselyn ulottua vain tietyn ajan taaksepäin, 10 minuutin havainnoille viikon, eikä pidempi raja ulotu sen yli.",
+        "description": "Kun anturin uusin data on tätä vanhempaa, käännetään vanhentuneesta datasta kertova binäärianturi päälle, ja korjausilmoitus voi kertoa mikä on vialla.\n\nAsetukset koskevat kaikkia antureita, ja mittauksen omista asetuksista voi sen korjausilmoituksen kytkeä pois tai antaa sille oman rajan. Vuorokausi-, kuukausi- ja vuositilastot julkaistaan vasta jakson päätyttyä, joten niille raja ei ole koskaan lyhyempi kuin kolme vuorokautta, kaksi kuukautta tai kaksi vuotta, ja STUKin ilman radioaktiivisuudelle kuusi viikkoa. FMI antaa kunkin kyselyn ulottua vain tietyn ajan taaksepäin, 10 minuutin havainnoille viikon, eikä pidempi raja ulotu sen yli.",
         "data": {
           "no_data_issue": "Tee korjausilmoitus kun anturi lakkaa saamasta dataa",
           "no_data_issue_hours": "Tunteja ilman uutta dataa ennen kuin data tulkitaan vanhentuneeksi"
@@ -128,12 +128,16 @@
           "data": {
             "unit": "Yksikkö",
             "negative_as_zero": "Ilmoita -1 arvona 0. Hyödyllinen sellaisten parametrien kanssa, jotka palauttavat -1 kun arvoa ei ole. Esim. sademäärä sellaisina päivinä kun ei ole satanut.",
+            "no_data_issue": "Tee korjausilmoitus kun anturi lakkaa saamasta dataa",
+            "no_data_issue_hours": "Tunteja ilman uutta dataa ennen kuin data tulkitaan vanhentuneeksi",
             "forecast_hours": "Ennusteessa näytettävä tuntimäärä",
             "forecast_past_hours": "Näytettävä ennustehistoria tunneissa",
             "forecast_step": "Kahden ennusteen aikaväli minuuteissa"
           },
           "data_description": {
-            "unit": "Jättäessäsi kentän tyhjäksi, käytetään Ilmatieteen laitoksen omaa yksikköä. Kaikille parametreille sitä ei ole saatavilla."
+            "unit": "Jättäessäsi kentän tyhjäksi, käytetään Ilmatieteen laitoksen omaa yksikköä. Kaikille parametreille sitä ei ole saatavilla.",
+            "no_data_issue": "Kytke pois mittaukselta, jota tehdään vain osan vuotta, kuten merijäältä. Korjausilmoitusten on oltava päällä myös integraation omissa asetuksissa.",
+            "no_data_issue_hours": "Jättäessäsi kentän tyhjäksi, käytetään integraation omaa asetusta. Anturi siirtyy tuntematon-tilaan, kun sen viimeisin arvo on vähintään näin vanha."
           }
         },
         "remove_measurements": {

@@ -491,15 +491,16 @@ class StationSubentryFlow(ConfigSubentryFlow):
         return self.async_show_form(step_id="measurement", data_schema=schema)
 
     async def async_step_settings(self, user_input: dict[str, Any] | None = None) -> SubentryFlowResult:
-        """A measurement's unit, -1 as 0, and for a forecast, how much of it to show."""
+        """A measurement's unit, -1 as 0, its stale data settings, and for a forecast, how much of it to show."""
         subentry = self._get_reconfigure_subentry()
         measurements = list(subentry.data[CONF_MEASUREMENTS])
         index = next(index for index, measurement in enumerate(measurements) if measurement_key(measurement) == self.key)
         measurement = measurements[index]
 
         if user_input is not None:
-            # A unit left empty is not in the form's data, and then FMI's own applies again.
-            measurements[index] = {**{key: value for key, value in measurement.items() if key != CONF_UNIT}, **user_input}
+            # A field left empty is not in the form's data, and then FMI's own unit or the entry's hours apply again.
+            kept = {key: value for key, value in measurement.items() if key not in (CONF_UNIT, CONF_NO_DATA_ISSUE_HOURS)}
+            measurements[index] = {**kept, **user_input}
             return self.async_update_and_abort(
                 self._get_entry(), subentry, data={**subentry.data, CONF_MEASUREMENTS: measurements}, reason="reconfigure_successful"
             )
@@ -507,10 +508,13 @@ class StationSubentryFlow(ConfigSubentryFlow):
         fields = {
             vol.Optional(CONF_UNIT): cv.string,
             vol.Required(CONF_NEGATIVE_AS_ZERO): cv.boolean,
+            vol.Required(CONF_NO_DATA_ISSUE): cv.boolean,
+            vol.Optional(CONF_NO_DATA_ISSUE_HOURS): cv.positive_int,
         }
         if "::forecast" in str(measurement[CONF_QUERY_ID]):
             fields |= {vol.Required(key): cv.positive_int for key in FORECAST_DEFAULTS}
-        schema = self.add_suggested_values_to_schema(vol.Schema(fields), {**FORECAST_DEFAULTS, CONF_NEGATIVE_AS_ZERO: False, **measurement})
+        defaults = {**FORECAST_DEFAULTS, CONF_NEGATIVE_AS_ZERO: False, CONF_NO_DATA_ISSUE: True}
+        schema = self.add_suggested_values_to_schema(vol.Schema(fields), {**defaults, **measurement})
         return self.async_show_form(
             step_id="settings", data_schema=schema, last_step=True, description_placeholders={CONF_MEASUREMENT: measurement[CONF_LABEL]}
         )

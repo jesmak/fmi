@@ -33,7 +33,7 @@
     "step": {
       "init": {
         "title": "Stale data",
-        "description": "When a sensor's newest data is older than this, the binary sensor for stale data turns on, and a repair issue can tell you what is wrong.\n\nThe setting applies to every sensor. Daily, monthly and yearly statistics are only reported once the period is over, so for those the limit is never shorter than three days, two months or two years, and for STUK's air radioactivity six weeks. FMI lets each query reach back only so far, a week for the 10-minute observations, and a longer limit ends there.",
+        "description": "When a sensor's newest data is older than this, the binary sensor for stale data turns on, and a repair issue can tell you what is wrong.\n\nThe settings apply to every sensor, and a measurement's own settings can turn its repair issue off or give it a limit of its own. Daily, monthly and yearly statistics are only reported once the period is over, so for those the limit is never shorter than three days, two months or two years, and for STUK's air radioactivity six weeks. FMI lets each query reach back only so far, a week for the 10-minute observations, and a longer limit ends there.",
         "data": {
           "no_data_issue": "Raise a repair issue when a sensor stops getting data",
           "no_data_issue_hours": "Hours without new data before the data is considered stale"
@@ -128,12 +128,16 @@
           "data": {
             "unit": "Unit",
             "negative_as_zero": "Report -1 as 0. Helpful with parameters that return -1 when there is no measurable value, such as precipitation on days when it has not rained.",
+            "no_data_issue": "Raise a repair issue when the sensor stops getting data",
+            "no_data_issue_hours": "Hours without new data before the data is considered stale",
             "forecast_hours": "Forecast hours to show",
             "forecast_past_hours": "Forecast history to show (hours)",
             "forecast_step": "Time step between two forecast values in minutes"
           },
           "data_description": {
-            "unit": "If you leave the field empty, FMI's own unit is used. It is not available for every parameter."
+            "unit": "If you leave the field empty, FMI's own unit is used. It is not available for every parameter.",
+            "no_data_issue": "Turn it off for a measurement that is only made for part of the year, such as sea ice. Repair issues have to be on in the integration's own settings too.",
+            "no_data_issue_hours": "If you leave the field empty, the integration's own setting is used. The sensor turns unknown once its latest value is at least this old."
           }
         },
         "remove_measurements": {

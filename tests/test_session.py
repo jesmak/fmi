@@ -149,3 +149,41 @@ def test_a_document_is_downloaded_only_when_it_has_changed(monkeypatch):
     assert FMISession().get_changed_document("feed", 'W/"abc"') is None
     assert FMISession().get_changed_document("feed", 'W/"old"') == (b"<feed />", 'W/"abc"')
     assert sent == [None, 'W/"abc"', 'W/"old"']
+
+
+ICE_QUERY = {"storedquery_id": "fmi::observations::seaice::manual::timevaluepair", "fmisid": "100655"}
+
+
+def test_the_latest_value_of_a_series(monkeypatch):
+    result = _session(monkeypatch, "fmi_sea_ice.xml").get_feature("fin", ICE_QUERY, "sndice_pt1m_avg", get_latest=True)
+
+    # The newest value is NaN and left out.
+    assert result["data"] == [{"time": datetime(2026, 1, 27, 8, 0, tzinfo=UTC), "value": "5.0"}]
+    assert (result["latitude"], result["longitude"]) == (60.17, 24.965)
+
+
+def test_every_value_of_a_series(monkeypatch):
+    result = _session(monkeypatch, "fmi_sea_ice.xml").get_feature("fin", ICE_QUERY, "ICE_PT1S_INSTANT", get_latest=False)
+
+    assert [(item["time"].day, item["value"]) for item in result["data"]] == [(20, "12.0"), (3, "18.0")]
+
+
+def test_a_series_queries_parameters_and_stations(monkeypatch):
+    session = _session(monkeypatch, "fmi_sea_ice.xml")
+
+    fields, stations = session.get_series_coverage("fin", ICE_QUERY)
+
+    assert fields == ["ICE_PT1S_INSTANT", "SNDICE_PT1M_AVG"]
+    assert [(station["id"], station["name"], station["measured"]) for station in stations] == [
+        ("100655", "Helsinki pohjoissatama", {"ICE_PT1S_INSTANT", "SNDICE_PT1M_AVG"})
+    ]
+    assert session.list_parameters("fin", ICE_QUERY) == ["ICE_PT1S_INSTANT", "SNDICE_PT1M_AVG"]
+
+
+def test_a_station_with_only_nan_has_not_measured_the_parameter(monkeypatch):
+    content = (FIXTURES / "fmi_sea_ice.xml").read_text(encoding="utf-8").replace(">12.0<", ">NaN<").replace(">18.0<", ">NaN<")
+    monkeypatch.setattr(FMISession, "get_document", lambda self, url: content.encode())
+
+    _, [station] = FMISession().get_series_coverage("fin", ICE_QUERY)
+
+    assert station["measured"] == {"SNDICE_PT1M_AVG"}

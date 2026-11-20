@@ -13,7 +13,7 @@ The data in the picture is made up.
 ## What is it?
 
 FMI publishes almost everything it measures as open data. That is the weather at some 200 stations, rain, snow
-depth, sea level, waves, water temperature, air quality, solar radiation and STUK's radiation measurements, along
+depth, sea level, waves, water temperature, sea ice, air quality, solar radiation and STUK's radiation measurements, along
 with FMI's forecasts and weather warnings. The weather integrations usually give you the temperature and the forecast. This one
 gives you the rest as well.
 
@@ -67,8 +67,9 @@ of the measurements it suggests, and the warning texts are in that language. Cha
 
 ### Options
 
-**Configure** on the integration sets when a measurement's data counts as stale. The settings apply to every
-measurement.
+**Configure** on the integration sets when a measurement's data counts as stale. The hours apply to every
+measurement that has none of its own (see [Changing a station](#changing-a-station)). Switching the repair issue off
+here turns it off for all of them.
 
 | Name                   | Type | Description                                                        | Default |
 | ---------------------- | ---- | ------------------------------------------------------------------ | ------- |
@@ -95,6 +96,11 @@ Choose **Add measurements** on the integration page.
      samples are collected for about a week and analysed one to four weeks later, and a nuclide below the detection
      limit is left out of a sample. A sensor shows the nuclide's value in the newest sample that has it, with the time
      that sample's collection ended.
+   - Sea ice and the snow on it are observed by hand at about 20 coastal stations, about once a week while there is
+     ice. The stations that observed them in the past year are offered. In the winter of 2025–2026 the longest gap
+     between two observations at a station was a month, and the last observation of the spring was followed by none.
+     Give such a measurement [its own settings](#changing-a-station): a limit long enough to keep its value between
+     observations, and its repair issue switched off, so that the summer does not raise one.
 3. **Names.** Filled in from FMI's description of the parameter, with the period of a daily or hourly query, such
    as "Sademäärä, tunti". Home Assistant shows the station's name in front of it, so the sensor reads
    "Lappeenranta lentoasema Sademäärä, tunti".
@@ -109,14 +115,18 @@ measurements to several stations.
 - **Add measurements:** only what the station has reported is offered.
 - **Change a measurement's settings:**
 
-  | Name                | Type   | Description                                                                         | Default |
-  | ------------------- | ------ | ----------------------------------------------------------------------------------- | ------- |
-  | Unit                | string | The unit to show. Empty uses FMI's own, which FMI does not give for every parameter | FMI's   |
-  | Report -1 as 0      | bool   | For parameters that use -1 for no measurable value, such as daily precipitation     | `false` |
-  | Forecast hours      | int    | How many hours ahead a forecast shows                                               | 36      |
-  | Forecast past hours | int    | How many hours of the forecast already past it keeps                                | 5       |
-  | Forecast step       | int    | Minutes between two forecast values                                                 | 30      |
+  | Name                   | Type   | Description                                                                         | Default            |
+  | ---------------------- | ------ | ----------------------------------------------------------------------------------- | ------------------ |
+  | Unit                   | string | The unit to show. Empty uses FMI's own, which FMI does not give for every parameter | FMI's              |
+  | Report -1 as 0         | bool   | For parameters that use -1 for no measurable value, such as daily precipitation     | `false`            |
+  | Raise a repair issue   | bool   | A repair issue when this measurement stops getting data                             | `true`             |
+  | Hours without new data | int    | How old its newest data may be before it counts as stale. Empty uses the options'   | The options' hours |
+  | Forecast hours         | int    | How many hours ahead a forecast shows                                               | 36                 |
+  | Forecast past hours    | int    | How many hours of the forecast already past it keeps                                | 5                  |
+  | Forecast step          | int    | Minutes between two forecast values                                                 | 30                 |
 
+  A repair issue is raised only when it is on both here and in the [options](#options). A sensor shows its newest
+  value until the value is older than its limit. The minimums for statistics and STUK's samples apply here too.
   The forecast settings are only for forecasts.
 
 - **Remove measurements:** a station keeps at least one. To remove it altogether, delete it on the integration page.
@@ -179,7 +189,7 @@ The `forecast` attribute is not kept in history.
 
 Every measurement also has a diagnostic binary sensor, such as
 `binary_sensor.lappeenranta_lentoasema_sademaara_tunti_stale_data`. It is on while the newest data FMI holds for the
-measurement is older than the limit in the options, or than FMI lets the query reach back, and it turns off by itself
+measurement is older than its limit, or than FMI lets the query reach back, and it turns off by itself
 when data comes back. The age comes from FMI's own timestamps, so restarting Home Assistant does not reset it.
 
 FMI removes parameters from stations, and stations are now and then shut down or renumbered. Neither is an error:

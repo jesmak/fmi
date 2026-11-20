@@ -244,14 +244,34 @@ async def test_a_measurements_unit(hass: HomeAssistant, entry: MockConfigEntry):
     result = await _reconfigure(hass, entry, "measurement")
     result = await _configure(hass, result, {"measurement": f"{WEATHER}_t2m"})
     assert result["step_id"] == "settings"
-    result = await _configure(hass, result, {CONF_UNIT: "K", "negative_as_zero": True})
+    result = await _configure(hass, result, {CONF_UNIT: "K", "negative_as_zero": True, "no_data_issue": False, "no_data_issue_hours": 840})
 
     assert result["reason"] == "reconfigure_successful"
     assert result.get("translation_domain") is None, "the integration's own text"
     [subentry] = entry.subentries.values()
     assert subentry.data[CONF_MEASUREMENTS][0][CONF_UNIT] == "K"
     assert subentry.data[CONF_MEASUREMENTS][0]["negative_as_zero"] is True
-    assert hass.states.get("sensor.helsinki_kaisaniemi_ilman_lampotila").attributes["unit_of_measurement"] == "K"
+    assert subentry.data[CONF_MEASUREMENTS][0]["no_data_issue_hours"] == 840
+    attributes = hass.states.get("sensor.helsinki_kaisaniemi_ilman_lampotila").attributes
+    assert (attributes["unit_of_measurement"], attributes["no_data_issue"], attributes["no_data_issue_hours"]) == ("K", False, 840)
+
+
+async def test_a_measurements_hours_left_empty_go_back_to_the_entrys(hass: HomeAssistant, entry: MockConfigEntry):
+    result = await _reconfigure(hass, entry, "measurement")
+    result = await _configure(hass, result, {"measurement": f"{WEATHER}_t2m"})
+    await _configure(hass, result, {"negative_as_zero": False, "no_data_issue": True, "no_data_issue_hours": 840})
+    [subentry] = entry.subentries.values()
+    result = await hass.config_entries.subentries.async_init(
+        (entry.entry_id, SUBENTRY_STATION), context={"source": SOURCE_RECONFIGURE, "subentry_id": subentry.subentry_id}
+    )
+    result = await _configure(hass, result, {"next_step_id": "measurement"})
+    result = await _configure(hass, result, {"measurement": f"{WEATHER}_t2m"})
+    hours = next(key for key in result["data_schema"].schema if key == "no_data_issue_hours")
+    assert hours.description["suggested_value"] == 840
+    await _configure(hass, result, {"negative_as_zero": False, "no_data_issue": True})
+
+    [subentry] = entry.subentries.values()
+    assert "no_data_issue_hours" not in subentry.data[CONF_MEASUREMENTS][0]
 
 
 async def test_removing_a_measurement_removes_its_entities(hass: HomeAssistant, entry: MockConfigEntry):
