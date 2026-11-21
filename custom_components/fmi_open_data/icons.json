@@ -1,4 +1,86 @@
 {
+  "entity": {
+    "sensor": {
+      "measurement": {
+        "default": "mdi:weather-cloudy"
+      },
+      "radioactivity": {
+        "default": "mdi:radioactive"
+      },
+      "air_quality": {
+        "default": "mdi:molecule"
+      },
+      "snow_on_ice": {
+        "default": "mdi:snowflake-variant"
+      },
+      "ice": {
+        "default": "mdi:snowflake"
+      },
+      "snow": {
+        "default": "mdi:weather-snowy"
+      },
+      "water_temperature": {
+        "default": "mdi:thermometer-water"
+      },
+      "dew_point": {
+        "default": "mdi:water-thermometer-outline"
+      },
+      "ground_temperature": {
+        "default": "mdi:thermometer-lines"
+      },
+      "temperature": {
+        "default": "mdi:thermometer"
+      },
+      "humidity": {
+        "default": "mdi:water-percent"
+      },
+      "pressure": {
+        "default": "mdi:gauge"
+      },
+      "wind_gust": {
+        "default": "mdi:weather-windy-variant"
+      },
+      "wind_direction": {
+        "default": "mdi:compass-outline"
+      },
+      "wind_speed": {
+        "default": "mdi:weather-windy"
+      },
+      "precipitation_intensity": {
+        "default": "mdi:weather-pouring"
+      },
+      "precipitation": {
+        "default": "mdi:weather-rainy"
+      },
+      "cloud_base": {
+        "default": "mdi:cloud-arrow-up"
+      },
+      "cloud_cover": {
+        "default": "mdi:weather-cloudy"
+      },
+      "visibility": {
+        "default": "mdi:weather-fog"
+      },
+      "uv": {
+        "default": "mdi:sun-wireless"
+      },
+      "sunshine": {
+        "default": "mdi:weather-sunny"
+      },
+      "solar_radiation": {
+        "default": "mdi:white-balance-sunny"
+      },
+      "water_level": {
+        "default": "mdi:waves-arrow-up"
+      },
+      "waves": {
+        "default": "mdi:waves"
+      },
+      "magnetic_field": {
+        "default": "mdi:magnet"
+      }
+    }
+  },
   "services": {
     "get_observations": {
       "service": "mdi:chart-timeline-variant"

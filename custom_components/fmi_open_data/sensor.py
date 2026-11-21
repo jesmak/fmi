@@ -24,6 +24,7 @@ from .const import (
     CONF_WARNING_TYPES,
     WARNING_LEVELS,
 )
+from .icons import parameter_kind
 from .query_coordinator import FMIQueryCoordinator
 from .warning_coordinator import FMIWarningsCoordinator
 from .warning_map import FMIWarningMapCoordinator, feed_attributes
@@ -114,6 +115,8 @@ class FMIQuerySensor(CoordinatorEntity[FMIQueryCoordinator], SensorEntity):
         self._attr_device_info = coordinator.config_entry.runtime_data.devices[coordinator.subentry.subentry_id]
         # The measurement. The station is the device's name, which Home Assistant puts in front.
         self._attr_name = coordinator.measurement[CONF_LABEL]
+        # Only for the icon in icons.json: the name above wins over a translated one.
+        self._attr_translation_key = parameter_kind(coordinator.measurement[CONF_PARAMETER])
         self._config_attributes = get_config_attributes(coordinator)
 
     @property
@@ -131,8 +134,6 @@ class FMIQuerySensor(CoordinatorEntity[FMIQueryCoordinator], SensorEntity):
 
 class FMISensor(FMIQuerySensor):
     """The latest observed value."""
-
-    _attr_icon = "mdi:weather-cloudy"
 
     @property
     def native_value(self):
@@ -153,7 +154,6 @@ class FMIForecastSensor(FMIQuerySensor):
 
     # The whole forecast repeats on every refresh; history only needs the next value.
     _unrecorded_attributes = frozenset({ATTR_FORECAST})
-    _attr_icon = "mdi:weather-cloudy-clock"
 
     @property
     def native_value(self):
