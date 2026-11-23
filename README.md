@@ -115,15 +115,15 @@ measurements to several stations.
 - **Add measurements:** only what the station has reported is offered.
 - **Change a measurement's settings:**
 
-  | Name                   | Type   | Description                                                                         | Default            |
-  | ---------------------- | ------ | ----------------------------------------------------------------------------------- | ------------------ |
-  | Unit                   | string | The unit to show. Empty uses FMI's own, which FMI does not give for every parameter | FMI's              |
-  | Report -1 as 0         | bool   | For parameters that use -1 for no measurable value, such as daily precipitation     | `false`            |
-  | Raise a repair issue   | bool   | A repair issue when this measurement stops getting data                             | `true`             |
-  | Hours without new data | int    | How old its newest data may be before it counts as stale. Empty uses the options'   | The options' hours |
-  | Forecast hours         | int    | How many hours ahead a forecast shows                                               | 36                 |
-  | Forecast past hours    | int    | How many hours of the forecast already past it keeps                                | 5                  |
-  | Forecast step          | int    | Minutes between two forecast values                                                 | 30                 |
+  | Name                   | Type   | Description                                                                                   | Default            |
+  | ---------------------- | ------ | --------------------------------------------------------------------------------------------- | ------------------ |
+  | Unit                   | string | The unit the values are in. Empty uses FMI's own, which FMI does not give for every parameter | FMI's              |
+  | Report -1 as 0         | bool   | For parameters that use -1 for no measurable value, such as daily precipitation               | `false`            |
+  | Raise a repair issue   | bool   | A repair issue when this measurement stops getting data                                       | `true`             |
+  | Hours without new data | int    | How old its newest data may be before it counts as stale. Empty uses the options'             | The options' hours |
+  | Forecast hours         | int    | How many hours ahead a forecast shows                                                         | 36                 |
+  | Forecast past hours    | int    | How many hours of the forecast already past it keeps                                          | 5                  |
+  | Forecast step          | int    | Minutes between two forecast values                                                           | 30                 |
 
   A repair issue is raised only when it is on both here and in the [options](#options). A sensor shows its newest
   value until the value is older than its limit. The minimums for statistics and STUK's samples apply here too.
@@ -169,6 +169,10 @@ can be added, such as one for the land and one for the sea.
 
 Every measurement is a sensor, named after the station and the measurement. An observation's state is the latest
 value, a forecast's the next one.
+
+A measurement Home Assistant has a device class for, such as a temperature, a wind speed, a snow depth or fine
+particles, gets that class when its unit is one Home Assistant accepts for it. Home Assistant can then show it in the
+units you choose. The rest are plain numbers in FMI's unit, spelled as Home Assistant spells it.
 
 | Attribute                                                | Description                                                                           |
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------- |

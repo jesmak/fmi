@@ -26,6 +26,7 @@ from .const import (
 )
 from .icons import parameter_kind
 from .query_coordinator import FMIQueryCoordinator
+from .units import async_relabel_statistics, sensor_class, state_class
 from .warning_coordinator import FMIWarningsCoordinator
 from .warning_map import FMIWarningMapCoordinator, feed_attributes
 
@@ -107,7 +108,6 @@ class FMIQuerySensor(CoordinatorEntity[FMIQueryCoordinator], SensorEntity):
 
     _attr_attribution = ATTRIBUTION
     _attr_has_entity_name = True
-    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: FMIQueryCoordinator):
         super().__init__(coordinator)
@@ -118,14 +118,50 @@ class FMIQuerySensor(CoordinatorEntity[FMIQueryCoordinator], SensorEntity):
         # Only for the icon in icons.json: the name above wins over a translated one.
         self._attr_translation_key = parameter_kind(coordinator.measurement[CONF_PARAMETER])
         self._config_attributes = get_config_attributes(coordinator)
+        self._statistics_relabelled = False
 
     @property
     def _values(self) -> list[dict]:
         return self.coordinator.data["data"] if self.coordinator.data else []
 
     @property
-    def native_unit_of_measurement(self) -> str | None:
+    def _fmi_unit(self) -> str | None:
+        """FMI's unit, or the user's, as it is spelled there."""
         return self.coordinator.data.get("unit") if self.coordinator.data else None
+
+    @property
+    def _class_and_unit(self) -> tuple[SensorDeviceClass | None, str | None]:
+        return sensor_class(self.coordinator.measurement[CONF_PARAMETER], self._fmi_unit)
+
+    @property
+    def device_class(self) -> SensorDeviceClass | None:
+        return self._class_and_unit[0]
+
+    @property
+    def state_class(self) -> SensorStateClass:
+        return state_class(self.device_class)
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        return self._class_and_unit[1]
+
+    # The unit is known only once FMI has answered, which at startup it may not have.
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self.coordinator.data:
+            await self._async_relabel_statistics()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        if not self._statistics_relabelled and self.coordinator.data:
+            self.hass.async_create_task(self._async_relabel_statistics())
+        super()._handle_coordinator_update()
+
+    async def _async_relabel_statistics(self) -> None:
+        if self._statistics_relabelled:
+            return
+        self._statistics_relabelled = True
+        await async_relabel_statistics(self.hass, self.entity_id, self.device_class, self._fmi_unit, self.native_unit_of_measurement)
 
     def _location_attributes(self) -> dict:
         data = self.coordinator.data or {}

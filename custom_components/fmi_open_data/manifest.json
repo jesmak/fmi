@@ -1,6 +1,7 @@
 {
   "domain": "fmi_open_data",
   "name": "FMI Open Data",
+  "after_dependencies": ["recorder"],
   "categories": ["weather_alerts"],
   "codeowners": [
     "@jesmak"

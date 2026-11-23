@@ -253,7 +253,8 @@ async def test_a_measurements_unit(hass: HomeAssistant, entry: MockConfigEntry):
     assert subentry.data[CONF_MEASUREMENTS][0]["negative_as_zero"] is True
     assert subentry.data[CONF_MEASUREMENTS][0]["no_data_issue_hours"] == 840
     attributes = hass.states.get("sensor.helsinki_kaisaniemi_ilman_lampotila").attributes
-    assert (attributes["unit_of_measurement"], attributes["no_data_issue"], attributes["no_data_issue_hours"]) == ("K", False, 840)
+    # The values are taken to be in kelvins, and Home Assistant shows a temperature in its unit system's own unit.
+    assert (attributes["unit_of_measurement"], attributes["no_data_issue"], attributes["no_data_issue_hours"]) == ("°C", False, 840)
 
 
 async def test_a_measurements_hours_left_empty_go_back_to_the_entrys(hass: HomeAssistant, entry: MockConfigEntry):
