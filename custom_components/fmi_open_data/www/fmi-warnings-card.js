@@ -926,6 +926,10 @@ function filledHeight(content, config, limit = Infinity) {
 function spareRoom(filled, content) {
   return Math.max(0, Math.floor(filled - content + SLACK_PX));
 }
+function heldSpare(held, content) {
+  const spare = spareRoom(held, content);
+  return spare < ROW_PX ? spare : 0;
+}
 function fillLimit(config, layout, minimum = 0) {
   const rows = config.grid_options ? config.grid_options.rows : config.layout_options?.grid_rows;
   if (layout !== "grid" || typeof rows === "number") {
@@ -1713,8 +1717,9 @@ var FmiWarningsCard = class extends i4 {
   /**
    * In a sections view whose rows are left automatic, the card takes the whole rows its content needs, or the half rows
    * with `row_step: half`, so the cards under it stay on the rows, up to the limit of a card that grows up to one. The
-   * room left over goes under the title, or above
-   * the content without one. A row sliding open or shut counts as it will be when the slide ends.
+   * room left over goes under the title, or without one its upper half goes above the content, which is centred. A row
+   * sliding open or shut counts as it will be when the slide ends. A card held to a height that leaves less than a row
+   * over its content spreads that room the same way.
    */
   fillRows() {
     const card = this.renderRoot.querySelector("ha-card");
@@ -1722,7 +1727,8 @@ var FmiWarningsCard = class extends i4 {
       return;
     }
     const limit = fillLimit(this.config ?? {}, this.layout, this.minimumHeight());
-    if (!limit) {
+    const held = !limit && Boolean(heightStyle(this.config ?? {}, this.layout, this.minimumHeight()));
+    if (!limit && !held) {
       this.filled = 0;
       this.spare = 0;
       return;
@@ -1736,7 +1742,7 @@ var FmiWarningsCard = class extends i4 {
     }
     const scale = drawnScale(card);
     const style = getComputedStyle(card);
-    let content = (last.getBoundingClientRect().bottom - card.getBoundingClientRect().top) / scale + px(style.paddingBottom) + px(style.borderBottomWidth);
+    let content = (last.getBoundingClientRect().bottom - card.getBoundingClientRect().top) / scale + (card.querySelector(":scope > .body")?.scrollTop ?? 0) + px(style.paddingBottom) + px(style.borderBottomWidth);
     for (const expander of card.querySelectorAll(".expander")) {
       const end = expander.classList.contains("open") ? expander.querySelector(".details")?.getBoundingClientRect().height ?? 0 : 0;
       content += (end - expander.getBoundingClientRect().height) / scale;
@@ -1746,14 +1752,23 @@ var FmiWarningsCard = class extends i4 {
       const spareStyle = getComputedStyle(spare);
       content -= px(spare.classList.contains("spare") ? spareStyle.paddingBottom : spareStyle.paddingTop);
     }
+    if (held) {
+      this.filled = 0;
+      this.spare = heldSpare(card.getBoundingClientRect().height / scale, content);
+      return;
+    }
     const filled = filledHeight(content, this.config ?? {}, limit);
     this.filled = filled;
     this.spare = spareRoom(filled, content);
   }
-  /** The card's inline style: the height it is held to, or the rows it fills up to any limit, with their spare room. */
+  /**
+   * The card's inline style: the height it is held to, or the rows it fills up to any limit, with their spare room, all
+   * of it under the title, or without one the upper half above the content.
+   */
   cardStyle() {
     const style = filledStyle(this.config ?? {}, this.layout, this.minimumHeight(), this.filled);
-    return this.filled ? `${style}; --spare: ${this.spare}px` : style;
+    const spare = this.config?.title ? this.spare : Math.floor(this.spare / 2);
+    return spare ? [style, `--spare: ${spare}px`].filter(Boolean).join("; ") : style;
   }
   timeZone() {
     return this.hass?.locale?.time_zone === "server" ? this.hass.config?.time_zone : void 0;
@@ -1842,7 +1857,7 @@ var FmiWarningsCard = class extends i4 {
                     overflow-wrap: anywhere;
                 }
 
-                /* The room a whole row leaves over, under the title, or above the content without one. Padding, not a
+                /* The room left over, under the title, or its upper half above the content without one. Padding, not a
                 margin, which would collapse into a neighbour's. */
                 ha-card > .spare {
                     padding-bottom: var(--spare, 0px);

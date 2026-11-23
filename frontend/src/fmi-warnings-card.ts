@@ -15,7 +15,7 @@ import { ScrollFade, fadeStyles } from "./fade";
 import type { HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
-import { drawnScale, fillLimit, filledHeight, filledStyle, spareRoom, validRowStep } from "./rows";
+import { drawnScale, fillLimit, filledHeight, filledStyle, heldSpare, spareRoom, validRowStep } from "./rows";
 import type { FmiWarningsCardConfig, Warning } from "./types";
 import { eventEntity, isWarningsSensor, moment, pastWarnings, timeline, visibleWarnings, warningsSensors } from "./warnings";
 import type { HistoryRow, Past, Shown } from "./warnings";
@@ -555,8 +555,9 @@ export class FmiWarningsCard extends LitElement {
     /**
      * In a sections view whose rows are left automatic, the card takes the whole rows its content needs, or the half rows
      * with `row_step: half`, so the cards under it stay on the rows, up to the limit of a card that grows up to one. The
-     * room left over goes under the title, or above
-     * the content without one. A row sliding open or shut counts as it will be when the slide ends.
+     * room left over goes under the title, or without one its upper half goes above the content, which is centred. A row
+     * sliding open or shut counts as it will be when the slide ends. A card held to a height that leaves less than a row
+     * over its content spreads that room the same way.
      */
     private fillRows(): void {
         const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
@@ -564,7 +565,8 @@ export class FmiWarningsCard extends LitElement {
             return;
         }
         const limit = fillLimit(this.config ?? {}, this.layout, this.minimumHeight());
-        if (!limit) {
+        const held = !limit && Boolean(heightStyle(this.config ?? {}, this.layout, this.minimumHeight()));
+        if (!limit && !held) {
             this.filled = 0;
             this.spare = 0;
             return;
@@ -582,8 +584,10 @@ export class FmiWarningsCard extends LitElement {
         // Drawn sizes are unscaled, as the padding and border added to them are the layout's.
         const scale = drawnScale(card);
         const style = getComputedStyle(card);
+        // However far the rows are scrolled, as a held card's scroll.
         let content =
             (last.getBoundingClientRect().bottom - card.getBoundingClientRect().top) / scale +
+            (card.querySelector<HTMLElement>(":scope > .body")?.scrollTop ?? 0) +
             px(style.paddingBottom) +
             px(style.borderBottomWidth);
         // A slide's box is clipped while it moves, so each fold counts at its end: an open one at its details, a shut one at nothing.
@@ -599,15 +603,24 @@ export class FmiWarningsCard extends LitElement {
             const spareStyle = getComputedStyle(spare);
             content -= px(spare.classList.contains("spare") ? spareStyle.paddingBottom : spareStyle.paddingTop);
         }
+        if (held) {
+            this.filled = 0;
+            this.spare = heldSpare(card.getBoundingClientRect().height / scale, content);
+            return;
+        }
         const filled = filledHeight(content, this.config ?? {}, limit);
         this.filled = filled;
         this.spare = spareRoom(filled, content);
     }
 
-    /** The card's inline style: the height it is held to, or the rows it fills up to any limit, with their spare room. */
+    /**
+     * The card's inline style: the height it is held to, or the rows it fills up to any limit, with their spare room, all
+     * of it under the title, or without one the upper half above the content.
+     */
     private cardStyle(): string {
         const style = filledStyle(this.config ?? {}, this.layout, this.minimumHeight(), this.filled);
-        return this.filled ? `${style}; --spare: ${this.spare}px` : style;
+        const spare = this.config?.title ? this.spare : Math.floor(this.spare / 2);
+        return spare ? [style, `--spare: ${spare}px`].filter(Boolean).join("; ") : style;
     }
 
     private timeZone(): string | undefined {
@@ -700,7 +713,7 @@ export class FmiWarningsCard extends LitElement {
                     overflow-wrap: anywhere;
                 }
 
-                /* The room a whole row leaves over, under the title, or above the content without one. Padding, not a
+                /* The room left over, under the title, or its upper half above the content without one. Padding, not a
                 margin, which would collapse into a neighbour's. */
                 ha-card > .spare {
                     padding-bottom: var(--spare, 0px);

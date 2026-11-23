@@ -90,31 +90,32 @@ afterEach(() => {
 describe("filling the rows of a sections view", () => {
     // The content ends 11 px of padding under its last part: at 150 px with it ending at 139.
     it.each([
-        ["whole rows", {}, "min-height: 184px; --spare: 34px"],
-        ["half rows", { row_step: "half" }, "min-height: 152px; --spare: 2px"],
+        ["whole rows", {}, "min-height: 184px; --spare: 17px"],
+        ["half rows", { row_step: "half" }, "min-height: 152px; --spare: 1px"],
     ])("on automatic rows, ends on %s", async (_name, config, expected) => {
         expect(await filled(await card(config, "grid"), 139)).toBe(expected);
     });
 
     // The content is 120.4 px, a fraction over two rows, and then 216 px drawn at 0.8, as a dialog opening draws the card.
     it.each([
-        ["takes the next row for a content a fraction of a pixel over one", 109.4, 1, "min-height: 184px; --spare: 63px"],
-        ["measures a card drawn scaled, in the layout's pixels", 205, 0.8, "min-height: 248px; --spare: 32px"],
+        ["takes the next row for a content a fraction of a pixel over one", 109.4, 1, "min-height: 184px; --spare: 31px"],
+        ["measures a card drawn scaled, in the layout's pixels", 205, 0.8, "min-height: 248px; --spare: 16px"],
     ])("%s", async (_name, end, scale, expected) => {
         expect(await filled(await card({}, "grid"), end, scale)).toBe(expected);
     });
 
-    it.each<[string, Record<string, unknown>, Warning[], string, string]>([
-        ["under the title", { title: "Varoitukset" }, [WIND], ".card-title", "padding-bottom"],
-        ["under the title with no warnings", { title: "Varoitukset" }, [], ".card-title", "padding-bottom"],
-        ["above the timeline and the rows without a title", {}, [WIND], ".body", "padding-top"],
-        ["above the line saying there are none without a title", {}, [], ".empty", "padding-top"],
-    ])("puts the spare room %s, and doesn't count it again once drawn", async (_name, config, warnings, holder, side) => {
+    // Without a title the content is centred, so only the upper half of the room, 17 of 34 px, goes above it.
+    it.each<[string, Record<string, unknown>, Warning[], string, string, number]>([
+        ["under the title", { title: "Varoitukset" }, [WIND], ".card-title", "padding-bottom", 34],
+        ["under the title with no warnings", { title: "Varoitukset" }, [], ".card-title", "padding-bottom", 34],
+        ["half of it above the timeline and the rows without a title", {}, [WIND], ".body", "padding-top", 17],
+        ["half of it above the line saying there are none without a title", {}, [], ".empty", "padding-top", 17],
+    ])("puts the spare room %s, and doesn't count it again once drawn", async (_name, config, warnings, holder, side, drawn) => {
         const element = await card(config, "grid", warnings);
         expect([...element.shadowRoot!.querySelectorAll(".spare, .spare-top")]).toEqual([one(element, holder)]);
-        expect(await filled(element, 139)).toBe("min-height: 184px; --spare: 34px");
-        one(element, holder).style.setProperty(side, "34px");
-        expect(await filled(element, 173)).toBe("min-height: 184px; --spare: 34px");
+        expect(await filled(element, 139)).toBe(`min-height: 184px; --spare: ${drawn}px`);
+        one(element, holder).style.setProperty(side, `${drawn}px`);
+        expect(await filled(element, 139 + drawn)).toBe(`min-height: 184px; --spare: ${drawn}px`);
     });
 
     it("measures to its last part's end, never an element a theme adds after it", async () => {
@@ -122,31 +123,31 @@ describe("filling the rows of a sections view", () => {
         const added = document.createElement("div");
         box(added, 0, 900);
         one(element, "ha-card").append(added);
-        expect(await filled(element, 139)).toBe("min-height: 184px; --spare: 34px");
+        expect(await filled(element, 139)).toBe("min-height: 184px; --spare: 17px");
     });
 
     // Each fold counts at its slide's end, whatever its drawn height: open at its details, shut at nothing. The content
     // drawn ends at 150 px, so it comes to 150 plus each fold's end less its drawn height, less the spare room above the
     // body as drawn, which moves with the slide. The first row's details are 80 px, the second's 50.
     it.each<[string, [boolean, number], [boolean, number], number, string]>([
-        ["the first opening alone, 150 − 30 + 80 = 200", [true, 30], [false, 0], 0, "min-height: 248px; --spare: 48px"],
-        ["the first shutting alone, 150 − 30 = 120", [false, 30], [false, 0], 0, "min-height: 120px; --spare: 0px"],
-        ["the first opening as the second shuts, 150 − 30 + 80 − 30 = 170", [true, 30], [false, 30], 0, "min-height: 184px; --spare: 14px"],
+        ["the first opening alone, 150 − 30 + 80 = 200", [true, 30], [false, 0], 0, "min-height: 248px; --spare: 24px"],
+        ["the first shutting alone, 150 − 30 = 120", [false, 30], [false, 0], 0, "min-height: 120px"],
+        ["the first opening as the second shuts, 150 − 30 + 80 − 30 = 170", [true, 30], [false, 30], 0, "min-height: 184px; --spare: 7px"],
         [
             "the first shutting as the second opens, 150 − 30 − 30 + 50 = 140",
             [false, 30],
             [true, 30],
             0,
-            "min-height: 184px; --spare: 44px",
+            "min-height: 184px; --spare: 22px",
         ],
-        ["both shutting at once, 150 − 30 − 30 = 90", [false, 30], [false, 30], 0, "min-height: 120px; --spare: 30px"],
-        ["the first open at rest and the second shut, 150", [true, 80], [false, 0], 0, "min-height: 184px; --spare: 34px"],
+        ["both shutting at once, 150 − 30 − 30 = 90", [false, 30], [false, 30], 0, "min-height: 120px; --spare: 15px"],
+        ["the first open at rest and the second shut, 150", [true, 80], [false, 0], 0, "min-height: 184px; --spare: 17px"],
         [
             "the first opening as the spare room is drawn at 20, 150 − 20 − 30 + 80 = 180",
             [true, 30],
             [false, 0],
             20,
-            "min-height: 184px; --spare: 4px",
+            "min-height: 184px; --spare: 2px",
         ],
     ])("counts each row at the end of its slide with %s", async (_name, first, second, spare, expected) => {
         const element = await card({}, "grid");
@@ -170,15 +171,32 @@ describe("filling the rows of a sections view", () => {
 
     // 500 px rounded down to the rows is 440.
     it.each([
-        ["under it, on the rows its content needs", 139, "max-height: 440px; min-height: 184px; --spare: 34px"],
-        ["over it, on the limit rounded down to the rows", 600, "max-height: 440px; min-height: 440px; --spare: 0px"],
+        ["under it, on the rows its content needs", 139, "max-height: 440px; min-height: 184px; --spare: 17px"],
+        ["over it, on the limit rounded down to the rows", 600, "max-height: 440px; min-height: 440px"],
     ])("grows up to a limit on automatic rows %s", async (_name, end, expected) => {
         expect(await filled(await card({ max_height: 500 }, "grid"), end)).toBe(expected);
     });
 
+    // Held to 300 px, the room left over is spread as on filled rows while it is less than a row, and otherwise left under
+    // the content. The rows scrolled down by 100 px end 100 px lower than drawn.
+    it.each<[string, Record<string, unknown>, number, number, string]>([
+        ["a little room under the title", { title: "Varoitukset" }, 260, 0, "height: 300px; --spare: 29px"],
+        ["a little room around the content without a title", {}, 260, 0, "height: 300px; --spare: 14px"],
+        ["a row or more under the content", { title: "Varoitukset" }, 200, 0, "height: 300px"],
+        ["nothing for scrolled rows longer than the card", { title: "Varoitukset" }, 280, 100, "height: 300px"],
+    ])("held to a height, spreads %s", async (_name, config, end, scrolled, expected) => {
+        const element = await card({ ...config, height: 300 }, "grid");
+        laidOut(element, end);
+        box(one(element, "ha-card"), 0, 300);
+        Object.defineProperty(one(element, ".body"), "scrollTop", { value: scrolled, configurable: true });
+        (element as unknown as { fillRows(): void }).fillRows();
+        await element.updateComplete;
+        expect(style(element)).toBe(expected);
+    });
+
     it("lets go of the rows it filled once held to a height, and doesn't bring them back before it is measured again", async () => {
         const element = await card({}, "grid");
-        expect(await filled(element, 139)).toBe("min-height: 184px; --spare: 34px");
+        expect(await filled(element, 139)).toBe("min-height: 184px; --spare: 17px");
         element.setConfig({ type: "custom:fmi-warnings-card", entity: ENTITY, height: 300 } as never);
         await element.updateComplete;
         expect(await filled(element, 139)).toBe("height: 300px");
