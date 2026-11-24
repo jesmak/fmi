@@ -1,3 +1,4 @@
+import type { ScrollIndicatorConfig } from "./fade";
 import type { LovelaceCardConfig } from "./hass";
 import type { RowStepConfig } from "./rows";
 
@@ -21,7 +22,7 @@ export interface Warning {
     parameters?: Record<string, unknown>;
 }
 
-export interface FmiWarningsCardConfig extends LovelaceCardConfig, RowStepConfig {
+export interface FmiWarningsCardConfig extends LovelaceCardConfig, RowStepConfig, ScrollIndicatorConfig {
     entity: string;
     title?: string;
     show_timeline?: boolean;

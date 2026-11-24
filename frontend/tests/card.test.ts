@@ -544,7 +544,7 @@ describe("fmi-warnings-card", () => {
     });
 });
 
-describe("the editor's rounding", () => {
+describe("the editor's rounding and scroll indicator", () => {
     type Form = HTMLElement & { data: Record<string, unknown>; schema: Array<{ name: string }> };
 
     async function editor(config: Record<string, unknown>): Promise<{ form: Form; saved: unknown[] }> {
@@ -558,10 +558,10 @@ describe("the editor's rounding", () => {
         return { form: element.shadowRoot!.querySelector<Form>("ha-form")!, saved };
     }
 
-    it("is offered last while the card fits its content, the height mode being set in YAML only, and only half rows are saved", async () => {
+    it("offers the rounding before the scroll indicator while the card fits its content, the height mode being set in YAML only, and only half rows are saved", async () => {
         const { form, saved } = await editor({});
         const names = form.schema.map((entry) => entry.name);
-        expect(names.at(-1)).toBe("row_step");
+        expect(names.slice(-2)).toEqual(["row_step", "scroll_indicator"]);
         expect(names.filter((name) => name.includes("height"))).toEqual([]);
         expect(form.data).toMatchObject({ row_step: "full" });
         for (const row_step of ["half", "full"]) {
@@ -573,18 +573,30 @@ describe("the editor's rounding", () => {
         ]);
     });
 
-    it("is offered for a card that grows up to a limit, which keeps its limit", async () => {
+    it("offers the rounding for a card that grows up to a limit, which keeps its limit", async () => {
         const { form, saved } = await editor({ max_height: 400 });
         expect(form.schema.map((entry) => entry.name)).toContain("row_step");
         form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, row_step: "half" } } }));
         expect(saved).toEqual([{ type: "custom:fmi-warnings-card", entity: ENTITY, max_height: 400, row_step: "half" }]);
     });
 
-    it("is neither offered nor saved for a card held to a height", async () => {
+    it("neither offers nor saves the rounding for a card held to a height", async () => {
         const { form, saved } = await editor({ height: 300 });
         expect(form.schema.map((entry) => entry.name)).not.toContain("row_step");
         form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, row_step: "half" } } }));
         expect(saved).toEqual([{ type: "custom:fmi-warnings-card", entity: ENTITY, height: 300 }]);
+    });
+
+    it("leaves the default scroll indicator out of the configuration, and keeps another", async () => {
+        const { form, saved } = await editor({});
+        expect(form.data).toMatchObject({ scroll_indicator: "both" });
+        for (const scroll_indicator of ["fade", "both"]) {
+            form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { ...form.data, scroll_indicator } } }));
+        }
+        expect(saved).toEqual([
+            { type: "custom:fmi-warnings-card", entity: ENTITY, scroll_indicator: "fade" },
+            { type: "custom:fmi-warnings-card", entity: ENTITY },
+        ]);
     });
 });
 
